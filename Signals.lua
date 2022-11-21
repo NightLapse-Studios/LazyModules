@@ -161,8 +161,7 @@ local EventWrapper = {
 local mt_EventBuilder = { __index = EventBuilder }
 local mt_EventWrapper = { __index = EventWrapper }
 
--- Makes a wrapper for events which uses a verb->noun abstraction idea rather than module->something-happened
--- Client and Server have slightly different wrappers
+
 function mod:NewEvent(identifier)
 	unwrap_or_error(
 		Events.Identifiers[identifier] == nil,
@@ -210,6 +209,15 @@ function mod:GetEvent(module, identifier)
 end
 
 
+
+--[[
+	Transmitters:
+
+	Transmitters are a fire-and-forget event that clients and servers can send to eachother, just like normal remotes.
+		Transmitters can be used to send data to all clients but you really shouldn't >:^|
+		Broadcasters are there for that reason and these abstractions are valuable for code quality and visibility more
+		than anything else
+]]
 
 
 -- We'll link ids to their mods and mods to their ids so that they can be requested by ids alone
@@ -294,10 +302,8 @@ local function basic_transmitter(identifier: string)
 	end
 
 	return transmitter
-end
+end	
 
--- Makes a wrapper for events which uses a verb->noun abstraction idea rather than module->something-happened
--- Client and Server have slightly different wrappers
 function mod:NewTransmitter(identifier: string)
 	local transmitter = basic_transmitter(identifier)
 
@@ -332,6 +338,20 @@ end
 
 
 
+--[[
+	Broadcasters:
+
+	Broadcasters bring fire-and-forget to cross-client events.
+	When the client does something (that the server must typically validate) which will affect other clients,
+		the Broadcaster pattern allows you to call `Broadcast` on the server and client. The client behavior will just
+		fire server, but the server behavrio will replicate to all clients except for the one supplied in the first argument
+		(same as typical RemoteEvents)
+
+	Single-file networking design is much easier given the accompanying Builder functions which can each be used on
+		client and server.
+
+	Search `NewBroadcaster` for example patterns in other modules
+]]
 
 local Broadcasters = {
 	Identifiers = { },
@@ -440,6 +460,7 @@ end
 
 
 
+-- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
 function mod:__finalize(G)
 --[[ 	while AnyEventIsWaiting == true do
 		task.wait()
