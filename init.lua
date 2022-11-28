@@ -35,9 +35,9 @@
 `__no_preload`:
 	FLAG, boolean?
 
-	__no_preload modules may depend on pre-loaded modules but pre-loaded modules will still be initialized in the same
-		phase as all others. __no_preload modules need to be manually loaded at a special time
-		(I don't know of other use cases than to define a custom load step for getting server data)
+__no_preload modules may depend on pre-loaded modules but pre-loaded modules will still be initialized in the same
+	phase as all others. __no_preload modules need to be manually loaded at a special time
+	(I don't know of other use cases than to define a custom load step for getting server data)
 
 `__build_signals`:(G, B):
 	FUNCTION, selfcall?
@@ -338,7 +338,6 @@ function mod.Init(G)
 
 		while not (G.LoadedFlags.PlayerStats and G.LoadedFlags.Settings)
 		do
-			print(G.LoadedFlags.PlayerStats, G.LoadedFlags.Settings)
 			task.wait()
 		end
 	end

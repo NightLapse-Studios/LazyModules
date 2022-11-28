@@ -40,6 +40,8 @@ local Verbs = mod.Verbs
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local IsServer = game:GetService("RunService"):IsServer()
 
+local AnyEventIsWaiting = false
+
 local Players = game.Players
 local ServerScriptService, ReplicatedStorage = game.ServerScriptService, game.ReplicatedStorage
 
@@ -99,30 +101,7 @@ function mod:NewGenericSignal(verb, noun)
 	return sig
 end
 
-local AnyEventIsWaiting = false
 
-local function wait_for_signal(verb, noun, func)
-	while mod.Verbs[verb] == nil do task.wait() end
-	local t = mod.Verbs[verb]
-	while t[noun] == nil do task.wait() end
-	t[noun]:Hook(func)
-end
-
-function mod:HookGenericSignal(verb, noun, func)
-	unwrap_or_error(
-		Globals.LOADING_CONTEXT == Globals.LazyModules.CONTEXTS.SIGNAL_BUILDING,
-		"Can only hook Signals during the signal building startup phase"
-	)
-
-	AnyEventIsWaiting = true
-
-	local co = coroutine.create(wait_for_signal)
-	local _, signal = coroutine.resume(co, verb, noun, func)
-
-	AnyEventIsWaiting = false
-
-	return signal
-end
 
 
 --[[
@@ -194,19 +173,6 @@ function mod:NewEvent(identifier)
 	return event
 end
 
-local function wait_for_event(module, identifier)
-	while Events[module] == nil do task.wait() end
-	local t = Events[module]
-	while t[identifier] == nil do task.wait() end
-end
-
-function mod:GetEvent(module, identifier)
-	AnyEventIsWaiting = true
-	local co = coroutine.create(wait_for_event)
-	local _, event = coroutine.resume(co, module, identifier)
-	AnyEventIsWaiting = false
-	return event
-end
 
 
 
@@ -218,7 +184,6 @@ end
 		Broadcasters are there for that reason and these abstractions are valuable for code quality and visibility more
 		than anything else
 ]]
-
 
 -- We'll link ids to their mods and mods to their ids so that they can be requested by ids alone
 local Transmitters = {
@@ -318,20 +283,6 @@ function mod:NewTransmitter(identifier: string)
 	Transmitters.Identifiers[identifier] = mod.CurrentModule
 	Modules[mod.CurrentModule][identifier] = transmitter
 
-	return transmitter
-end
-
-local function wait_for_transmitter(module, identifier)
-	while Transmitters[module] == nil do task.wait() end
-	local t = Transmitters[module]
-	while t[identifier] == nil do task.wait() end
-end
-
-function mod:GetTransmitter(module, identifier)
-	AnyEventIsWaiting = true
-	local co = coroutine.create(wait_for_transmitter)
-	local _, transmitter = coroutine.resume(co, module, identifier)
-	AnyEventIsWaiting = false
 	return transmitter
 end
 
@@ -444,10 +395,42 @@ function mod:NewBroadcaster(identifier: string)
 	return broadcaster
 end
 
+
+
+
+local function wait_for_event(module, identifier)
+	while Events[module] == nil do task.wait() end
+	local t = Events[module]
+	while t[identifier] == nil do task.wait() end
+end
+
+local function wait_for_transmitter(module, identifier)
+	while Transmitters[module] == nil do task.wait() end
+	local t = Transmitters[module]
+	while t[identifier] == nil do task.wait() end
+end
+
 local function wait_for_broadcaster(module, identifier)
 	while Broadcasters[module] == nil do task.wait() end
 	local t = Broadcasters[module]
 	while t[identifier] == nil do task.wait() end
+end
+
+
+function mod:GetEvent(module, identifier)
+	AnyEventIsWaiting = true
+	local co = coroutine.create(wait_for_event)
+	local _, event = coroutine.resume(co, module, identifier)
+	AnyEventIsWaiting = false
+	return event
+end
+
+function mod:GetTransmitter(module, identifier)
+	AnyEventIsWaiting = true
+	local co = coroutine.create(wait_for_transmitter)
+	local _, transmitter = coroutine.resume(co, module, identifier)
+	AnyEventIsWaiting = false
+	return transmitter
 end
 
 function mod:GetBroadcaster(module, identifier)
@@ -458,13 +441,62 @@ function mod:GetBroadcaster(module, identifier)
 	return broadcaster
 end
 
+local function wait_for_signal(verb, noun, func)
+	while mod.Verbs[verb] == nil do task.wait() end
+	local t = mod.Verbs[verb]
+	while t[noun] == nil do task.wait() end
+	t[noun]:Hook(func)
+end
 
+function mod:HookGenericSignal(verb, noun, func)
+	unwrap_or_error(
+		Globals.LOADING_CONTEXT == Globals.LazyModules.CONTEXTS.SIGNAL_BUILDING,
+		"Can only hook Signals during the signal building startup phase"
+	)
+
+	AnyEventIsWaiting = true
+
+	local co = coroutine.create(wait_for_signal)
+	local _, signal = coroutine.resume(co, verb, noun, func)
+
+	AnyEventIsWaiting = false
+
+	return signal
+end
+
+function mod:Builder( module_name: string )
+	assert(module_name)
+	assert(typeof(module_name) == "string")
+	
+	mod.CurrentModule = module_name
+	
+	return mod
+end
+
+
+
+
+function mod:__init(G, LazyModules)
+	Globals = G
+	LazyModules = LazyModules
+
+	--The one true require tree
+	safe_require = require(ReplicatedFirst.Util.SafeRequire)
+	safe_require:__init(G)
+	safe_require = safe_require.require
+
+	Err = require(ReplicatedFirst.Util.Error)
+	unwrap_or_warn = Err.unwrap_or_warn
+	unwrap_or_error = Err.unwrap_or_error
+
+	LazyString = require(ReplicatedFirst.Util.LazyString)
+end
 
 -- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
 function mod:__finalize(G)
---[[ 	while AnyEventIsWaiting == true do
+	while AnyEventIsWaiting == true do
 		task.wait()
-	end ]]
+	end
 
 	for module, identifers in Transmitters.Modules do
 		for ident, transmitter in identifers do
@@ -540,34 +572,6 @@ function mod:__finalize(G)
 			setmetatable(event, mt_EventWrapper)
 		end
 	end
-end
-
-
-
-
-function mod:Builder( module_name: string )
-	assert(module_name)
-	assert(typeof(module_name) == "string")
-
-	mod.CurrentModule = module_name
-
-	return mod
-end
-
-function mod:__init(G, LazyModules)
-	Globals = G
-	LazyModules = LazyModules
-
-	--The one true require tree
-	safe_require = require(ReplicatedFirst.Util.SafeRequire)
-	safe_require:__init(G)
-	safe_require = safe_require.require
-
-	Err = require(ReplicatedFirst.Util.Error)
-	unwrap_or_warn = Err.unwrap_or_warn
-	unwrap_or_error = Err.unwrap_or_error
-
-	LazyString = require(ReplicatedFirst.Util.LazyString)
 end
 
 return mod
