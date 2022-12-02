@@ -99,14 +99,6 @@ local function indent()
 	return _indent
 end
 
---[[
-	Contexts provide a way for scripts to know when they're being executed
-]]
-local function process_context(prior, next)
-
-	return prior, next
-end
-
 -- Determine for our scripts if they are initializing or not
 local function set_context(context: number)
 	local prior = Globals.LOADING_CONTEXT
@@ -316,7 +308,7 @@ end
 
 	These modules can be a problem if their parent scripts have no idea that the it might not be ready to do everything
 ]]
-function mod.Init(G)
+function mod.Begin(G)
 	G.LOADING_CONTEXT = mod.CONTEXTS.LOAD_INIT
 
 	try_init(G.Main, "Main")
