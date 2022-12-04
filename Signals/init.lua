@@ -23,19 +23,17 @@ Valid usage:
 	Signals are not usable during the signal building phase
 ]]
 local mod = {
-	Verbs = { },
 	Nouns = { },
 }
 
 local Globals
 local LazyModules
 local LazyString
+local PSA
 local Err
 local unwrap_or_warn
 local unwrap_or_error
 local safe_require
-
-local Verbs = mod.Verbs
 
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local IsServer = game:GetService("RunService"):IsServer()
@@ -60,65 +58,91 @@ local Broadcasters
 local GameEvents
 local Events
 
+local WaitingList
 
 
-local function wait_for_event(module, identifier)
-	while Events[module] == nil do task.wait() end
-	local t = Events[module]
-	while t[identifier] == nil do task.wait() end
+local function wait_for_event(identifier, cb)
+	local module = mod.CurrentModule
+	local idx = WaitingList:insert("Event: " .. module .. " " .. identifier)
+
+	while Events.Identifiers[identifier] == nil do task.wait() end
+	WaitingList:remove(idx)
+
+	if cb then
+		cb(Events.Identifiers[identifier])
+	end
 end
 
-local function wait_for_gameevent(module, identifier)
-	while GameEvents[module] == nil do task.wait() end
-	local t = GameEvents[module]
-	while t[identifier] == nil do task.wait() end
+local function wait_for_gameevent(verb, noun, cb)
+	local idx = WaitingList:insert("GameEvent: " .. verb .. " " .. noun)
+	while GameEvents.Verbs[verb] == nil do task.wait() end
+	local t = GameEvents.Verbs[verb]
+
+	while t[noun] == nil do task.wait() end
+	WaitingList:remove(idx)
+
+	if cb then
+		cb(t[noun])
+	end
 end
 
-local function wait_for_transmitter(module, identifier)
-	while Transmitters[module] == nil do task.wait() end
-	local t = Transmitters[module]
-	while t[identifier] == nil do task.wait() end
+local function wait_for_transmitter(identifier, cb)
+	local module = mod.CurrentModule
+	local idx = WaitingList:insert("Transmitter: " .. module .. " " .. identifier)
+
+	while Transmitters.Identifiers[identifier] == nil do task.wait() end
+	WaitingList:remove(idx)
+
+	if cb then
+		cb(Transmitters.Identifiers[identifier])
+	end
 end
 
-local function wait_for_broadcaster(module, identifier)
-	while Broadcasters[module] == nil do task.wait() end
-	local t = Broadcasters[module]
-	while t[identifier] == nil do task.wait() end
+local function wait_for_broadcaster(identifier, cb)
+	local module = mod.CurrentModule
+	local idx = WaitingList:insert("Broadcaster: " .. module .. " " .. identifier)
+
+	while Broadcasters.Identifiers[identifier] == nil do task.wait() end
+	WaitingList:remove(idx)
+
+	if cb then
+		cb(Broadcasters.Identifiers[identifier])
+	end
 end
 
 
 
 
-function mod:GetEvent(module, identifier)
-	AnyEventIsWaiting = true
+function mod:GetEvent(identifier, cb, force_context: string?)
+	if force_context and force_context ~= Globals.CONTEXT then
+		return
+	end
 	local co = coroutine.create(wait_for_event)
-	local _, event = coroutine.resume(co, module, identifier)
-	AnyEventIsWaiting = false
-	return event
+	local _, _ = coroutine.resume(co, identifier, cb)
 end
 
-function mod:NewGameEvent(module, identifier)
-	AnyEventIsWaiting = true
+function mod:GetGameEvent(verb, noun, cb, force_context: string)
+	if force_context and force_context ~= Globals.CONTEXT then
+		return
+	end
 	local co = coroutine.create(wait_for_gameevent)
-	local _, event = coroutine.resume(co, module, identifier)
-	AnyEventIsWaiting = false
-	return event
+	local _, _ = coroutine.resume(co, verb, noun, cb)
 end
 
-function mod:GetTransmitter(module, identifier)
-	AnyEventIsWaiting = true
+function mod:GetTransmitter(identifier, cb, force_context: string)
+	if force_context and force_context ~= Globals.CONTEXT then
+		return
+	end
 	local co = coroutine.create(wait_for_transmitter)
-	local _, transmitter = coroutine.resume(co, module, identifier)
-	AnyEventIsWaiting = false
-	return transmitter
+	local _, _ = coroutine.resume(co, identifier, cb)
 end
 
-function mod:GetBroadcaster(module, identifier)
-	AnyEventIsWaiting = true
+function mod:GetBroadcaster(identifier, cb, force_context: string)
+	if force_context and force_context ~= Globals.CONTEXT then
+		return
+	end
 	local co = coroutine.create(wait_for_broadcaster)
-	local _, broadcaster = coroutine.resume(co, module, identifier)
-	AnyEventIsWaiting = false
-	return broadcaster
+	local _, _ = coroutine.resume(co, identifier, cb)
 end
 
 
@@ -149,6 +173,9 @@ function mod:__init(G, LazyModules)
 	safe_require = require(ReplicatedFirst.Util.SafeRequire)
 	safe_require:__init(G)
 	safe_require = safe_require.require
+
+	PSA = require(ReplicatedFirst.Modules.PackedSparseArray)
+	WaitingList = PSA.new()
 
 	Err = require(ReplicatedFirst.Util.Error)
 	unwrap_or_warn = Err.unwrap_or_warn
@@ -188,7 +215,14 @@ end
 
 -- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
 function mod:__finalize(G)
-	while AnyEventIsWaiting == true do
+	local wait_dur = 0
+	while WaitingList:is_empty() == false do
+		wait_dur += 1
+		unwrap_or_error(
+			wait_dur < 32,
+			"Took too long to resolve signals (should usually be 1 tick)\nContents:\n" .. WaitingList:dump()
+		)
+
 		task.wait()
 	end
 
@@ -216,13 +250,15 @@ function mod:__finalize(G)
 		for ident, broadcaster in identifers do
 			local transmitter_str = "Broadcaster `" .. module .. "::" .. ident .. "` "
 
+			broadcaster:Build()
+
 			if CONTEXT == "Client" then
 --[[ 				unwrap_or_error(
 					broadcaster.__ClientConnection ~= false,
 					transmitter_str .. "is not configured on the client"
 				) ]]
-				if self.__ClientConnection then
-					broadcaster[1].OnClientEvent:Connect(self.__ClientConnection)
+				if broadcaster.__ClientConnection then
+					broadcaster[1].OnClientEvent:Connect(broadcaster.__ClientConnection)
 				end
 
 				setmetatable(broadcaster, mt_ClientBroadcaster)
@@ -239,16 +275,6 @@ function mod:__finalize(G)
 					broadcaster.__ServerConnection ~= false,
 					transmitter_str .. "needs a config call to Builder:ServerConnection(func)"
 				) ]]
-				if broadcaster.__ShouldAccept then
-					broadcaster[1].OnServerEvent:Connect(function(plr, ...)
-						local should_accept = broadcaster.__ShouldAccept(plr, ...)
-						if not should_accept then return end
-
-						broadcaster.__ServerConnection(plr, ...)
-					end)
-				elseif broadcaster.__ServerConnection then
-					broadcaster[1].OnServerEvent:Connect(broadcaster.__ServerConnection)
-				end
 
 				setmetatable(broadcaster, mt_ServerBroadcaster)
 			end
@@ -257,41 +283,22 @@ function mod:__finalize(G)
 
 	for module, identifers in GameEvents.Modules do
 		for ident, event in identifers do
-			local transmitter_str = "Broadcaster `" .. module .. "::" .. ident .. "` "
+			local transmitter_str = "GameEvent `" .. module .. "::" .. ident .. "` "
+
+			event:Build()
 
 			if CONTEXT == "Client" then
---[[ 				unwrap_or_error(
-					broadcaster.__ClientConnection ~= false,
-					transmitter_str .. "is not configured on the client"
-				) ]]
-				if self.__ClientConnection then
-					event[1].OnClientEvent:Connect(self.__ClientConnection)
-				end
-
 				setmetatable(event, mt_ClientGameEvent)
 			elseif CONTEXT == "Server" then
-				unwrap_or_warn(
-					event.__ShouldAccept ~= false,
-					transmitter_str .. "needs a config call to Builder:ShouldAccept(func)"
-				)
-				unwrap_or_error(
-					typeof(event.__ShouldAccept) == "function" and typeof(event.__ServerConnection) == "function",
-					transmitter_str .. "passed value is not a function"
-				)
---[[ 				unwrap_or_error(
-					broadcaster.__ServerConnection ~= false,
-					transmitter_str .. "needs a config call to Builder:ServerConnection(func)"
-				) ]]
-				if event.__ShouldAccept then
-					event[1].OnServerEvent:Connect(function(plr, ...)
-						local should_accept = event.__ShouldAccept(plr, ...)
-						if not should_accept then return end
-
-						event.__ServerConnection(plr, ...)
-						event:Fire(plr)
-					end)
-				elseif event.__ServerConnection then
-					event[1].OnServerEvent:Connect(event.__ServerConnection)
+				if event.__ServerConnection then
+					unwrap_or_warn(
+						event.__ShouldAccept ~= false,
+						transmitter_str .. "needs a config call to Builder:ShouldAccept(func) (due to server connection)"
+					)
+					unwrap_or_error(
+						typeof(event.__ShouldAccept) == "function" and typeof(event.__ServerConnection) == "function",
+						transmitter_str .. "passed value is not a function"
+					)
 				end
 
 				setmetatable(event, mt_ServerGameEvent)

@@ -77,7 +77,7 @@ local BroadcastBuilder = {
 					self.__ServerConnection(plr, ...)
 				end
 			end)
-		else
+		elseif self.__ClientConnection then
 			self[1].OnClientEvent:Connect(self.__ClientConnection)
 		end
 	end

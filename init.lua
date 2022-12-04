@@ -81,7 +81,7 @@ local LOAD_CONTEXTS = mod.CONTEXTS
 
 local depth = 0
 
-local INIT_CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
+local CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 
 local Globals
 local Signals
@@ -110,7 +110,7 @@ local function set_context(context: number)
 	if context == LOAD_CONTEXTS.LOAD_INIT then
 		unwrap_or_error(
 			prior >= LOAD_CONTEXTS.LOAD_INIT,
-			"\n" .. INIT_CONTEXT .. " init: Module is attempting to load during pre-loading",
+			"\n" .. CONTEXT .. " init: Module is attempting to load during pre-loading",
 			"Hint: if LazyModules executes an `__init` function, then it must be caused by another module's `__init` function\nExcept for the first module in the init tree"
 	   )
 	end
@@ -137,7 +137,7 @@ local function format_load_err(name)
 		_script = _script.Parent
 	end
 
-	ret = "\n" .. INIT_CONTEXT .. " init: Module `" .. name .. "` isn't in the `Game` object\n" ..
+	ret = "\n" .. CONTEXT .. " init: Module `" .. name .. "` isn't in the `Game` object\n" ..
 	"\nSuggested fix:\nGlobals." .. name .. " = LazyModules.PreLoad(game." .. ret .. ")"
 
 	return ret
@@ -217,7 +217,7 @@ function mod.__raw_load(script: Instance, name: string): any
 	local module = safe_require(script)
 	module = unwrap_or_warn(
 		module,
-		"\n" .. INIT_CONTEXT .. " init: Path to `" .. script.Name .. "` not found during PreLoad",
+		"\n" .. CONTEXT .. " init: Path to `" .. script.Name .. "` not found during PreLoad",
 		"\nRequired from:\n" .. debug.traceback(nil, 2)
 	)
 
@@ -285,6 +285,17 @@ function mod.Load(script: (string | Instance)): any?
 	return module
 end
 
+function mod.LightLoad(script: Instance): any?
+	local module
+
+	-- A script has been passed in
+	module = mod.__raw_load(script, script.Name)
+
+	try_init(module, script.Name)
+
+	return module
+end
+
 --TODO: This is an incomplete interface
 -- Feels that the needs of the codebase need to develop around it more before we make more design decisions here
 local IsServer = game:GetService("RunService"):IsServer()
@@ -318,8 +329,7 @@ function mod.Begin(G)
 
 		local did_init = Initialized[i]
 		if did_init == false then
-			warn("Dangling module init: " .. i)
-			init_wrapper(v, i)
+			try_init(v, i, " DANGLING!!!")
 		end
 	end
 
@@ -347,6 +357,17 @@ function mod.Begin(G)
 
 	set_context(LOAD_CONTEXTS.FINISHED)
 end
+
+
+
+mod.API_Values = {
+	LightLoad = mod.LightLoad,
+	Load = mod.Load,
+	Hook = mod.Hook,
+	PreLoad = mod.PreLoad,
+	LazyModules = mod,
+	CONTEXT = CONTEXT
+}
 
 function mod:__init(G)
 	Globals = G

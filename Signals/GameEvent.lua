@@ -9,6 +9,8 @@ local mod = {
 	}
 }
 
+local Verbs = mod.GameEvents.Verbs
+
 local GameEvents = mod.GameEvents
 
 local mt = { __index = mod }
@@ -40,13 +42,10 @@ local GameEventBuilder = {
 	ClientConnection = function(self, func: CGameEventConnection)
 		if not func then return self end
 		if IsServer then return self end
-		unwrap_or_error(
-			self.Configured.Client == false,
-			"Cannot have multiple recievers of a transmission object"
-		)
 
 		self.Configured.Client = true
-		self[1].OnClientEvent:Connect(func)
+		self.Connections += 1
+		self[2].Event:Connect(func)
 
 		return self
 	end,
@@ -54,13 +53,10 @@ local GameEventBuilder = {
 	ServerConnection = function(self, func: SGameEventConnection)
 		if not func then return self end
 		if not IsServer then return self end
-		unwrap_or_error(
-			self.Configured.Server == false,
-			"Cannot have multiple recievers of a transmission object"
-		)
 
 		self.Configured.Server = true
-		self[1].OnServerEvent:Connect(func)
+		self.Connections += 1
+		self[2].Event:Connect(func)
 
 		return self
 	end,
@@ -68,45 +64,66 @@ local GameEventBuilder = {
 	ShouldAccept = function(self, func)
 		unwrap_or_error(
 			typeof(func) == "function",
-			"Missing func for Broadcaster"
+			"Missing func for GameEvent"
 		)
 
 		self.__ShouldAccept = func
 		return self
 	end,
+
+	Build = function(self)
+		if IsServer then
+			self[1].OnServerEvent:Connect(function(plr, v: Verb, n: Noun)
+				local should_accept = self.__ShouldAccept(plr, v, n)
+
+				if should_accept then
+					--Note that this accesses the wrapper function below, as we do not index to the bindable event
+					self:Fire(plr, v, n)
+				end
+			end)
+		else
+			self[1].OnClientEvent:Connect(
+				function(plr, v: Verb, n: Noun)
+					self[2]:Fire(plr, v, n)
+				end
+			)
+		end
+	end
 }
 local ClientGameEvent = {
 	Fire = function(self)
+		print("FIRED " .. Globals.CONTEXT )
+		--Note that this doesn't use the bindable events, those only happen in respons to a server firing a GE
+		--Only server GEs can be valid
 		self[1]:FireServer(self.Verb, self.Noun)
 	end,
 }
 local ServerGameEvent = {
 	Fire = function(self, actor: Player)
 		assert(actor)
+		print("FIRED " .. Globals.CONTEXT )
 
 		actor = actor.UserId
 		local v: Verb, n: Noun = self.Verb, self.Noun
 
-		for _, plr in pairs(Players:GetPlayers()) do
-			self[1]:FireClient(plr, actor, v, n)
-		end
+		self[1]:FireAllClients(actor, v, n)
+		self[2]:Fire(actor)
 	end,
 }
 
 local mt_GameEventBuilder = { __index = GameEventBuilder}
-GameEvents.client_mt = { __index = ClientGameEvent }
-GameEvents.server_mt = { __index = ServerGameEvent }
+mod.client_mt = { __index = ClientGameEvent }
+mod.server_mt = { __index = ServerGameEvent }
 
-local Verbs = { }
 function mod.NewGameEvent(self: Builder, verb: Verb, noun: Noun)
 	local id = verb .. noun
 
 	local event = remote_wrapper(id, mt_GameEventBuilder)
+	event[2] = Instance.new("BindableEvent")
+	event.Connections = 0
 	event.Verb = verb
 	event.Noun = noun
 	event.__ShouldAccept = false
-	event.__ServerConnection = false
-	event.__ClientConnection = false
 
 	local _mod = GameEvents.Identifiers[id]
 	unwrap_or_error(
