@@ -29,12 +29,12 @@ local function NewTest(self, name, test_func)
 
 	test_func(mod)
 	if HasFailures then
-		print("\t\t❌" .. TestName)
+		print("\t❌" .. TestName)
 		for i, v in Outputs do
 			print(Outputs[i])
 		end
 	else
-		print("\t\t✅" .. TestName)
+		print("\t✅" .. TestName)
 	end
 
 	--revert state
@@ -49,13 +49,24 @@ local function NewSituation(self, description: string?, ...)
 	Situation = description or ""
 	local conditions = { ... }
 
-	local failures, failed = "", 0
+	assert(#conditions % 2 == 0,
+		"Conditions must be a value, expectation pair. All values must have a corresponding expectation, even if `nil`"
+	)
 
-	for i = 1, #conditions, 1 do
-		if conditions[i] ~= true then
+	local num_conditions = #conditions / 2
+
+	local failures, failed = "", 0
+	local fail_reasons = ""
+
+	for i = 1, #conditions, 2 do
+		local actual, expected = conditions[i], conditions[i + 1]
+
+		if actual ~= expected then
 			local sep = if failed == 0 then "" else ", "			
 
-			failures = failures .. sep .. tostring(i)
+			local cond = tostring((i + 1) / 2)
+			failures = failures .. sep .. cond
+			fail_reasons = fail_reasons .. "\n\t\t\tCond. " .. cond .. " expects " .. tostring(expected) .. " got " .. tostring(actual)
 
 			HasFailures = true
 			failed += 1
@@ -63,10 +74,10 @@ local function NewSituation(self, description: string?, ...)
 	end
 
 	if failed > 0 then
-		table.insert(Outputs,  "\t\t\t✖ While " .. Situation)
-		table.insert(Outputs, "\t\t\t\tDue to " .. failed .. " out of " .. #conditions .. " condition(s): " .. failures)
+		table.insert(Outputs,  "\t\t✖ While " .. Situation)
+		table.insert(Outputs, "\t\t\tDue to " .. failed .. " of " .. num_conditions .. " condition(s): " .. failures .. fail_reasons)
 	else
-		table.insert(Outputs,  "\t\t\t✔ While " .. Situation)
+		table.insert(Outputs,  "\t\t✔ While " .. Situation)
 	end
 end
 
@@ -81,8 +92,8 @@ function mod:Builder( module_name: string )
 	assert(typeof(module_name) == "string")
 
 	mod.CurrentModule = module_name
-	print("Testing " .. module_name .. "")
-	print("\twhich should:")
+	print("📃" .. module_name .. " Testing:")
+	print(" It should:")
 
 	return mod
 end
@@ -98,8 +109,6 @@ function mod:__init(G)
 	Err = require(ReplicatedFirst.Util.Error)
 	unwrap_or_warn = Err.unwrap_or_warn
 	unwrap_or_error = Err.unwrap_or_error
-
-	LazyString = require(ReplicatedFirst.Util.LazyString)
 end
 
 -- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
