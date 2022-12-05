@@ -33,7 +33,11 @@ local EventBuilder = {
 	Type = "Builder",
 	Context = CONTEXT,
 
-	Connect = function(self, func)
+	Connect = function(self, func, force_context: string?)
+		if force_context and Globals.CONTEXT ~= force_context then
+			return
+		end
+ 
 		unwrap_or_error(
 			self.Connected ~= true,
 			"Attempt to Connect to an Event multiple times"

@@ -115,6 +115,7 @@ local ClientGameEvent = {
 }
 local ServerGameEvent = {
 	Fire = function(self, actor: Player)
+		--print(v, n)
 		assert(actor)
 
 		actor = actor.UserId
@@ -124,7 +125,8 @@ local ServerGameEvent = {
 		self[2]:Fire(actor)
 
 		for _, o in self.Implications do
-			o[2]:Fire(actor, v, n)
+			--print(v, o.Noun)
+			o[2]:Fire(actor, v, o.Noun)
 		end
 	end,
 }

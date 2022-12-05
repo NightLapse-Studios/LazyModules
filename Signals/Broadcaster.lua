@@ -96,12 +96,9 @@ local BroadcasterClient = {
 	end
 }
 local BroadcasterServer = {
-	Broadcast = function(self, plr, ...)
-		for i,v in pairs(Players:GetPlayers()) do
-			if plr == v then continue end
-
-			self[1]:FireClient(v, ...)
-		end
+	Broadcast = function(self, ...)
+		self[2]:Fire(...)
+		self[1]:FireAllClients(...)
 	end,
 }
 

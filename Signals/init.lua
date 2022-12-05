@@ -117,7 +117,11 @@ function mod:GetEvent(identifier, cb, force_context: string?)
 		return
 	end
 	local co = coroutine.create(wait_for_event)
-	local _, _ = coroutine.resume(co, identifier, cb)
+	local succ, ret = coroutine.resume(co, identifier, cb)
+	unwrap_or_error(
+		succ == true,
+		LazyString.new("\nError waiting for Signal:\n", ret)
+	)
 end
 
 function mod:GetGameEvent(verb, noun, cb, force_context: string)
@@ -125,7 +129,11 @@ function mod:GetGameEvent(verb, noun, cb, force_context: string)
 		return
 	end
 	local co = coroutine.create(wait_for_gameevent)
-	local _, _ = coroutine.resume(co, verb, noun, cb)
+	local succ, ret = coroutine.resume(co, verb, noun, cb)
+	unwrap_or_error(
+		succ == true,
+		LazyString.new("\nError waiting for Signal:\n", ret)
+	)
 end
 
 function mod:GetTransmitter(identifier, cb, force_context: string)
@@ -133,7 +141,11 @@ function mod:GetTransmitter(identifier, cb, force_context: string)
 		return
 	end
 	local co = coroutine.create(wait_for_transmitter)
-	local _, _ = coroutine.resume(co, identifier, cb)
+	local succ, ret = coroutine.resume(co, identifier, cb)
+	unwrap_or_error(
+		succ == true,
+		LazyString.new("\nError waiting for Signal:\n", ret)
+	)
 end
 
 function mod:GetBroadcaster(identifier, cb, force_context: string)
@@ -141,7 +153,11 @@ function mod:GetBroadcaster(identifier, cb, force_context: string)
 		return
 	end
 	local co = coroutine.create(wait_for_broadcaster)
-	local _, _ = coroutine.resume(co, identifier, cb)
+	local succ, ret = coroutine.resume(co, identifier, cb)
+	unwrap_or_error(
+		succ == true,
+		LazyString.new("\nError waiting for Signal:\n", ret)
+	)
 end
 
 
