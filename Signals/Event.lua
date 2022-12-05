@@ -27,7 +27,7 @@ local IsServer = game:GetService("RunService"):IsServer()
 local ServerScriptService, ReplicatedStorage = game:GetService("ServerScriptService"), game.ReplicatedStorage
 
 local PlayerScripts = if IsServer then false else game.Players.LocalPlayer.PlayerScripts
-local CONTEXT = IsServer and "Server" or "Client"
+local CONTEXT = IsServer and "SERVER" or "CLIENT"
 
 local EventBuilder = {
 	Type = "Builder",

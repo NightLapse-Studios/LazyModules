@@ -43,7 +43,7 @@ local AnyEventIsWaiting = false
 local Players = game.Players
 
 local PlayerScripts = if IsServer then false else game.Players.LocalPlayer.PlayerScripts
-local CONTEXT = IsServer and "Server" or "Client"
+local CONTEXT = IsServer and "SERVER" or "CLIENT"
 
 --event abstraction modules
 local GameEvent
@@ -248,7 +248,7 @@ function mod:__finalize(G)
 		for ident, transmitter in identifers do
 			local transmitter_str = "Transmitter `" .. module .. "::" .. ident
 
-			if CONTEXT == "Client" then
+			if CONTEXT == "CLIENT" then
 --[[ 				unwrap_or_error(
 					transmitter.Configured.Client == false,
 					transmitter_str .. "` is not configured on the client"
@@ -270,9 +270,9 @@ function mod:__finalize(G)
 
 			broadcaster:Build()
 
-			if CONTEXT == "Client" then
+			if CONTEXT == "CLIENT" then
 				setmetatable(broadcaster, mt_ClientBroadcaster)
-			elseif CONTEXT == "Server" then
+			elseif CONTEXT == "SERVER" then
 				if broadcaster.Connections > 0 then
 					unwrap_or_warn(
 						broadcaster.__ShouldAccept ~= false,
@@ -305,9 +305,9 @@ function mod:__finalize(G)
 				)
 			end
 
-			if CONTEXT == "Client" then
+			if CONTEXT == "CLIENT" then
 				setmetatable(event, mt_ClientGameEvent)
-			elseif CONTEXT == "Server" then
+			elseif CONTEXT == "SERVER" then
 --[[ 				if event.Connections > 0 then
 					unwrap_or_warn(
 						event.__ShouldAccept ~= false,
@@ -322,7 +322,7 @@ function mod:__finalize(G)
 
 	for module, identifers in Events.Modules do
 		for ident, event in identifers do
-			if CONTEXT == "Client" then
+			if CONTEXT == "CLIENT" then
 				local event_str = "Event `" .. module .. "::" .. ident
 				unwrap_or_error(
 					event.Type == "Builder",
@@ -330,7 +330,7 @@ function mod:__finalize(G)
 				)
 
 				setmetatable(event, mt_ClientEvent)
-			elseif CONTEXT == "Server" then
+			elseif CONTEXT == "SERVER" then
 				local event_str = "Event `" .. module .. "::" .. ident
 				unwrap_or_error(
 					event.Type == "Builder",

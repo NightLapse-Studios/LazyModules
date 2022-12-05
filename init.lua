@@ -72,19 +72,22 @@ local mod = {
 		SIGNAL_BUILDING = 4,
 		FINALIZE = 5,
 		RUN = 6,
+		TESTING = 7,
 
 		FINISHED = 1000
 	}
 }
 
+local TESTING = false
 local LOAD_CONTEXTS = mod.CONTEXTS
+local CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 
 local depth = 0
 
-local CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 
 local Globals
 local Signals
+local Tests
 local unwrap_or_warn
 local unwrap_or_error
 local safe_require
@@ -163,6 +166,20 @@ local function signals_wrapper(module, name)
 		-- Pass the builder to the module
 		-- The module will use the builder to register its signals
 		module:__build_signals(Globals, builder)
+		reset_context(prior_context)
+	end
+end
+
+local function tests_wrapper(module, name)
+	if typeof(module) == "table" and module.__tests then
+		local prior_context = set_context(LOAD_CONTEXTS.TESTING)
+
+		-- Configure the builder for this module
+		local builder = Tests:Builder( name )
+
+		-- Pass the builder to the module
+		-- The module will use the builder to register its signals
+		module:__tests(Globals, builder)
 		reset_context(prior_context)
 	end
 end
@@ -346,6 +363,10 @@ function mod.Begin(G)
 
 	mod:__finalize(G)
 
+	if TESTING == true then
+		mod:__tests(G)
+	end
+
 	mod:__run(G)
 
 	--TODO: Clearly something about initialization is still not realized... This is a scuffed post-finalize stage
@@ -382,6 +403,10 @@ function mod:__init(G)
 	Signals:__init(G, mod)
 	mod.Signals = Signals
 
+	Tests = require(script.Tests)
+	Tests:__init(G, mod)
+	mod.Tests = Tests
+
 	local err = require(script.Parent.Error)
 	unwrap_or_warn = err.unwrap_or_warn
 	unwrap_or_error = err.unwrap_or_error
@@ -400,6 +425,20 @@ function mod:__finalize(G)
 			local s, r = pcall(function() return v.__finalize end)
 			if s and r then
 				finalize_wrapper(v, i)
+			end
+		end
+	end
+end
+
+function mod:__tests(G)
+	print("\n\t\tTESTING\nn")
+
+	for i,v in PreLoads do
+		if typeof(v == "table") then
+			--Roact managed to ruin everything
+			local s, r = pcall(function() return v.__tests end)
+			if s and r then
+				tests_wrapper(v, i)
 			end
 		end
 	end
