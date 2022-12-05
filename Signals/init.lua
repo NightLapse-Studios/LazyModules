@@ -189,7 +189,7 @@ function mod:__init(G, LazyModules)
 	safe_require:__init(G)
 	safe_require = safe_require.require
 
-	PSA = require(ReplicatedFirst.Modules.PackedSparseArray)
+	PSA = require(ReplicatedFirst.Util.SparseList)
 	WaitingList = PSA.new()
 
 	Err = require(ReplicatedFirst.Util.Error)

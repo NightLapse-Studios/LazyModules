@@ -78,7 +78,7 @@ local mod = {
 	}
 }
 
-local TESTING = false
+local TESTING = true
 local LOAD_CONTEXTS = mod.CONTEXTS
 local CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 

@@ -53,8 +53,7 @@ local function NewSituation(self, description: string?, ...)
 
 	for i = 1, #conditions, 1 do
 		if conditions[i] ~= true then
-			local sep = ", "
-			if i == 1 then sep = "" end
+			local sep = if failed == 0 then "" else ", "			
 
 			failures = failures .. sep .. tostring(i)
 
