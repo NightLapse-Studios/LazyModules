@@ -41,7 +41,6 @@ local IsServer = game:GetService("RunService"):IsServer()
 local AnyEventIsWaiting = false
 
 local Players = game.Players
-local ServerScriptService, ReplicatedStorage = game.ServerScriptService, game.ReplicatedStorage
 
 local PlayerScripts = if IsServer then false else game.Players.LocalPlayer.PlayerScripts
 local CONTEXT = IsServer and "Server" or "Client"
@@ -186,10 +185,10 @@ function mod:__init(G, LazyModules)
 	Broadcaster = require(script.Broadcaster)
 	Event = require(script.Event)
 
-	GameEvent:__init(G)
-	Transmitter:__init(G)
-	Broadcaster:__init(G)
-	Event:__init(G)
+	GameEvent:__init(G, mod)
+	Transmitter:__init(G, mod)
+	Broadcaster:__init(G, mod)
+	Event:__init(G, mod)
 
 	mt_ClientTransmitter = Transmitter.client_mt
 	mt_ServerTransmitter = Transmitter.server_mt
@@ -218,10 +217,13 @@ function mod:__finalize(G)
 	local wait_dur = 0
 	while WaitingList:is_empty() == false do
 		wait_dur += 1
-		unwrap_or_error(
-			wait_dur < 32,
-			"Took too long to resolve signals (should usually be 1 tick)\nContents:\n" .. WaitingList:dump()
+		local too_long = wait_dur > 32
+		unwrap_or_warn(
+			too_long == false,
+			"Took too long to resolve signals (should usually be 1 tick)\n\nContents:\n" .. WaitingList:dump()
 		)
+
+		if too_long then break end
 
 		task.wait()
 	end
@@ -253,28 +255,21 @@ function mod:__finalize(G)
 			broadcaster:Build()
 
 			if CONTEXT == "Client" then
---[[ 				unwrap_or_error(
-					broadcaster.__ClientConnection ~= false,
-					transmitter_str .. "is not configured on the client"
-				) ]]
-				if broadcaster.__ClientConnection then
-					broadcaster[1].OnClientEvent:Connect(broadcaster.__ClientConnection)
-				end
-
 				setmetatable(broadcaster, mt_ClientBroadcaster)
 			elseif CONTEXT == "Server" then
-				unwrap_or_warn(
-					broadcaster.__ShouldAccept ~= false,
-					transmitter_str .. "needs a config call to Builder:ShouldAccept(func)"
-				)
-				unwrap_or_error(
-					typeof(broadcaster.__ShouldAccept) == "function" and typeof(broadcaster.__ServerConnection) == "function",
-					transmitter_str .. "passed value is not a function"
-				)
---[[ 				unwrap_or_error(
-					broadcaster.__ServerConnection ~= false,
-					transmitter_str .. "needs a config call to Builder:ServerConnection(func)"
-				) ]]
+				if broadcaster.Connections > 0 then
+					unwrap_or_warn(
+						broadcaster.__ShouldAccept ~= false,
+						transmitter_str .. "has no config call to Builder:ShouldAccept(func)\nTherefore any client firing this event will be trusted!"
+					)
+
+					if broadcaster.__ShouldAccept then
+						unwrap_or_error(
+							typeof(broadcaster.__ShouldAccept) == "function",
+							transmitter_str .. "passed value is not a function"
+						)
+					end
+				end
 
 				setmetatable(broadcaster, mt_ServerBroadcaster)
 			end
@@ -287,19 +282,22 @@ function mod:__finalize(G)
 
 			event:Build()
 
+			for i,v in event.Implications do
+				unwrap_or_warn(
+					typeof(v) ~= "string",
+					LazyString.new(transmitter_str, "has unresolved implication for `", event.Verb, "`\n\n(GameEvent `", event.Verb, " ", i, "` does not exist)\n")
+				)
+			end
+
 			if CONTEXT == "Client" then
 				setmetatable(event, mt_ClientGameEvent)
 			elseif CONTEXT == "Server" then
-				if event.__ServerConnection then
+--[[ 				if event.Connections > 0 then
 					unwrap_or_warn(
 						event.__ShouldAccept ~= false,
 						transmitter_str .. "needs a config call to Builder:ShouldAccept(func) (due to server connection)"
 					)
-					unwrap_or_error(
-						typeof(event.__ShouldAccept) == "function" and typeof(event.__ServerConnection) == "function",
-						transmitter_str .. "passed value is not a function"
-					)
-				end
+				end ]]
 
 				setmetatable(event, mt_ServerGameEvent)
 			end

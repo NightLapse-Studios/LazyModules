@@ -5,7 +5,8 @@ local mod = {
 	GameEvents = {
 		Verbs = { },
 		Identifiers = { },
-		Modules = { }
+		Modules = { },
+		Implications = { }
 	}
 }
 
@@ -19,11 +20,13 @@ local mt = { __index = mod }
 
 local Globals
 local LazyString
+local Signals
 local unwrap_or_warn
 local unwrap_or_error
 local safe_require
 
 local IsServer = game:GetService("RunService"):IsServer()
+local SocialService = game:GetService("SocialService")
 
 local Players = game.Players
 
@@ -85,14 +88,26 @@ local GameEventBuilder = {
 			self[1].OnClientEvent:Connect(
 				function(plr, v: Verb, n: Noun)
 					self[2]:Fire(plr, v, n)
+
+					for _, o in self.Implications do
+						o[2]:Fire(plr, v, n)
+					end
 				end
 			)
 		end
+	end,
+
+	Implies = function(self, noun: Noun)
+		self.Implications[noun] = Signals.CurrentModule
+		Signals:GetGameEvent(self.Verb, noun, function(E)
+			self.Implications[noun] = E
+		end)
+
+		return self
 	end
 }
 local ClientGameEvent = {
 	Fire = function(self)
-		print("FIRED " .. Globals.CONTEXT )
 		--Note that this doesn't use the bindable events, those only happen in respons to a server firing a GE
 		--Only server GEs can be valid
 		self[1]:FireServer(self.Verb, self.Noun)
@@ -101,13 +116,16 @@ local ClientGameEvent = {
 local ServerGameEvent = {
 	Fire = function(self, actor: Player)
 		assert(actor)
-		print("FIRED " .. Globals.CONTEXT )
 
 		actor = actor.UserId
 		local v: Verb, n: Noun = self.Verb, self.Noun
 
 		self[1]:FireAllClients(actor, v, n)
 		self[2]:Fire(actor)
+
+		for _, o in self.Implications do
+			o[2]:Fire(actor, v, n)
+		end
 	end,
 }
 
@@ -123,6 +141,7 @@ function mod.NewGameEvent(self: Builder, verb: Verb, noun: Noun)
 	event.Connections = 0
 	event.Verb = verb
 	event.Noun = noun
+	event.Implications = { }
 	event.__ShouldAccept = false
 
 	local _mod = GameEvents.Identifiers[id]
@@ -147,7 +166,7 @@ function mod.NewGameEvent(self: Builder, verb: Verb, noun: Noun)
 	return event
 end
 
-function mod:__init(G)
+function mod:__init(G, S)
 	Globals = G
 
 	--The one true require tree
@@ -160,6 +179,8 @@ function mod:__init(G)
 	unwrap_or_error = err.unwrap_or_error
 
 	LazyString = require(game.ReplicatedFirst.Util.LazyString)
+
+	Signals = S
 end
 
 return mod

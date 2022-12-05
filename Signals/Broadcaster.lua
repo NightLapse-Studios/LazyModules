@@ -42,6 +42,28 @@ local remote_wrapper = require(script.Parent.__remote_wrapper)
 local BroadcastBuilder = {
 	Type = "Builder",
 
+	ClientConnection = function(self, func: CGameEventConnection)
+		if not func then return self end
+		if IsServer then return self end
+
+		self.Configured.Client = true
+		self.Connections += 1
+		self[2].Event:Connect(func)
+
+		return self
+	end,
+
+	ServerConnection = function(self, func: SGameEventConnection)
+		if not func then return self end
+		if not IsServer then return self end
+
+		self.Configured.Server = true
+		self.Connections += 1
+		self[2].Event:Connect(func)
+
+		return self
+	end,
+
 	ShouldAccept = function(self, func)
 		unwrap_or_error(
 			typeof(func) == "function",
@@ -51,34 +73,19 @@ local BroadcastBuilder = {
 		return self
 	end,
 
-	ServerConnection = function(self, func)
-		unwrap_or_error(
-			typeof(func) == "function",
-			"Missing func for Broadcaster"
-		)
-		self.__ServerConnection = func
-		return self
-	end,
-
-	ClientConnection = function(self, func)
-		unwrap_or_error(
-			typeof(func) == "function",
-			"Missing func for Broadcaster"
-		)
-		self.__ClientConnection = func
-	end,
-
 	Build = function(self)
 		if IsServer then
 			self[1].OnServerEvent:Connect(function(plr, ...)
 				local should_accept = self.__ShouldAccept(plr, ...)
 
 				if should_accept then
-					self.__ServerConnection(plr, ...)
+					self[2]:Fire(plr, ...)
 				end
 			end)
-		elseif self.__ClientConnection then
-			self[1].OnClientEvent:Connect(self.__ClientConnection)
+		else
+			self[1].OnClientEvent:Connect(function(plr, ...)
+				self[2]:Fire(plr, ...)
+			end)
 		end
 	end
 }
@@ -105,22 +112,22 @@ mod.server_mt = {__index = BroadcasterServer}
 -- Broadcasters use a client->server?->all-clients model
 function mod.NewBroadcaster(self: Builder, identifier: string)
 	local broadcaster = remote_wrapper(identifier, mt_BroadcastBuilder)
+	broadcaster[2] = Instance.new("BindableEvent")
+	broadcaster.Connections = 0
 	broadcaster.__ShouldAccept = false
-	broadcaster.__ServerConnection = false
-	broadcaster.__ClientConnection = false
 	setmetatable(broadcaster, mt_BroadcastBuilder)
 
 	Broadcasters[self.CurrentModule] = Broadcasters[self.CurrentModule] or { }
 
 	unwrap_or_error(
-		Broadcasters[self.CurrentModule][identifier] == nil,
+		Broadcasters.Identifiers[identifier] == nil,
 		"Re-declared broadcaster `" .. identifier .. "` in `" .. self.CurrentModule .. "`"
 	)
 
 	local Modules = Broadcasters.Modules
 	Modules[self.CurrentModule] = Modules[self.CurrentModule] or { }
 
-	Broadcasters.Identifiers[identifier] = self.CurrentModule
+	Broadcasters.Identifiers[identifier] = broadcaster
 	Modules[self.CurrentModule][identifier] = broadcaster
 
 	return broadcaster

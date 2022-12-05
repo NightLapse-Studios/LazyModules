@@ -24,7 +24,7 @@ local safe_require
 
 local IsServer = game:GetService("RunService"):IsServer()
 
-local ServerScriptService, ReplicatedStorage = game.ServerScriptService, game.ReplicatedStorage
+local ServerScriptService, ReplicatedStorage = game:GetService("ServerScriptService"), game.ReplicatedStorage
 
 local PlayerScripts = if IsServer then false else game.Players.LocalPlayer.PlayerScripts
 local CONTEXT = IsServer and "Server" or "Client"
@@ -62,8 +62,6 @@ function mod.NewEvent(self: Builder, identifier)
 		LazyString.new("Re-declared Event identifier `", identifier, "`\nFirst declared in `", Events.Identifiers[identifier], "`")
 	)
 
-	Events.Identifiers[identifier] = self.CurrentModule
-
 	local event =
 		setmetatable(
 			{
@@ -83,6 +81,7 @@ function mod.NewEvent(self: Builder, identifier)
 		"Duplicate event `" .. identifier .. "` in `" .. self.CurrentModule .. "`"
 	)
 
+	Events.Identifiers[identifier] = event
 	Events.Modules[self.CurrentModule][identifier] = event
 
 	return event

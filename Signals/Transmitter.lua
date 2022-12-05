@@ -90,7 +90,7 @@ function mod.NewTransmitter(self: Builder, identifier: string)
 		_mod == nil,
 		LazyString.new("Re-declared event `", identifier, "` in `", self.CurrentModule, "`.\nOriginally declared here: `", _mod, "`")
 	)
-	Transmitters.Identifiers[identifier] = self.CurrentModule
+	Transmitters.Identifiers[identifier] = transmitter
 	Modules[self.CurrentModule][identifier] = transmitter
 
 	return transmitter
