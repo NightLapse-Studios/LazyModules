@@ -82,6 +82,8 @@ local TESTING = true
 local LOAD_CONTEXTS = mod.CONTEXTS
 local CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 
+local config = require(game.ReplicatedFirst.ClientCore.BUILDCONFIG)
+
 local depth = 0
 
 
@@ -363,11 +365,14 @@ function mod.Begin(G)
 
 	mod:__finalize(G)
 
-	if TESTING == true then
+	mod:__run(G)
+
+	--We do this last so that UI and stuff can be set up too. Even game processes over large periods of time can
+	-- potentially be tested
+	if config.TESTING ~= false then
+		assert(config.TESTING == true or config.TESTING == "CLIENT" or config.TESTING == "SERVER")
 		mod:__tests(G)
 	end
-
-	mod:__run(G)
 
 	--TODO: Clearly something about initialization is still not realized... This is a scuffed post-finalize stage
 	if IsServer then

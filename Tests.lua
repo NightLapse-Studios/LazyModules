@@ -92,8 +92,7 @@ function mod:Builder( module_name: string )
 	assert(typeof(module_name) == "string")
 
 	mod.CurrentModule = module_name
-	print("📃" .. module_name .. " Testing:")
-	print(" It should:")
+	print("📃  " .. module_name .. " should:")
 
 	return mod
 end
