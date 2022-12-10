@@ -27,6 +27,7 @@ local LazyString
 local unwrap_or_warn
 local unwrap_or_error
 local safe_require
+local async_list
 
 local IsServer = game:GetService("RunService"):IsServer()
 
@@ -75,23 +76,24 @@ local ServerTransmitter = {
 	end,
 }
 
-local mt_TransmitterBuilder = { __index = TransmitterBuilder}
+local mt_TransmitterBuilder = { __index = TransmitterBuilder }
 mod.client_mt = { __index = ClientTransmitter }
 mod.server_mt = { __index = ServerTransmitter }
 
 function mod.NewTransmitter(self: Builder, identifier: string)
 	local transmitter = remote_wrapper(identifier, mt_TransmitterBuilder)
 
-	local Modules = Transmitters.Modules
-	Modules[self.CurrentModule] = Modules[self.CurrentModule] or { }
+--[[ 	local Modules = Transmitters.Modules
+	Modules[self.CurrentModule] = Modules[self.CurrentModule] or { } ]]
 
-	local _mod = Transmitters.Identifiers[identifier]
+	local _mod = Transmitters.Identifiers:inspect(identifier)
 	unwrap_or_error(
 		_mod == nil,
 		LazyString.new("Re-declared event `", identifier, "` in `", self.CurrentModule, "`.\nOriginally declared here: `", _mod, "`")
 	)
-	Transmitters.Identifiers[identifier] = transmitter
-	Modules[self.CurrentModule][identifier] = transmitter
+
+	Transmitters.Identifiers:provide(transmitter, identifier)
+	Transmitters.Modules:provide(transmitter, self.CurrentModule, identifier)
 
 	return transmitter
 end
@@ -107,6 +109,12 @@ function mod:__init(G)
 	local err = require(game.ReplicatedFirst.Util.Error)
 	unwrap_or_warn = err.unwrap_or_warn
 	unwrap_or_error = err.unwrap_or_error
+
+	async_list = require(game.ReplicatedFirst.Util.AsyncList)
+	async_list:__init(G)
+
+	mod.Transmitters.Identifiers = async_list.new(1)
+	mod.Transmitters.Modules = async_list.new(2)
 
 	LazyString = require(game.ReplicatedFirst.Util.LazyString)
 end

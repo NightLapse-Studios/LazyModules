@@ -21,6 +21,7 @@ local LazyString
 local unwrap_or_warn
 local unwrap_or_error
 local safe_require
+local async_list
 
 local IsServer = game:GetService("RunService"):IsServer()
 
@@ -62,7 +63,7 @@ mod.server_mt = { __index = EventWrapper }
 
 function mod.NewEvent(self: Builder, identifier)
 	unwrap_or_error(
-		Events.Identifiers[identifier] == nil,
+		Events.Identifiers:inspect(identifier) == nil,
 		LazyString.new("Re-declared Event identifier `", identifier, "`\nFirst declared in `", Events.Identifiers[identifier], "`")
 	)
 
@@ -78,15 +79,15 @@ function mod.NewEvent(self: Builder, identifier)
 			mt_EventBuilder
 		)
 
-	Events.Modules[self.CurrentModule] = Events.Modules[self.CurrentModule] or { }
+	Events.Modules.provided[self.CurrentModule] = Events.Modules.provided[self.CurrentModule] or { }
 
 	unwrap_or_error(
-		Events.Modules[self.CurrentModule][identifier] == nil,
+		Events.Modules:inspect(self.CurrentModule, identifier) == nil,
 		"Duplicate event `" .. identifier .. "` in `" .. self.CurrentModule .. "`"
 	)
 
-	Events.Identifiers[identifier] = event
-	Events.Modules[self.CurrentModule][identifier] = event
+	Events.Identifiers:provide(event, identifier)
+	Events.Modules:provide(event, self.CurrentModule, identifier)
 
 	return event
 end
@@ -103,6 +104,12 @@ function mod:__init(G)
 	unwrap_or_error = err.unwrap_or_error
 
 	LazyString = require(game.ReplicatedFirst.Util.LazyString)
+
+	async_list = require(game.ReplicatedFirst.Util.AsyncList)
+	async_list:__init(G)
+
+	mod.Events.Identifiers = async_list.new(1)
+	mod.Events.Modules = async_list.new(2)
 end
 
 return mod
