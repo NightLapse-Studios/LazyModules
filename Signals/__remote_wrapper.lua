@@ -17,9 +17,15 @@ return function(identifier: string, builder_mt: table)
 		)
 		transmitter[1].Name = identifier
 	else
+		local event = game.ReplicatedStorage:WaitForChild(identifier, 6)
+		
+		if not event then
+			warn("Waiting for event timed out! - " .. identifier .. debug.traceback())
+		end
+		
 		transmitter = setmetatable(
 			{
-				game.ReplicatedStorage:WaitForChild(identifier),
+				event,
 				Configured = {
 					Server = false,
 					Client = false,
