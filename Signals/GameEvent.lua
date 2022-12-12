@@ -6,7 +6,6 @@ local mod = {
 		Verbs = { },
 		Identifiers = { },
 		Modules = { },
-		Implications = { }
 	}
 }
 
@@ -24,6 +23,7 @@ local Signals
 local unwrap_or_warn
 local unwrap_or_error
 local safe_require
+local async_list
 
 local IsServer = game:GetService("RunService"):IsServer()
 local SocialService = game:GetService("SocialService")
@@ -108,14 +108,15 @@ local GameEventBuilder = {
 }
 local ClientGameEvent = {
 	Fire = function(self)
+		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
 		--Note that this doesn't use the bindable events, those only happen in respons to a server firing a GE
 		--Only server GEs can be valid
 		self[1]:FireServer(self.Verb, self.Noun)
-	end,
+	end
 }
 local ServerGameEvent = {
 	Fire = function(self, actor: Player)
-		--print(v, n)
+		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
 		assert(actor)
 
 		actor = actor.UserId
@@ -128,7 +129,7 @@ local ServerGameEvent = {
 			--print(v, o.Noun)
 			o[2]:Fire(actor, v, o.Noun)
 		end
-	end,
+	end
 }
 
 local mt_GameEventBuilder = { __index = GameEventBuilder}
@@ -146,24 +147,17 @@ function mod.NewGameEvent(self: Builder, verb: Verb, noun: Noun)
 	event.Implications = { }
 	event.__ShouldAccept = false
 
-	local _mod = GameEvents.Identifiers[id]
+	local _mod = GameEvents.Identifiers:inspect(id)
 	unwrap_or_error(
 		_mod == nil,
 		LazyString.new("Re-declared GameEvent `", id, "` in `", self.CurrentModule, "`.\nOriginally declared here: `", _mod, "`")
 	)
 
-	GameEvents.Identifiers[id] = event
+	GameEvents.Identifiers:provide(event, id)
 
-	if not Verbs[verb] then
-		Verbs[verb] = { }
-	end
+	GameEvents.Verbs:provide(event, verb, noun)
 
-	local Nouns = Verbs[verb]
-	Nouns[noun] = event
-
-	local Modules = GameEvents.Modules
-	Modules[self.CurrentModule] = Modules[self.CurrentModule] or { }
-	Modules[self.CurrentModule][id] = event
+	GameEvents.Modules:provide(event, self.CurrentModule, id)
 
 	return event
 end
@@ -181,6 +175,13 @@ function mod:__init(G, S)
 	unwrap_or_error = err.unwrap_or_error
 
 	LazyString = require(game.ReplicatedFirst.Util.LazyString)
+
+	async_list = require(game.ReplicatedFirst.Util.AsyncList)
+	async_list:__init(G)
+
+	mod.GameEvents.Verbs = async_list.new(2)
+	mod.GameEvents.Identifiers = async_list.new(1)
+	mod.GameEvents.Modules = async_list.new(2)
 
 	Signals = S
 end

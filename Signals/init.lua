@@ -60,104 +60,50 @@ local Events
 local WaitingList
 
 
-local function wait_for_event(identifier, cb)
-	local module = mod.CurrentModule
-	local idx = WaitingList:insert("Event: " .. module .. " " .. identifier)
-
-	while Events.Identifiers[identifier] == nil do task.wait() end
-	WaitingList:remove(idx)
-
-	if cb then
-		cb(Events.Identifiers[identifier])
-	end
-end
-
-local function wait_for_gameevent(verb, noun, cb)
-	local idx = WaitingList:insert("GameEvent: " .. verb .. " " .. noun)
-	while GameEvents.Verbs[verb] == nil do task.wait() end
-	local t = GameEvents.Verbs[verb]
-
-	while t[noun] == nil do task.wait() end
-	WaitingList:remove(idx)
-
-	if cb then
-		cb(t[noun])
-	end
-end
-
-local function wait_for_transmitter(identifier, cb)
-	local module = mod.CurrentModule
-	local idx = WaitingList:insert("Transmitter: " .. module .. " " .. identifier)
-
-	while Transmitters.Identifiers[identifier] == nil do task.wait() end
-	WaitingList:remove(idx)
-
-	if cb then
-		cb(Transmitters.Identifiers[identifier])
-	end
-end
-
-local function wait_for_broadcaster(identifier, cb)
-	local module = mod.CurrentModule
-	local idx = WaitingList:insert("Broadcaster: " .. module .. " " .. identifier)
-
-	while Broadcasters.Identifiers[identifier] == nil do task.wait() end
-	WaitingList:remove(idx)
-
-	if cb then
-		cb(Broadcasters.Identifiers[identifier])
-	end
-end
-
-
 
 
 function mod:GetEvent(identifier, cb, force_context: string?)
 	if force_context and force_context ~= Globals.CONTEXT then
 		return
 	end
-	local co = coroutine.create(wait_for_event)
-	local succ, ret = coroutine.resume(co, identifier, cb)
-	unwrap_or_error(
-		succ == true,
-		LazyString.new("\nError waiting for Signal:\n", ret)
-	)
+
+	local success = Event.Events.Identifiers:get(identifier, cb)
+	if not success then
+		error("\nEvent: " .. mod.CurrentModule .. " " .. identifier)
+	end
 end
 
 function mod:GetGameEvent(verb, noun, cb, force_context: string)
 	if force_context and force_context ~= Globals.CONTEXT then
 		return
 	end
-	local co = coroutine.create(wait_for_gameevent)
-	local succ, ret = coroutine.resume(co, verb, noun, cb)
-	unwrap_or_error(
-		succ == true,
-		LazyString.new("\nError waiting for Signal:\n", ret)
-	)
+
+	local success = GameEvent.GameEvents.Verbs:get(verb, noun, cb)
+	if not success then
+		error("\nGameEvent: " .. mod.CurrentModule .. " " .. verb .. " " .. noun)
+	end
 end
 
 function mod:GetTransmitter(identifier, cb, force_context: string)
 	if force_context and force_context ~= Globals.CONTEXT then
 		return
 	end
-	local co = coroutine.create(wait_for_transmitter)
-	local succ, ret = coroutine.resume(co, identifier, cb)
-	unwrap_or_error(
-		succ == true,
-		LazyString.new("\nError waiting for Signal:\n", ret)
-	)
+
+	local success = Transmitter.Transmitters.Identifiers:get(identifier, cb)
+	if not success then
+		error("\nEvent: " .. mod.CurrentModule .. " " .. identifier)
+	end
 end
 
 function mod:GetBroadcaster(identifier, cb, force_context: string)
 	if force_context and force_context ~= Globals.CONTEXT then
 		return
 	end
-	local co = coroutine.create(wait_for_broadcaster)
-	local succ, ret = coroutine.resume(co, identifier, cb)
-	unwrap_or_error(
-		succ == true,
-		LazyString.new("\nError waiting for Signal:\n", ret)
-	)
+
+	local success = Broadcaster.Broadcasters.Identifiers:get(identifier, cb)
+	if not success then
+		error("\nEvent: " .. mod.CurrentModule .. " " .. identifier)
+	end
 end
 
 
@@ -228,12 +174,13 @@ function mod:__init(G, LazyModules)
 	LazyString = require(ReplicatedFirst.Util.LazyString)
 end
 
--- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
-function mod:__finalize(G)
-	local wait_dur = 0
-	while WaitingList:is_empty() == false do
-		wait_dur += 1
-		local too_long = wait_dur > 32
+local function wait_for(async_table)
+	local waited = 0
+	while
+		async_table:is_awaiting()
+	do
+		waited += 1
+		local too_long = waited > 32
 		unwrap_or_warn(
 			too_long == false,
 			"Took too long to resolve signals (should usually be 1 tick)\n\nContents:\n" .. WaitingList:dump()
@@ -244,7 +191,24 @@ function mod:__finalize(G)
 		task.wait()
 	end
 
-	for module, identifers in Transmitters.Modules do
+	return waited
+end
+
+-- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
+function mod:__finalize(G)
+	task.desynchronize()
+
+	local wait_dur = 0
+	wait_dur += wait_for(Event.Events.Identifiers)
+	wait_dur += wait_for(GameEvent.GameEvents.Identifiers)
+	wait_dur += wait_for(Transmitter.Transmitters.Identifiers)
+	wait_dur += wait_for(Broadcaster.Broadcasters.Identifiers)
+
+	print("Waited " .. wait_dur .. " ticks")
+
+	task.synchronize()
+
+	for module, identifers in Transmitters.Modules.provided do
 		for ident, transmitter in identifers do
 			local transmitter_str = "Transmitter `" .. module .. "::" .. ident
 
@@ -264,7 +228,7 @@ function mod:__finalize(G)
 		end
 	end
 
-	for module, identifers in Broadcasters.Modules do
+	for module, identifers in Broadcasters.Modules.provided do
 		for ident, broadcaster in identifers do
 			local transmitter_str = "Broadcaster `" .. module .. "::" .. ident .. "` "
 
@@ -292,7 +256,7 @@ function mod:__finalize(G)
 		end
 	end
 
-	for module, identifers in GameEvents.Modules do
+	for module, identifers in GameEvents.Modules.provided do
 		for ident, event in identifers do
 			local transmitter_str = "GameEvent `" .. module .. "::" .. ident .. "` "
 
@@ -320,7 +284,7 @@ function mod:__finalize(G)
 		end
 	end
 
-	for module, identifers in Events.Modules do
+	for module, identifers in Events.Modules.provided do
 		for ident, event in identifers do
 			if CONTEXT == "CLIENT" then
 				local event_str = "Event `" .. module .. "::" .. ident

@@ -31,6 +31,7 @@ local LazyString
 local unwrap_or_warn
 local unwrap_or_error
 local safe_require
+local async_list
 
 local IsServer = game:GetService("RunService"):IsServer()
 
@@ -92,11 +93,13 @@ local BroadcastBuilder = {
 
 local BroadcasterClient = {
 	Broadcast = function(self, ...)
+		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
 		self[1]:FireServer(...)
 	end
 }
 local BroadcasterServer = {
 	Broadcast = function(self, ...)
+		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
 		self[2]:Fire(...)
 		self[1]:FireAllClients(...)
 	end,
@@ -114,18 +117,13 @@ function mod.NewBroadcaster(self: Builder, identifier: string)
 	broadcaster.__ShouldAccept = false
 	setmetatable(broadcaster, mt_BroadcastBuilder)
 
-	Broadcasters[self.CurrentModule] = Broadcasters[self.CurrentModule] or { }
-
 	unwrap_or_error(
-		Broadcasters.Identifiers[identifier] == nil,
+		Broadcasters.Identifiers:inspect(identifier) == nil,
 		"Re-declared broadcaster `" .. identifier .. "` in `" .. self.CurrentModule .. "`"
 	)
 
-	local Modules = Broadcasters.Modules
-	Modules[self.CurrentModule] = Modules[self.CurrentModule] or { }
-
-	Broadcasters.Identifiers[identifier] = broadcaster
-	Modules[self.CurrentModule][identifier] = broadcaster
+	Broadcasters.Identifiers:provide(broadcaster, identifier)
+	Broadcasters.Modules:provide(broadcaster, self.CurrentModule, identifier)
 
 	return broadcaster
 end
@@ -143,6 +141,12 @@ function mod:__init(G)
 	unwrap_or_error = err.unwrap_or_error
 
 	LazyString = require(game.ReplicatedFirst.Util.LazyString)
+
+	async_list = require(game.ReplicatedFirst.Util.AsyncList)
+	async_list:__init(G)
+
+	mod.Broadcasters.Identifiers = async_list.new(1)
+	mod.Broadcasters.Modules = async_list.new(2)
 end
 
 return mod
