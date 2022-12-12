@@ -49,6 +49,7 @@ local EventBuilder = {
 }
 local EventWrapper = {
 	Fire = function(self, ...)
+		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
 		self[1]:Fire(...)
 	end,
 	Connect = function()
@@ -79,7 +80,7 @@ function mod.NewEvent(self: Builder, identifier)
 			mt_EventBuilder
 		)
 
-	Events.Modules.provided[self.CurrentModule] = Events.Modules.provided[self.CurrentModule] or { }
+	event[1].Name = identifier
 
 	unwrap_or_error(
 		Events.Modules:inspect(self.CurrentModule, identifier) == nil,

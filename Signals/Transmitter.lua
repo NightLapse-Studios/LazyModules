@@ -67,11 +67,13 @@ local TransmitterBuilder = {
 }
 local ClientTransmitter = {
 	Transmit = function(self, ...)
+		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
 		self[1]:FireServer(...)
 	end,
 }
 local ServerTransmitter = {
 	Transmit = function(self, ...)
+		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
 		self[1]:FireClient(...)
 	end,
 }

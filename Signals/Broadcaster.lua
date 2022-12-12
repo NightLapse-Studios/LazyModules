@@ -93,11 +93,13 @@ local BroadcastBuilder = {
 
 local BroadcasterClient = {
 	Broadcast = function(self, ...)
+		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
 		self[1]:FireServer(...)
 	end
 }
 local BroadcasterServer = {
 	Broadcast = function(self, ...)
+		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
 		self[2]:Fire(...)
 		self[1]:FireAllClients(...)
 	end,

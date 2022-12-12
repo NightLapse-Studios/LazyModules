@@ -108,14 +108,15 @@ local GameEventBuilder = {
 }
 local ClientGameEvent = {
 	Fire = function(self)
+		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
 		--Note that this doesn't use the bindable events, those only happen in respons to a server firing a GE
 		--Only server GEs can be valid
 		self[1]:FireServer(self.Verb, self.Noun)
-	end,
+	end
 }
 local ServerGameEvent = {
 	Fire = function(self, actor: Player)
-		--print(v, n)
+		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
 		assert(actor)
 
 		actor = actor.UserId
@@ -128,7 +129,7 @@ local ServerGameEvent = {
 			--print(v, o.Noun)
 			o[2]:Fire(actor, v, o.Noun)
 		end
-	end,
+	end
 }
 
 local mt_GameEventBuilder = { __index = GameEventBuilder}
