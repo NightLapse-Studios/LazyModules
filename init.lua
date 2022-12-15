@@ -88,6 +88,9 @@ local depth = 0
 
 
 local Globals
+-- This module is required from __run in this module
+-- Because it needs to go through the whole loading process in order to rely on Assets, etc
+local UI
 local Signals
 local Tests
 local unwrap_or_warn
@@ -151,55 +154,55 @@ end
 local Initialized: {[string]: boolean} = { }
 
 local function init_wrapper(module, name)
-	if typeof(module) == "table" and module.__init then
-		local prior_context = set_context(LOAD_CONTEXTS.LOAD_INIT)
-		module:__init(Globals)
-		reset_context(prior_context)
-	end
+	local prior_context = set_context(LOAD_CONTEXTS.LOAD_INIT)
+	module:__init(Globals)
+	reset_context(prior_context)
 end
 
 local function signals_wrapper(module, name)
-	if typeof(module) == "table" and module.__build_signals then
-		local prior_context = set_context(LOAD_CONTEXTS.SIGNAL_BUILDING)
+	local prior_context = set_context(LOAD_CONTEXTS.SIGNAL_BUILDING)
 
-		-- Configure the builder for this module
-		local builder = Signals:Builder( name )
+	-- Configure the builder for this module
+	local builder = Signals:Builder( name )
 
-		-- Pass the builder to the module
-		-- The module will use the builder to register its signals
-		module:__build_signals(Globals, builder)
-		reset_context(prior_context)
-	end
+	-- Pass the builder to the module
+	-- The module will use the builder to register its signals
+	module:__build_signals(Globals, builder)
+	reset_context(prior_context)
 end
 
 local function tests_wrapper(module, name)
-	if typeof(module) == "table" and module.__tests then
-		local prior_context = set_context(LOAD_CONTEXTS.TESTING)
+	local prior_context = set_context(LOAD_CONTEXTS.TESTING)
 
-		-- Configure the builder for this module
-		local builder = Tests:Builder( name )
+	-- Configure the builder for this module
+	local builder = Tests:Builder( name )
 
-		-- Pass the builder to the module
-		-- The module will use the builder to register its signals
-		module:__tests(Globals, builder)
-		reset_context(prior_context)
-	end
+	module:__tests(Globals, builder)
+	reset_context(prior_context)
 end
 
 local function finalize_wrapper(module, name)
-	if typeof(module) == "table" and module.__finalize then
-		local prior_context = set_context(LOAD_CONTEXTS.FINALIZE)
-		module:__finalize(Globals)
-		reset_context(prior_context)
-	end
+	local prior_context = set_context(LOAD_CONTEXTS.FINALIZE)
+	module:__finalize(Globals)
+	reset_context(prior_context)
+end
+
+local function ui_wrapper(module, name)
+	local prior_context = set_context(LOAD_CONTEXTS.RUN)
+
+	local builder = UI:Builder( name )
+
+	-- Note that UI will not exist on server contexts
+	module:__ui(Globals, builder)
+	reset_context(prior_context)
 end
 
 local function run_wrapper(module, name)
-	if typeof(module) == "table" and module.__run then
-		local prior_context = set_context(LOAD_CONTEXTS.RUN)
-		module:__run(Globals)
-		reset_context(prior_context)
-	end
+	local prior_context = set_context(LOAD_CONTEXTS.RUN)
+
+	-- Note that UI will not exist on server contexts
+	module:__run(Globals, UI)
+	reset_context(prior_context)
 end
 
 local function try_init(module, name, astrisk)
@@ -210,8 +213,14 @@ local function try_init(module, name, astrisk)
 
 		print(indent() .. name .. astrisk)
 
-		signals_wrapper(module, name)
-		init_wrapper(module, name)
+		local s, r = pcall(function() return module.__init end)
+		if s and r then
+			init_wrapper(module, name)
+		end
+		s, r = pcall(function() return module.__build_signals end)
+		if s and r then
+			signals_wrapper(module, name)
+		end
 
 		depth -= 1
 	end
@@ -255,7 +264,8 @@ function mod.PreLoad(script: Instance, opt_name: string?): any
 
 	local module = Globals[opt_name] or mod.__raw_load(script, opt_name)
 
-	if typeof(module) == "table" and module.__no_preload then
+	local s, r = pcall(function() return module.__no_preload end)
+	if typeof(module) == "table" and r then
 		try_init(module, opt_name, " **FORCED**")
 	end
 
@@ -416,6 +426,9 @@ function mod:__init(G)
 	unwrap_or_warn = err.unwrap_or_warn
 	unwrap_or_error = err.unwrap_or_error
 
+	if CONTEXT == "CLIENT" then
+		UI = mod.PreLoad(script.UI)
+	end
 	self.Initialized = true
 end
 
@@ -453,7 +466,15 @@ function mod:__run(G)
 	for i,v in PreLoads do
 		if typeof(v == "table") then
 			--Roact managed to ruin everything
-			local s, r = pcall(function() return v.__run end)
+			local s, r
+			if CONTEXT == "CLIENT" then
+				s, r = pcall(function() return v.__ui end)
+				if s and r then
+					ui_wrapper(v, i)
+				end
+			end
+
+			s, r = pcall(function() return v.__run end)
 			if s and r then
 				run_wrapper(v, i)
 			end
