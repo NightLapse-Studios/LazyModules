@@ -196,7 +196,7 @@ local function ui_wrapper(module, name)
 	if config.Debug then
 		print(" -- > UI INIT: " .. name)
 	end
-	module:__ui(Globals, builder)
+	module:__ui(Globals, builder, UI.A, UI.D)
 	reset_context(prior_context)
 end
 

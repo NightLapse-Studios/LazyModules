@@ -161,6 +161,7 @@ local TypeBindings = {
 
 local Classes = {
 	GuiBase2d = {
+		Name = "string",
 		AutoLocalize = "bool",
 		RootLocalizationTable = "LocalizationTable",
 		SelectionBehaviorDown = Enum.SelectionBehavior,
@@ -357,7 +358,7 @@ local Classes = {
 		MaxSize = "Vector2",
 		MinSize = "Vector2",
 	},
-	UIAspectRatioConstrait = {
+	UIAspectRatioConstraint = {
 		AspectRatio = "float",
 		AspectType = "Enum",
 		DominantAxis = "Enum",
@@ -419,49 +420,52 @@ local Classes = {
 local UIBuilder = {
 	Type = "Builder",
 	Context = CONTEXT,
+	--TODO: Allow nested stateful elements to be made simultaneously
+	BuildingStateful = { },
+	BuildingElements = { },
 	Current = { },
+	FinishedSet = { },
 	--Here we store things such as extended componenets, since these contian 
-	Building = { },
 	Processors = { },
 	Nesteds = { },
 
 	--Wrapper functions for making extending components
 	Stateful = function(self, name)
 		local component = Roact.Component:extend(name)
-		for i,v in self.Building do
+		for i,v in self.BuildingStateful do
 			component[i] = v
 		end
-		self.Building = { }
+		self.BuildingStateful = { }
 		return component
 	end,
 
 	Init = function(self, func)
-		--assert(self.Building[Roact.Type] == Roact.Type.StatefulComponentInstance)
-		self.Building.init = func
+		--assert(self.BuildingStateful[Roact.Type] == Roact.Type.StatefulComponentInstance)
+		self.BuildingStateful.init = func
 		return self
 	end,
 
 	Render = function(self, func)
-		--assert(self.Building[Roact.Type] == Roact.Type.StatefulComponentInstance)
-		self.Building.render = func
+		--assert(self.BuildingStateful[Roact.Type] == Roact.Type.StatefulComponentInstance)
+		self.BuildingStateful.render = func
 		return self
 	end,
 
 	DidMount = function(self, func)
-		--assert(self.Building[Roact.Type] == Roact.Type.StatefulComponentInstance)
-		self.Building.didMount = func
+		--assert(self.BuildingStateful[Roact.Type] == Roact.Type.StatefulComponentInstance)
+		self.BuildingStateful.didMount = func
 		return self
 	end,
 
 	WillUnmount = function(self, func)
-		--assert(self.Building[Roact.Type] == Roact.Type.StatefulComponentInstance)
-		self.Building.willUnmount = func
+		--assert(self.BuildingStateful[Roact.Type] == Roact.Type.StatefulComponentInstance)
+		self.BuildingStateful.willUnmount = func
 		return self
 	end,
 
 	WillUpdate = function(self, func)
-		--assert(self.Building[Roact.Type] == Roact.Type.StatefulComponentInstance)
-		self.Building.willUpdate = func
+		--assert(self.BuildingStateful[Roact.Type] == Roact.Type.StatefulComponentInstance)
+		self.BuildingStateful.willUpdate = func
 		return self
 	end,
 
@@ -472,50 +476,99 @@ local UIBuilder = {
 		self:Position(0.5, 0, 0.5, 0)
 		return self
 	end,
-
-	MoveBy = function(self, xs, xo, ys, yo)
-		local pos = self.Current.Position or UDim2.new()
-		pos += UDim2.new(xs, xo, ys, yo)
-		self:Position_Raw(pos)
-		return self
-	end,
 }
 
-local mt_EventBuilder = { __index = UIBuilder }
+local elements_set_list = UIBuilder.BuildingElements
+local function alloc_prop_set()
+	local new = { }
+	table.insert(elements_set_list, new)
+	UIBuilder.Current = new
+end
+
+local function dealloc_prop_set()
+	if UIBuilder.Current == nil then
+		error("UIBuilder: Current is nil")
+	end
+	UIBuilder.Current = elements_set_list[#elements_set_list - 1]
+	UIBuilder.FinishedSet = table.remove(elements_set_list)
+end
+
+mod.A = alloc_prop_set
+mod.D = dealloc_prop_set
+
+--Some ham fisted logic to allow stuff to work
+local next_alloc_call = true
+
+local mt_EventBuilder = {
+	__index = UIBuilder,
+	__call = function(...)
+		if next_alloc_call == true then
+			alloc_prop_set()
+		else
+			dealloc_prop_set()
+		end
+
+		next_alloc_call = not next_alloc_call
+
+		--Remember that mod represents `self` in most functions
+		-- see `mod.Builder`
+		return mod
+	end
+}
+
+function UIBuilder:MoveBy(self, xs, xo, ys, yo)
+	local pos = self.Current.Position or UDim2.new()
+	pos += UDim2.new(xs, xo, ys, yo)
+	self:Position_Raw(pos)
+	return self
+end
+
+function mod:JustifyLeft(scaling, spacing)
+	self:AnchorPoint(0, 0.5)
+
+	local old_pos = self.Current.Position
+	if old_pos then
+		self:Position(scaling, spacing, old_pos.Y.Scale, old_pos.Y.Offset)
+	else
+		self:Position(scaling, spacing, 0.5, 0)
+	end
+
+	return self
+end
 
 --Sets up a named list in the props table, which gains the functionality of the UIBuilder
 -- Essentially nesting custom props into the props list, by a specified name
 -- Intended use is such as in the StdElements `TextButton` and `ImageButton` in GUI.lua
 function UIBuilder:Props(name, ...)
 	local props = {
-		-- Hacky but necessary
+		-- Hacky but necessary to isolate the props from the metatable
 		-- This means that StdElements which expect a custom props table must index `.Current` to access the props
-		Current = { }
+		Current = UIBuilder.FinishedSet
 	}
-	self.Current[name] = props
+	UIBuilder.Current[name] = props
 	setmetatable(props, mt_EventBuilder)
 	return props
 end
 
 function UIBuilder:AppendProps(other_props: table)
 	for i,v in other_props do
-		self.Current[i] = v
+		UIBuilder.Current[i] = v
 	end
 	return self
 end
 
 function UIBuilder:Attribute(name, value)
-	self.Current[Roact.Attribute[name]] = value
+	UIBuilder.Current[Roact.Attribute[name]] = value
 	return self
 end
 
 function UIBuilder:Prop(name, value)
-	self.Current[name] = value
+	UIBuilder.Current[name] = value
 	return self
 end
 
 function UIBuilder:Ref(value)
-	self.Current[Roact.Ref] = value
+	UIBuilder.Current[Roact.Ref] = value
 	return self
 end
 
@@ -530,36 +583,17 @@ end
 
 function UIBuilder:Dynamic(func, ...)
 --[[ 		for i,v in {...} do
-		self.Current[i] = v
+		UIBuilder.Current[i] = v
 	end ]]
-	local element = Roact.createElement(func, self.Current)
-	self.Current = { }
+	local element = Roact.createElement(func, UIBuilder.FinishedSet)
+	UIBuilder.FinishedSet = { }
 	return element
 end
 
 function UIBuilder:Bind(name, binding)
 	assert(binding[Roact.Type] == Roact.Type.Binding)
-	self.Current[name] = binding
+	UIBuilder.Current[name] = binding
 	return self
-end
-
-function mod.Static(self: Builder, ui_type, identifier, tree)
-	unwrap_or_error(
-		UIs.Types:inspect(ui_type, identifier) == nil,
-		LazyString.new("Re-declared Event identifier `", ui_type, "`\nFirst declared in `", UIs.Types[ui_type], "`")
-	)
-
-	tree = Roact.createFragment(tree)
-
-	unwrap_or_error(
-		UIs.Modules:inspect(self.CurrentModule, identifier) == nil,
-		"Duplicate event `" .. ui_type .. "` in `" .. self.CurrentModule .. "`"
-	)
-
-	UIs.Types:provide(tree, ui_type, identifier)
-	UIs.Modules:provide(tree, self.CurrentModule, ui_type, identifier)
-
-	return tree
 end
 
 local StdElement = { }
@@ -578,9 +612,8 @@ function mod:StdElement(name, _)
 	assert(StandardElements[name] ~= nil)
 	local element_prototype = StandardElements[name]
 
-	--We need to clear the state before we create the new element
-	local props = self.Current
-	self.Current = { }
+	local props = UIBuilder.FinishedSet
+	UIBuilder.FinishedSet = { }
 
 	--Elements not assigned to functions will do a deep clone
 	-- functional elements will function like normal roact elements
@@ -598,10 +631,24 @@ function mod:StdElement(name, _)
 	return element
 end
 
+--[[ function mod:Classify(std_element: string, desc: string)
+	assert(StandardElements[desc] ~= nil)
+	self.Classifications[desc] = self.Classifications[desc] or { }
+	self.Classifications[desc][std_element] = StandardElements[desc]
+end ]]
+
 
 --A small system which allows us to register external functions which modify the props of the element being built
 function mod:RegisterStdModifier(name, func)
 	Roact.elementModule[name] = func
+	UIBuilder[name] = func
+end
+
+function mod:StdModifier(name, props)
+	local processor = mod[name]
+	assert(processor ~= nil)
+	processor(self, self, props)
+	return self
 end
 
 function mod:Builder( module_name: string )
@@ -617,6 +664,21 @@ end
 local PropFuncs = { }
 local empty_table = { }
 
+function mod:Children(...)
+	local existing_children = UIBuilder.Current[Roact.Children]
+	local new_children = { ... }
+
+	if not existing_children then
+		UIBuilder.Current[Roact.Children] = new_children
+	else
+		for i,v in new_children do
+			table.insert(existing_children, v)
+		end
+		UIBuilder.Current[Roact.Children] = existing_children
+	end
+	return self
+end
+
 function mod:__finalize(G)
 	for class, properties in Classes do
 		for prop_name, type in properties do
@@ -630,7 +692,7 @@ function mod:__finalize(G)
 				end
 				UIBuilder[prop_name] = function(_self, ...)
 					local value = ctor(...)
-					_self.Current[prop_name] = value
+					UIBuilder.Current[prop_name] = value
 					return _self
 				end
 
@@ -641,7 +703,7 @@ function mod:__finalize(G)
 					return _self
 				end
 				UIBuilder[raw_name] = function(_self, value)
-					_self.Current[prop_name] = value
+					UIBuilder.Current[prop_name] = value
 					return _self
 				end
 
@@ -656,7 +718,7 @@ function mod:__finalize(G)
 					return _self
 				end
 				UIBuilder[prop_name] = function(_self, value)
-					_self.Current[event_key] = value
+					UIBuilder.Current[event_key] = value
 					return _self
 				end
 			else
@@ -665,7 +727,7 @@ function mod:__finalize(G)
 					return _self
 				end
 				UIBuilder[prop_name] = function(_self, value)
-					_self.Current[prop_name] = value
+					UIBuilder.Current[prop_name] = value
 					return _self
 				end
 			end
@@ -710,8 +772,8 @@ function mod:__finalize(G)
 		]]
 
 		UIBuilder[class] = function(_self, ...)
-			local element = Roact.createElement(class, self.Current)
-			_self.Current = { }
+			local element = Roact.createElement(class, UIBuilder.FinishedSet)
+			UIBuilder.FinishedSet = { }
 			return element
 		end
 	end
@@ -719,6 +781,9 @@ end
 
 function mod:__init(G)
 	Globals = G
+
+	--Allocate an empty prop set so that elements can be made without any props or host elements
+	alloc_prop_set()
 
 	safe_require = G.Load(game.ReplicatedFirst.Util.SafeRequire).require
 
@@ -732,9 +797,6 @@ function mod:__init(G)
 	Roact = G.Load(game.ReplicatedFirst.Modules.Roact)
 	Style = G.Load(game.ReplicatedFirst.Modules.GUI.Style)
 	Assets = G.Load(game.ReplicatedFirst.Modules.Assets)
-
-	UIs.Types = AsyncList.new(2)
-	UIs.Modules = AsyncList.new(3)
 end
 
 --This function takes in a table of names of instance types and scans for ones which are GuiObjects
@@ -779,7 +841,7 @@ end
 	else
 		local func = function(_self, ...)
 			local value = ctor(...)
-			_self.Current[name] = value
+			UIBuilder.Current[name] = value
 			return _self
 		end
 	
@@ -793,7 +855,7 @@ end
 		UIBuilder[raw_name] = PropFuncCaache_Raw[ctor]
 	else
 		local raw_func = function(_self, value)
-			_self.Current[raw_name] = value
+			UIBuilder.Current[raw_name] = value
 			return _self
 		end
 		PropFuncCaache_Raw[ctor] = raw_func
@@ -801,7 +863,7 @@ end
 	end
 else
 	UIBuilder[name] = function(_self, value)
-		_self.Current[name] = value
+		UIBuilder.Current[name] = value
 		return _self
 	end
 end
