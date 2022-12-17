@@ -523,7 +523,7 @@ local mt_EventBuilder = {
 	end
 }
 
-function UIBuilder:MoveBy(self, xs, xo, ys, yo)
+function UIBuilder:MoveBy(xs, xo, ys, yo)
 	local pos = self.Current.Position or UDim2.new()
 	pos += UDim2.new(xs, xo, ys, yo)
 	self:Position_Raw(pos)
