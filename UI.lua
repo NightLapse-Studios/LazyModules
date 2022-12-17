@@ -62,6 +62,7 @@ local TypeBindings = {
 	int = "primitive",
 	float = "primitive",
 	string = "primitive",
+	Content = "primitive",
 	LocalizationTable = "reference",
 	GuiObject = "reference",
 	SelectionImageObject = "reference",
@@ -160,6 +161,12 @@ local TypeBindings = {
 }
 
 local Classes = {
+	GuiButton = {
+		AutoButtonColor = "bool",
+		Modal = "bool",
+		Selected = "bool",
+		Style = "Enum"
+	},
 	GuiBase2d = {
 		Name = "string",
 		AutoLocalize = "bool",
@@ -533,6 +540,96 @@ function mod:JustifyLeft(scaling, spacing)
 		self:Position(scaling, spacing, 0.5, 0)
 	end
 
+	return self
+end
+function mod:JustifyRight(scaling, spacing)
+	self:AnchorPoint(1, 0.5)
+
+	local old_pos = self.Current.Position
+	if old_pos then
+		self:Position(1 - scaling, -spacing, old_pos.Y.Scale, old_pos.Y.Offset)
+	else
+		self:Position(1 - scaling, -spacing, 0.5, 0)
+	end
+
+	return self
+end
+function mod:JustifyTop(scaling, spacing)
+	self:AnchorPoint(0.5, 0)
+
+	local old_pos = self.Current.Position
+	if old_pos then
+		self:Position(old_pos.X.Scale, old_pos.X.Offset, scaling, spacing)
+	else
+		self:Position(0.5, 0, scaling, spacing)
+	end
+
+	return self
+end
+function mod:JustifyBottom(scaling, spacing)
+	self:AnchorPoint(0.5, 1)
+
+	local old_pos = self.Current.Position
+	if old_pos then
+		self:Position(old_pos.X.Scale, old_pos.X.Offset, 1 - scaling, -spacing)
+	else
+		self:Position(0.5, 0, 1 - scaling, -spacing)
+	end
+
+	return self
+end
+
+function mod:OutsideLeft(scaling, spacing)
+	self:AnchorPoint(1, 0.5)
+
+	local old_pos = self.Current.Position
+	if old_pos then
+		self:Position(-scaling, -spacing, old_pos.Y.Scale, old_pos.Y.Offset)
+	else
+		self:Position(-scaling, -spacing, 0.5, 0)
+	end
+
+	return self
+end
+function mod:OutsideRight(scaling, spacing)
+	self:AnchorPoint(0, 0.5)
+
+	local old_pos = self.Current.Position
+	if old_pos then
+		self:Position(1 + scaling, spacing, old_pos.Y.Scale, old_pos.Y.Offset)
+	else
+		self:Position(1 + scaling, spacing, 0.5, 0)
+	end
+
+	return self
+end
+function mod:OutsideTop(scaling, spacing)
+	self:AnchorPoint(0.5, 1)
+
+	local old_pos = self.Current.Position
+	if old_pos then
+		self:Position(old_pos.X.Scale, old_pos.X.Offset, -scaling, -spacing)
+	else
+		self:Position(0.5, 0, -scaling, -spacing)
+	end
+
+	return self
+end
+function mod:OutsideBottom(scaling, spacing)
+	self:AnchorPoint(0.5, 0)
+
+	local old_pos = self.Current.Position
+	if old_pos then
+		self:Position(old_pos.X.Scale, old_pos.X.Offset, 1 + scaling, spacing)
+	else
+		self:Position(0.5, 0, 1 + scaling, spacing)
+	end
+
+	return self
+end
+
+function mod:InnerPadding(scaling, spacing)
+	self:Size(1 - scaling, -spacing, 1 - scaling, -spacing)
 	return self
 end
 
