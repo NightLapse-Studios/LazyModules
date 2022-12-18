@@ -193,7 +193,10 @@ local function ui_wrapper(module, name)
 	local builder = UI:Builder( name )
 
 	-- Note that UI will not exist on server contexts
-	module:__ui(Globals, builder)
+	if config.Debug then
+		print(" -- > UI INIT: " .. name)
+	end
+	module:__ui(Globals, builder, UI.A, UI.D)
 	reset_context(prior_context)
 end
 
