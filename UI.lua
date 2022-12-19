@@ -498,6 +498,8 @@ local function dealloc_prop_set()
 	end
 	UIBuilder.Current = elements_set_list[#elements_set_list - 1]
 	UIBuilder.FinishedSet = table.remove(elements_set_list)
+
+	return UIBuilder.FinishedSet
 end
 
 mod.A = alloc_prop_set
@@ -507,20 +509,7 @@ mod.D = dealloc_prop_set
 local next_alloc_call = true
 
 local mt_EventBuilder = {
-	__index = UIBuilder,
-	__call = function(...)
-		if next_alloc_call == true then
-			alloc_prop_set()
-		else
-			dealloc_prop_set()
-		end
-
-		next_alloc_call = not next_alloc_call
-
-		--Remember that mod represents `self` in most functions
-		-- see `mod.Builder`
-		return mod
-	end
+	__index = UIBuilder
 }
 
 function UIBuilder:MoveBy(xs, xo, ys, yo)
@@ -637,17 +626,20 @@ end
 -- Essentially nesting custom props into the props list, by a specified name
 -- Intended use is such as in the StdElements `TextButton` and `ImageButton` in GUI.lua
 function UIBuilder:Props(name, ...)
-	local props = {
+--[[ 	local props = {
 		-- Hacky but necessary to isolate the props from the metatable
 		-- This means that StdElements which expect a custom props table must index `.Current` to access the props
 		Current = UIBuilder.FinishedSet
-	}
-	UIBuilder.Current[name] = props
-	setmetatable(props, mt_EventBuilder)
-	return props
+	} ]]
+	UIBuilder.Current[name] = UIBuilder.FinishedSet
+	UIBuilder.FinishedSet = { }
+	--setmetatable(props, mt_EventBuilder)
+	return self
 end
 
 function UIBuilder:AppendProps(other_props: table)
+	if not other_props then return self end
+
 	for i,v in other_props do
 		UIBuilder.Current[i] = v
 	end
@@ -669,12 +661,31 @@ function UIBuilder:Ref(value)
 	return self
 end
 
+function UIBuilder:CreateRef()
+	return Roact.createRef()
+end
+
+--[[ function UIBuilder:ForwardRef(func)
+	return Roact.forwardRef(func)
+end ]]
+
+function UIBuilder:InsertChild(child)
+	local _current = self.Current
+	_current[Roact.Children] = _current[Roact.Children] or { }
+	table.insert(_current, child)
+	return self
+end
+
 function UIBuilder:Binding(default)
 	return Roact.createBinding(default)
 end
 
 function UIBuilder:JoinBindings(bindings)
 	return Roact.joinBindings(bindings)
+end
+
+function UIBuilder:Fragment(t: table)
+	return Roact.createFragment(t)
 end
 
 
