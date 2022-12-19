@@ -39,21 +39,18 @@ local EventBuilder = {
 			return
 		end
  
-		unwrap_or_error(
-			self.Connected ~= true,
-			"Attempt to Connect to an Event multiple times"
-		)
-		self[1].Event:Connect(func)
-		self.Connected = true
+		self[#self + 1] = func
 	end
 }
 local EventWrapper = {
 	Fire = function(self, ...)
 		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
-		self[1]:Fire(...)
+		for i = 1, #self do
+			self[i](...)
+		end
 	end,
-	Connect = function()
-		error("Only one reciever can be attached to an event\nNor can you connect to an Event outside of the BUILD_EVENTS phase")
+	Connect = function(self, func)
+		self[#self + 1] = func
 	end
 }
 
@@ -70,17 +67,9 @@ function mod.NewEvent(self: Builder, identifier)
 
 	local event =
 		setmetatable(
-			{
-				Instance.new("BindableEvent",
-					IsServer
-					and ServerScriptService
-					or PlayerScripts),
-				Connected = false
-			},
+			{ },
 			mt_EventBuilder
 		)
-
-	event[1].Name = identifier
 
 	unwrap_or_error(
 		Events.Modules:inspect(self.CurrentModule, identifier) == nil,

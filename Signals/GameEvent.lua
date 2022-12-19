@@ -48,7 +48,7 @@ local GameEventBuilder = {
 
 		self.Configured.Client = true
 		self.Connections += 1
-		self[2].Event:Connect(func)
+		self[2][#self[2]+1] = func
 
 		return self
 	end,
@@ -59,7 +59,7 @@ local GameEventBuilder = {
 
 		self.Configured.Server = true
 		self.Connections += 1
-		self[2].Event:Connect(func)
+		self[2][#self[2]+1] = func
 
 		return self
 	end,
@@ -87,7 +87,9 @@ local GameEventBuilder = {
 		else
 			self[1].OnClientEvent:Connect(
 				function(plr, v: Verb, n: Noun)
-					self[2]:Fire(plr, v, n)
+					for i = 1, #(self[2]) do
+						self[2][i](plr, v, n)
+					end
 
 					for _, o in self.Implications do
 						o[2]:Fire(plr, v, n)
@@ -123,7 +125,9 @@ local ServerGameEvent = {
 		local v: Verb, n: Noun = self.Verb, self.Noun
 
 		self[1]:FireAllClients(actor, v, n)
-		self[2]:Fire(actor)
+		for i = 1, #(self[2]) do
+			self[2][i](actor)
+		end
 
 		for _, o in self.Implications do
 			--print(v, o.Noun)
@@ -140,7 +144,7 @@ function mod.NewGameEvent(self: Builder, verb: Verb, noun: Noun)
 	local id = verb .. noun
 
 	local event = remote_wrapper(id, mt_GameEventBuilder)
-	event[2] = Instance.new("BindableEvent")
+	event[2] = {} -- stores functions for events on the same machine
 	event.Connections = 0
 	event.Verb = verb
 	event.Noun = noun

@@ -370,7 +370,7 @@ function mod.Begin(G)
 		local ClientReadyEvent = game.ReplicatedStorage:WaitForChild("ClientReadyEvent")
 		ClientReadyEvent:FireServer()
 
-		while not (G.LoadedFlags.PlayerStats and G.LoadedFlags.Settings)
+		while not (G.LoadedFlags.PlayerStats)
 		do
 			task.wait()
 		end
