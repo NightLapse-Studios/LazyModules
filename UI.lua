@@ -17,6 +17,44 @@
 	** See Menu.lua for some usage examples, including StdElements.
 
 	** See GUI.lua for examples of how to register StdElements.
+	
+	Tweens:
+			Tweens play when they are mounted, they are bindings.
+			If they are unmounted, their motor still runs, but the sequence will not advance to the next step until mounted again.
+			
+			@param start default 0, should be a number
+			@return a tween sequence for chain definitions
+			I:Tween(start)
+			
+			--Motor chains, occur when the previous step is complete.
+			:spring(target, frequency, dampingRatio)
+			:linear(target, velocity)
+			:instant(target)
+			
+			to tween non numbers it is recommended to append at the end of the chain with :map(I:ColorMap(c1, c2))
+			
+			-- other chainable functions
+			@param count can be -1 for infinite
+			:repeatAll(count) -- repeats the entire chain defined for count times.
+			:repeatThis(count) -- repeats the last chained object for count times.
+			:pause(t) -- adds a chain which pauses the tween sequence for t seconds before continuing.
+			
+			-- external use
+			:wipe() -- clears the tween sequence
+			:reset() -- resets the tween sequence completely.
+			:pause() -- pauses the playing of the chain and and the motor and all.
+			:resume() -- resumes playing of the chain.
+			
+			most likely you will do like this
+				local tween = I:Tween():[initial chain played upon mount]
+				
+				TextColor = tween:map(I:ColorMap(c1, c2)),
+				
+				eg_playerClicked = function()
+					tween:wipe():linear()
+					or just
+					tween:reset()
+				end
 ]]
 
 local mod = {
@@ -32,6 +70,7 @@ local Globals
 local LazyString
 local AsyncList
 local Roact
+local Flipper
 local Style
 local Assets
 local unwrap_or_warn
@@ -665,6 +704,47 @@ function UIBuilder:CreateRef()
 	return Roact.createRef()
 end
 
+function UIBuilder:Tween(start)
+	start = start or 0
+	
+	local binding, updBinding = Roact.createBinding(start)
+	return binding:getTween()
+end
+
+function UIBuilder:NumberMap(n1, n2)
+	return function(v)
+		return n1 * (1 - v) + n2 * v
+	end
+end
+
+function UIBuilder:LerpMap(c1, c2)
+	return function(v)
+		return c1:Lerp(c2, v)
+	end
+end
+
+--[[ function UIBuilder:ColorSequenceMap(...)
+	local args = {...}
+	
+	local colors = { }
+	
+	local i = 1
+	while i < #args do
+		local arg = args[i]
+		if type(arg) == "number" then
+			colors[#colors+1] = Color3.new(arg, args[i + 1], args[i + 2])
+			i += 2
+		else
+			colors[#colors+1] = arg
+		end
+		i += 1
+	end
+	
+	return function(v)
+		return ColorSequence.new(colors[1]:Lerp(colors[3], v), colors[2]:Lerp(colors[4], v))
+	end
+end ]]
+
 --[[ function UIBuilder:ForwardRef(func)
 	return Roact.forwardRef(func)
 end ]]
@@ -905,6 +985,7 @@ function mod:__init(G)
 	Roact = G.Load(game.ReplicatedFirst.Modules.Roact)
 	Style = G.Load(game.ReplicatedFirst.Modules.GUI.Style)
 	Assets = G.Load(game.ReplicatedFirst.Modules.Assets)
+	Flipper = G.Load(game.ReplicatedFirst.Modules.Flipper)
 end
 
 --This function takes in a table of names of instance types and scans for ones which are GuiObjects

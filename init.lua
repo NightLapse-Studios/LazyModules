@@ -476,8 +476,12 @@ function mod:__run(G)
 					ui_wrapper(v, i)
 				end
 			end
-
-			s, r = pcall(function() return v.__run end)
+		end
+	end
+	
+	for i,v in PreLoads do
+		if typeof(v == "table") then
+			local s, r = pcall(function() return v.__run end)
 			if s and r then
 				run_wrapper(v, i)
 			end
