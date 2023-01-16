@@ -261,7 +261,6 @@ function mod.__raw_load(script: Instance, name: string): any
 	return module
 end
 
---Future API expansion should usually go here
 function mod.PreLoad(script: Instance, opt_name: string?): any
 	opt_name = opt_name or script.Name
 
@@ -328,22 +327,10 @@ function mod.LightLoad(script: Instance): any?
 	return module
 end
 
---TODO: This is an incomplete interface
--- Feels that the needs of the codebase need to develop around it more before we make more design decisions here
+
+
+
 local IsServer = game:GetService("RunService"):IsServer()
-local connect_types = {
-	--TODO: Other events
-	[typeof(Instance.new("RemoteEvent"))] = if IsServer then "OnServerEvent" else "OnClientEvent",
-	[typeof(Instance.new("BindableEvent"))] = "Event"
-}
-
-function mod.Hook(script: string, event: string, func): RBXScriptConnection?
-	local event = mod.GetEvent(script, event)
-
-	if event then
-		return event[connect_types[typeof(event)]]:Connect(func)
-	end
-end
 
 --[[
 	To support gradually moving to this heirarchy, modules that need an __init call

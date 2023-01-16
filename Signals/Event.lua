@@ -36,10 +36,29 @@ local EventBuilder = {
 
 	Connect = function(self, func, force_context: string?)
 		if force_context and Globals.CONTEXT ~= force_context then
-			return
+			return self
 		end
  
 		self[#self + 1] = func
+		return self
+	end,
+
+	ServerConnection = function(self, func)
+		if CONTEXT ~= "SERVER" then
+			return self
+		end
+		
+		self[#self + 1] = func
+		return self
+	end,
+
+	ClientConnection = function(self, func)
+		if CONTEXT ~= "CLIENT" then
+			return self
+		end
+		
+		self[#self + 1] = func
+		return self
 	end
 }
 local EventWrapper = {
