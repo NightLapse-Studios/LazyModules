@@ -17,6 +17,44 @@
 	** See Menu.lua for some usage examples, including StdElements.
 
 	** See GUI.lua for examples of how to register StdElements.
+	
+	Tweens:
+			Tweens play when they are mounted, they are bindings.
+			If they are unmounted, their motor still runs, but the sequence will not advance to the next step until mounted again.
+			
+			@param start default 0, should be a number
+			@return a tween sequence for chain definitions
+			I:Tween(start)
+			
+			--Motor chains, occur when the previous step is complete.
+			:spring(target, frequency, dampingRatio)
+			:linear(target, velocity)
+			:instant(target)
+			
+			to tween non numbers it is recommended to append at the end of the chain with :map(I:ColorMap(c1, c2))
+			
+			-- other chainable functions
+			@param count can be -1 for infinite
+			:repeatAll(count) -- repeats the entire chain defined for count times.
+			:repeatThis(count) -- repeats the last chained object for count times.
+			:pause(t) -- adds a chain which pauses the tween sequence for t seconds before continuing.
+			
+			-- external use
+			:wipe() -- clears the tween sequence
+			:reset() -- resets the tween sequence completely.
+			:pause() -- pauses the playing of the chain and and the motor and all.
+			:resume() -- resumes playing of the chain.
+			
+			most likely you will do like this
+				local tween = I:Tween():[initial chain played upon mount]
+				
+				TextColor = tween:map(I:ColorMap(c1, c2)),
+				
+				eg_playerClicked = function()
+					tween:wipe():linear()
+					or just
+					tween:reset()
+				end
 ]]
 
 local mod = {
@@ -32,6 +70,7 @@ local Globals
 local LazyString
 local AsyncList
 local Roact
+local Flipper
 local Style
 local Assets
 local unwrap_or_warn
@@ -73,6 +112,8 @@ local TypeBindings = {
 	MouseButton2Click = "Event",
 	MouseButton2Down = "Event",
 	MouseButton2Up = "Event",
+	MouseEnter = "Event",
+	MouseLeave = "Event",
 	FocusLost = "Event",
 	Focused = "Event",
 	ReturnPressedFromOnScreenKeyboard = "Event",
@@ -206,6 +247,8 @@ local Classes = {
 		Activated = "Event",
 		MouseButton1Click = "Event",
 		MouseButton1Down = "Event",
+		MouseEnter = "Event",
+		MouseLeave = "Event",
 		MouseButton1Up = "Event",
 		MouseButton2Click = "Event",
 		MouseButton2Down = "Event",
@@ -477,12 +520,6 @@ local UIBuilder = {
 	end,
 
 	--TextToSize
-
-	Center = function(self)
-		self:AnchorPoint(0.5, 0.5)
-		self:Position(0.5, 0, 0.5, 0)
-		return self
-	end,
 }
 
 local elements_set_list = UIBuilder.BuildingElements
@@ -512,10 +549,102 @@ local mt_EventBuilder = {
 	__index = UIBuilder
 }
 
-function UIBuilder:MoveBy(xs, xo, ys, yo)
+function mod:RoundCorners(scale, pixels)
+	self:Children(
+		UIBuilder:UICorner()
+			:CornerRadius(scale or 0, pixels or 4)
+	)
+	
+	return self
+end
+
+function mod:Border(thick, color)
+	self:Children(
+		UIBuilder:UIStroke()
+			:ApplyStrokeMode(Enum.ApplyStrokeMode.Border)
+			:Color_Raw(color or Style.SecondaryColor2)
+			:Thickness(thick or 2)
+	)
+	
+	return self
+end
+
+function mod:Invisible()
+	self:BackgroundTransparency(1)
+	self:BorderSizePixel(0)
+	return self
+end
+
+function mod:Line(fromPos: UDim2, toPos: UDim2, thick)
+	local size, updSize = Roact.createBinding(UDim2.new(0,0,0,0))
+	local rotation, updRotation = Roact.createBinding(0)
+	local position, updPosition = Roact.createBinding(UDim2.new(0,0,0,0))
+	
+	local function updateBindings(rbx)
+		local absoluteSize = rbx.AbsoluteSize
+		
+		local x1 = fromPos.X.Scale * absoluteSize.X + fromPos.X.Offset
+		local y1 = fromPos.Y.Scale * absoluteSize.Y + fromPos.Y.Offset
+		local x2 = toPos.X.Scale * absoluteSize.X + toPos.X.Offset
+		local y2 = toPos.Y.Scale * absoluteSize.Y + toPos.Y.Offset
+		local dx = x2 - x1
+		local dy = y2 - y1
+		
+		local distance = math.sqrt(dx * dx + dy * dy)
+		updSize(UDim2.new(0, distance, 0, thick))
+		
+		updPosition(UDim2.new(0, (x1 + x2)/2, 0, (y1 + y2)/2))
+		
+		updRotation(math.deg(math.atan2(y2 - y1, x2 - x1)))
+	end
+	
+	local old = self.Current[Roact.Change.AbsoluteSize]
+	self.Current[Roact.Change.AbsoluteSize] = function(rbx)
+		if old then
+			old(rbx)
+		end
+		updateBindings(rbx)
+	end
+	
+	local oldp = self.Current[Roact.Change.Parent]
+	self.Current[Roact.Change.Parent] = function(rbx)
+		if oldp then
+			oldp(rbx)
+		end
+		
+		if rbx.Parent then
+			updateBindings(rbx)
+		end
+	end
+	
+	self:AnchorPoint(0.5, 0.5)
+	self:Size_Raw(size)
+	self:Rotation(rotation)
+	self:Position_Raw(position)
+	
+	return self
+end
+
+function mod:AspectRatioProp(ratio)
+	-- Aspect Ratio is X/Y, so the larger the ratio, the larger Width.
+	self:Children(
+		UIBuilder:UIAspectRatioConstraint()
+			:AspectRatio(ratio)
+	)
+	
+	return self
+end
+
+function mod:MoveBy(xs, xo, ys, yo)
 	local pos = self.Current.Position or UDim2.new()
 	pos += UDim2.new(xs, xo, ys, yo)
 	self:Position_Raw(pos)
+	return self
+end
+
+function mod:Center()
+	self:AnchorPoint(0.5, 0.5)
+	self:Position(0.5, 0, 0.5, 0)
 	return self
 end
 
@@ -617,9 +746,32 @@ function mod:OutsideBottom(scaling, spacing)
 	return self
 end
 
-function mod:InnerPadding(scaling, spacing)
+function mod:Inset(scaling, spacing)
 	self:Size(1 - scaling, -spacing, 1 - scaling, -spacing)
 	return self
+end
+
+local currentCamera = workspace.CurrentCamera
+
+local function calcSize(size)
+	local viewportSize = currentCamera.ViewportSize
+	return math.max(11, math.ceil(size * viewportSize.X / 1920 * viewportSize.Y / 1080))
+end
+
+function mod:ScaledTextSize(size)
+	local binding, updBinding = Roact.createBinding(calcSize(size))
+	
+	local old = self.Current[Roact.Change.AbsoluteSize]
+	
+	self.Current[Roact.Change.AbsoluteSize] = function(rbx)
+		if old then
+			old(rbx)
+		end
+		
+		updBinding(calcSize(size))
+	end
+	
+	return binding
 end
 
 --Sets up a named list in the props table, which gains the functionality of the UIBuilder
@@ -664,6 +816,48 @@ end
 function UIBuilder:CreateRef()
 	return Roact.createRef()
 end
+
+function UIBuilder:Tween(start)
+	start = start or 0
+	
+	local binding, updBinding = Roact.createBinding(start)
+	return binding:getTween()
+end
+
+function UIBuilder:NumberMap(n1, n2)
+	return function(v)
+		return n1 * (1 - v) + n2 * v
+	end
+end
+
+function UIBuilder:LerpMap(c1, c2)
+	return function(v)
+		return c1:Lerp(c2, v)
+	end
+end
+
+
+--[[ function UIBuilder:ColorSequenceMap(...)
+	local args = {...}
+	
+	local colors = { }
+	
+	local i = 1
+	while i < #args do
+		local arg = args[i]
+		if type(arg) == "number" then
+			colors[#colors+1] = Color3.new(arg, args[i + 1], args[i + 2])
+			i += 2
+		else
+			colors[#colors+1] = arg
+		end
+		i += 1
+	end
+	
+	return function(v)
+		return ColorSequence.new(colors[1]:Lerp(colors[3], v), colors[2]:Lerp(colors[4], v))
+	end
+end ]]
 
 --[[ function UIBuilder:ForwardRef(func)
 	return Roact.forwardRef(func)
@@ -905,6 +1099,7 @@ function mod:__init(G)
 	Roact = G.Load(game.ReplicatedFirst.Modules.Roact)
 	Style = G.Load(game.ReplicatedFirst.Modules.GUI.Style)
 	Assets = G.Load(game.ReplicatedFirst.Modules.Assets)
+	Flipper = G.Load(game.ReplicatedFirst.Modules.Flipper)
 end
 
 --This function takes in a table of names of instance types and scans for ones which are GuiObjects
@@ -936,6 +1131,10 @@ local function scan_instances()
 		PropFuncs[v] = instance
 		print(instance.Name)
 	end
+end
+
+function mod:__run()
+	
 end
 
 --[[
