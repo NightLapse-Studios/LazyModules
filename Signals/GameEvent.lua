@@ -77,7 +77,12 @@ local GameEventBuilder = {
 	Build = function(self)
 		if IsServer then
 			self[1].OnServerEvent:Connect(function(plr, n: Noun, noun: any)
-				local should_accept = self.__ShouldAccept(plr, n, noun)
+				local should_accept = false
+				if self.__ShouldAccept then
+					should_accept = self.__ShouldAccept(plr, n, noun)
+				else
+					warn("GameEvent " .. self.Verb .. ":" .. self.Noun .. " does not have a ShouldAccept function")
+					end
 
 				if should_accept then
 					--Note that this accesses the wrapper function below, as we do not index to the bindable event
