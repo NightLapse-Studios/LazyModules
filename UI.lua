@@ -981,6 +981,11 @@ function mod:Children(...)
 	return self
 end
 
+function mod:Change(name, callback)
+	UIBuilder.Current[Roact.Change[name]] = callback
+	return self
+end
+
 function mod:__finalize(G)
 	for class, properties in Classes do
 		for prop_name, type in properties do
@@ -1015,6 +1020,16 @@ function mod:__finalize(G)
 				end
 			elseif ctor == "Event" then
 				local event_key = Roact.Event[prop_name]
+				Roact.elementModule[prop_name] = function(_self, value)
+					_self.props[event_key] = value
+					return _self
+				end
+				UIBuilder[prop_name] = function(_self, value)
+					UIBuilder.Current[event_key] = value
+					return _self
+				end
+			elseif ctor == "Change" then
+				local event_key = Roact.Change[prop_name]
 				Roact.elementModule[prop_name] = function(_self, value)
 					_self.props[event_key] = value
 					return _self
