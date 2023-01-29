@@ -193,9 +193,10 @@ local function ui_wrapper(module, name)
 	local builder = UI:Builder( name )
 
 	-- Note that UI will not exist on server contexts
-	if config.Debug then
+	if config.LogUIInit then
 		print(" -- > UI INIT: " .. name)
 	end
+
 	module:__ui(Globals, builder, UI.A, UI.D)
 	reset_context(prior_context)
 end
@@ -214,7 +215,9 @@ local function try_init(module, name, astrisk)
 		Initialized[name] = true
 		depth += 1
 
-		print(indent() .. name .. astrisk)
+		if config.LogLoads then
+			print(indent() .. name .. astrisk)
+		end
 
 		local s, r = pcall(function() return module.__init end)
 		if s and r then
@@ -246,11 +249,14 @@ function mod.__raw_load(script: Instance, name: string): any
 	local prior_context = set_context(LOAD_CONTEXTS.PRELOAD)
 
 	local module = safe_require(script)
-	module = unwrap_or_warn(
-		module,
-		"\n" .. CONTEXT .. " init: Path to `" .. script.Name .. "` not found during PreLoad",
-		"\nRequired from:\n" .. debug.traceback(nil, 2)
-	)
+
+	if config.LogUnfoundLoads then
+		module = unwrap_or_warn(
+			module,
+			"\n" .. CONTEXT .. " init: Path to `" .. script.Name .. "` not found during PreLoad",
+			"\nRequired from:\n" .. debug.traceback(nil, 2)
+		)
+	end
 
 	reset_context(prior_context)
 
