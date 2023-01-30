@@ -581,6 +581,10 @@ function mod:Line(fromPos: UDim2, toPos: UDim2, thick)
 	local position, updPosition = Roact.createBinding(UDim2.new(0,0,0,0))
 	
 	local function updateBindings(rbx)
+		if not (rbx and rbx.Parent) then
+			return
+		end
+		
 		local absoluteSize = rbx.Parent.AbsoluteSize
 		
 		local x1 = fromPos.X.Scale * absoluteSize.X + fromPos.X.Offset
@@ -606,10 +610,25 @@ function mod:Line(fromPos: UDim2, toPos: UDim2, thick)
 		updateBindings(rbx)
 	end
 	
-	self.Current[Roact.Ref] = function(rbx)
-		if rbx then
-			updateBindings(rbx)
+	local old2 = self.Current[Roact.Change.AbsolutePosition]
+	self.Current[Roact.Change.AbsolutePosition] = function(rbx)
+		if old2 then
+			old2(rbx)
 		end
+		updateBindings(rbx)
+	end
+	
+	local old3 = self.Current[Roact.Change.Parent]
+	self.Current[Roact.Change.Parent] = function(rbx)
+		if old3 then
+			old3(rbx)
+		end
+		
+		updateBindings(rbx)
+	end
+	
+	self.Current[Roact.Ref] = function(rbx)
+		updateBindings(rbx)
 	end
 	
 	self:AnchorPoint(0.5, 0.5)
