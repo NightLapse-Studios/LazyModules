@@ -81,6 +81,7 @@ local mod = {
 local TESTING = true
 local LOAD_CONTEXTS = mod.CONTEXTS
 local CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
+local SOURCE_NAME = debug.info(function() return end, "s")
 
 local config = require(game.ReplicatedFirst.ClientCore.BUILDCONFIG)
 
@@ -116,11 +117,10 @@ local function set_context(context: number)
 
 	-- If our new context is initializing, then the prior contexts must have been initializing too.
 	if context == LOAD_CONTEXTS.LOAD_INIT then
-		unwrap_or_error(
-			prior >= LOAD_CONTEXTS.LOAD_INIT,
-			"\n" .. CONTEXT .. " init: Module is attempting to load during pre-loading",
-			"Hint: if LazyModules executes an `__init` function, then it must be caused by another module's `__init` function\nExcept for the first module in the init tree"
-	   )
+		if not (prior >= LOAD_CONTEXTS.LOAD_INIT) then
+			error("\n" .. CONTEXT .. " init: Module is attempting to load during pre-loading" ..
+				"Hint: if LazyModules executes an `__init` function, then it must be caused by another module's `__init` function\nExcept for the first module in the init tree")
+		end
 	end
 
 	Globals.LOADING_CONTEXT = context
@@ -149,6 +149,28 @@ local function format_load_err(name)
 	"\nSuggested fix:\nGlobals." .. name .. " = LazyModules.PreLoad(game." .. ret .. ")"
 
 	return ret
+end
+
+local function format_lazymodules_traceback()
+	local traceback = ""
+
+	local stack_idx = 0
+	repeat
+		stack_idx += 1
+		local source, line, fn_name = debug.info(stack_idx, "sln")
+
+		if source == SOURCE_NAME then
+			continue
+		end
+
+		if not source then
+			break
+		end
+
+		traceback = traceback .. source .. ":" .. line .. " function " .. fn_name .. "\n"
+	until false
+
+	return traceback
 end
 
 local Initialized: {[string]: boolean} = { }
@@ -251,11 +273,10 @@ function mod.__raw_load(script: Instance, name: string): any
 	local module = safe_require(script)
 
 	if config.LogUnfoundLoads then
-		module = unwrap_or_warn(
-			module,
-			"\n" .. CONTEXT .. " init: Path to `" .. script.Name .. "` not found during PreLoad",
-			"\nRequired from:\n" .. debug.traceback(nil, 2)
-		)
+		if not module then
+			warn("\n" .. CONTEXT .. " init: Path to `" .. script.Name .. "` not found during PreLoad" ..
+			"\nRequired from:\n" .. format_lazymodules_traceback())
+		end
 	end
 
 	reset_context(prior_context)
@@ -293,24 +314,20 @@ function mod.Load(script: (string | Instance)): any?
 	if typeof(script) == "string" then
 		-- A script's name has been passed in
 		module = Globals[script]
-		module = unwrap_or_warn(
-			module,
-			format_load_err(script),
-			"Required from:\n" .. debug.traceback(nil, 1)
-		)
 
 		if not module then
+			warn(format_load_err(script))
+			warn("\tRequired from:\n" .. format_lazymodules_traceback())
 			return
 		end
 	elseif script then
 		-- A script has been passed in
 		module = mod.__raw_load(script, script.Name)
 
-		module = unwrap_or_warn(
-			module,
-			format_load_err(script.Name),
-			"Required from:\n" .. debug.traceback(nil, 1)
-		)
+		if not module then
+			warn(format_load_err(script))
+			warn("\tRequired from:\n" .. format_lazymodules_traceback())
+		end
 
 		try_init(module, script.Name, " **FROM INSTANCE**")
 
@@ -329,6 +346,19 @@ function mod.LightLoad(script: Instance): any?
 	module = mod.__raw_load(script, script.Name)
 
 	try_init(module, script.Name)
+	
+	local s, r
+	if CONTEXT == "CLIENT" then
+		s, r = pcall(function() return module.__ui end)
+		if s and r then
+			ui_wrapper(module, script.Name)
+		end
+	end
+
+	if module.__run or module.__finalize then
+		warn("Module `" .. script.Name .. "` has loading stages which are not supported by LightLoad")
+		--warn("\tRequired from:\n" .. format_lazymodules_traceback())
+	end
 
 	return module
 end
@@ -395,7 +425,6 @@ end
 mod.API_Values = {
 	LightLoad = mod.LightLoad,
 	Load = mod.Load,
-	Hook = mod.Hook,
 	PreLoad = mod.PreLoad,
 	LazyModules = mod,
 	CONTEXT = CONTEXT
