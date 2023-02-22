@@ -233,7 +233,8 @@ end
 
 local function try_init(module, name, astrisk)
 	astrisk = astrisk or ""
-	if Initialized[name] == false then
+
+	if Initialized[name] ~= true then
 		Initialized[name] = true
 		depth += 1
 
@@ -280,6 +281,11 @@ function mod.__raw_load(script: Instance, name: string): any
 	end
 
 	reset_context(prior_context)
+	
+	-- Guard against multiple inits on one module
+	if Initialized[name] ~= nil then
+		return module
+	end
 
 	Globals[name] = module
 	PreLoads[name] = module
@@ -346,7 +352,7 @@ function mod.LightLoad(script: Instance): any?
 	module = mod.__raw_load(script, script.Name)
 
 	try_init(module, script.Name)
-	
+
 	local s, r
 	if CONTEXT == "CLIENT" then
 		s, r = pcall(function() return module.__ui end)
