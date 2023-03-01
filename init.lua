@@ -295,6 +295,12 @@ function mod.__raw_load(script: Instance, name: string): any
 end
 
 function mod.PreLoad(script: Instance, opt_name: string?): any
+	-- This check was discovered because referencing string.Name doesn't error, but returns nil for some reason
+	-- It is common to mistakenly pass a string into thie function
+	if typeof(script.Name) ~= "string" then
+		error("Value passed into LazyModules.PreLoad must be a script")
+	end
+
 	opt_name = opt_name or script.Name
 
 	local module = Globals[opt_name] or mod.__raw_load(script, opt_name)
