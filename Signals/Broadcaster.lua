@@ -93,13 +93,19 @@ local BroadcastBuilder = {
 
 local BroadcasterClient = {
 	Broadcast = function(self, ...)
-		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
+		if self.monitor then
+			self.monitor(self, ...)
+		end
+
 		self[1]:FireServer(...)
 	end
 }
 local BroadcasterServer = {
 	Broadcast = function(self, ...)
-		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
+		if self.monitor then
+			self.monitor(self, ...)
+		end
+
 		self[2]:Fire(...)
 		self[1]:FireAllClients(...)
 	end,
@@ -109,12 +115,16 @@ local mt_BroadcastBuilder = {__index = BroadcastBuilder}
 mod.client_mt = {__index = BroadcasterClient}
 mod.server_mt = {__index = BroadcasterServer}
 
+local function default_should_accept()
+	return true
+end
+
 -- Broadcasters use a client->server?->all-clients model
 function mod.NewBroadcaster(self: Builder, identifier: string)
 	local broadcaster = remote_wrapper(identifier, mt_BroadcastBuilder)
 	broadcaster[2] = Instance.new("BindableEvent")
 	broadcaster.Connections = 0
-	broadcaster.__ShouldAccept = false
+	broadcaster.__ShouldAccept = default_should_accept
 	setmetatable(broadcaster, mt_BroadcastBuilder)
 
 	unwrap_or_error(

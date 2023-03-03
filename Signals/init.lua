@@ -117,6 +117,21 @@ function mod:Builder( module_name: string )
 	return mod
 end
 
+
+local function monitor_func(signal, ...)
+	print(signal[1].Name)
+end
+
+function mod:Monitor( ... )
+	-- TODO: You can't put Signals.Events in here. We should probably sunset Events
+	local signals = { ... }
+	for i,v in signals do
+		v.monitor = monitor_func
+	end
+end
+
+
+
 local mt_ClientTransmitter
 local mt_ServerTransmitter
 local mt_ServerBroadcaster

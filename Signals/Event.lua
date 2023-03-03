@@ -63,7 +63,10 @@ local EventBuilder = {
 }
 local EventWrapper = {
 	Fire = function(self, ...)
-		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
+		if self.monitor then
+			self.monitor(self, ...)
+		end
+
 		for i = 1, #self do
 			self[i](...)
 		end

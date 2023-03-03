@@ -115,7 +115,10 @@ local GameEventBuilder = {
 }
 local ClientGameEvent = {
 	Fire = function(self, noun: any)
-		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
+		if self.monitor then
+			self.monitor(self)
+		end
+
 		--Note that this doesn't use the bindable events, those only happen in respons to a server firing a GE
 		--Only server GEs can be valid
 		self[1]:FireServer(self.Verb, self.Noun, noun)
