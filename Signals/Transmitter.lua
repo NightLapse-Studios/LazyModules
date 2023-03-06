@@ -31,7 +31,7 @@ local async_list
 
 local IsServer = game:GetService("RunService"):IsServer()
 
-local remote_wrapper = require(script.Parent.__remote_wrapper)
+local remote_wrapper = require(script.Parent.__remote_wrapper).wrapper
 
 -- These wrappers are named from the perspective of their callers
 -- so the client one uses "FireServer" to transmit and vice-versa

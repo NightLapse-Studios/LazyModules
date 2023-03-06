@@ -151,7 +151,7 @@ local function format_load_err(name)
 	return ret
 end
 
-local function format_lazymodules_traceback()
+function mod.format_lazymodules_traceback()
 	local traceback = ""
 
 	local stack_idx = 0
@@ -276,7 +276,7 @@ function mod.__raw_load(script: Instance, name: string): any
 	if config.LogUnfoundLoads then
 		if not module then
 			warn("\n" .. CONTEXT .. " init: Path to `" .. script.Name .. "` not found during PreLoad" ..
-			"\nRequired from:\n" .. format_lazymodules_traceback())
+			"\nRequired from:\n" .. mod.format_lazymodules_traceback())
 		end
 	end
 
@@ -329,7 +329,7 @@ function mod.Load(script: (string | Instance)): any?
 
 		if not module then
 			warn(format_load_err(script))
-			warn("\tRequired from:\n" .. format_lazymodules_traceback())
+			warn("\tRequired from:\n" .. mod.format_lazymodules_traceback())
 			return
 		end
 	elseif script then
@@ -338,7 +338,7 @@ function mod.Load(script: (string | Instance)): any?
 
 		if not module then
 			warn(format_load_err(script))
-			warn("\tRequired from:\n" .. format_lazymodules_traceback())
+			warn("\tRequired from:\n" .. mod.format_lazymodules_traceback())
 		end
 
 		try_init(module, script.Name, " **FROM INSTANCE**")
@@ -369,7 +369,7 @@ function mod.LightLoad(script: Instance): any?
 
 	if module.__run or module.__finalize then
 		warn("Module `" .. script.Name .. "` has loading stages which are not supported by LightLoad")
-		--warn("\tRequired from:\n" .. format_lazymodules_traceback())
+		--warn("\tRequired from:\n" .. mod.format_lazymodules_traceback())
 	end
 
 	return module

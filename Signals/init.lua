@@ -145,10 +145,12 @@ function mod:__init(G, LazyModules)
 	Globals = G
 	LazyModules = LazyModules
 
-	--The one true require tree
 	safe_require = require(ReplicatedFirst.Util.SafeRequire)
 	safe_require:__init(G)
 	safe_require = safe_require.require
+
+	local remote_wrapper = require(ReplicatedFirst.Util.LazyModules.Signals.__remote_wrapper)
+	remote_wrapper:__init(G, LazyModules)
 
 	PSA = require(ReplicatedFirst.Util.SparseList)
 	WaitingList = PSA.new()

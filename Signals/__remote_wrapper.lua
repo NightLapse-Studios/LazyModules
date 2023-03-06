@@ -1,7 +1,14 @@
 
 local IsServer = game:GetService("RunService"):IsServer()
 
-return function(identifier: string, builder_mt: table)
+local mod = { }
+
+local lazymod_traceback
+function mod:__init(G, LazyModules)
+	lazymod_traceback = LazyModules.format_lazymodules_traceback
+end
+
+function mod.wrapper(identifier: string, builder_mt: table)
 	-- TODO: check that all events made on the server are also made on the client
 	local transmitter
 	if IsServer then
@@ -20,7 +27,7 @@ return function(identifier: string, builder_mt: table)
 		local event = game.ReplicatedStorage:WaitForChild(identifier, 6)
 		
 		if not event then
-			warn("Waiting for event timed out! - " .. identifier .. debug.traceback())
+			warn("Waiting for event timed out! - " .. identifier .. "\n" .. lazymod_traceback())
 		end
 		
 		transmitter = setmetatable(
@@ -37,3 +44,5 @@ return function(identifier: string, builder_mt: table)
 
 	return transmitter
 end
+
+return mod

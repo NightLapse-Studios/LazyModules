@@ -37,7 +37,7 @@ local IsServer = game:GetService("RunService"):IsServer()
 
 local Players = game.Players
 
-local remote_wrapper = require(script.Parent.__remote_wrapper)
+local remote_wrapper = require(script.Parent.__remote_wrapper).wrapper
 
 -- Rare case of inheritance in the wild
 local BroadcastBuilder = {

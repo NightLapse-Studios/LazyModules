@@ -30,7 +30,7 @@ local SocialService = game:GetService("SocialService")
 
 local Players = game.Players
 
-local remote_wrapper = require(script.Parent.__remote_wrapper)
+local remote_wrapper = require(script.Parent.__remote_wrapper).wrapper
 
 type Verb = string
 type Noun = string
@@ -41,6 +41,11 @@ type SGameEventConnection = (Player, Verb, Noun) -> nil
 -- so the client one uses "FireServer" to transmit and vice-versa
 local GameEventBuilder = {
 	Type = "Builder",
+
+	RequiresVerification = function(self, bool)
+		self.__RequiresVerification = bool
+		return self
+	end,
 
 	ClientConnection = function(self, func: CGameEventConnection)
 		if not func then return self end
@@ -74,15 +79,31 @@ local GameEventBuilder = {
 		return self
 	end,
 
+	ImpliesNoun = function(self, noun: Noun)
+		self.Implications[noun] = Signals.CurrentModule
+		Signals:GetGameEvent(self.Verb, noun, function(E)
+			self.Implications[noun] = E
+		end)
+
+		return self
+	end,
+
+	ImpliesScenario = function(self, verb: Verb, noun: Noun)
+		self.Implications[noun] = Signals.CurrentModule
+		Signals:GetGameEvent(verb, noun, function(E)
+			self.Implications[noun] = E
+		end)
+	end,
+
 	Build = function(self)
 		if IsServer then
 			self[1].OnServerEvent:Connect(function(plr, n: Noun, noun: any)
 				local should_accept = false
 				if self.__ShouldAccept then
 					should_accept = self.__ShouldAccept(plr, n, noun)
-				else
-					warn("GameEvent " .. self.Verb .. ":" .. self.Noun .. " does not have a ShouldAccept function")
-					end
+				elseif self.RequiresVerification then
+					error("GameEvent " .. self.Verb .. ":" .. self.Noun .. " does not have a ShouldAccept function")
+				end
 
 				if should_accept then
 					--Note that this accesses the wrapper function below, as we do not index to the bindable event
@@ -103,15 +124,6 @@ local GameEventBuilder = {
 			)
 		end
 	end,
-
-	Implies = function(self, noun: Noun)
-		self.Implications[noun] = Signals.CurrentModule
-		Signals:GetGameEvent(self.Verb, noun, function(E)
-			self.Implications[noun] = E
-		end)
-
-		return self
-	end
 }
 local ClientGameEvent = {
 	Fire = function(self, noun: any)
@@ -119,13 +131,25 @@ local ClientGameEvent = {
 			self.monitor(self)
 		end
 
-		--Note that this doesn't use the bindable events, those only happen in respons to a server firing a GE
-		--Only server GEs can be valid
-		self[1]:FireServer(self.Verb, self.Noun, noun)
+		if self.__RequiresVerification then
+			--Note that this doesn't use the bindable events, those only happen in respons to a server firing a GE
+			--Only server GEs can be valid
+			self[1]:FireServer(self.Verb, self.Noun, noun)
+		else
+			local plr = game.Players.LocalPlayer
+			for i = 1, #(self[2]) do
+				self[2][i](plr.UserId, noun)
+			end
+	
+			for _, o in self.Implications do
+				--print(v, o.Noun)
+				o[2]:Fire(plr.UserId, noun)
+			end
+		end
 	end
 }
 local ServerGameEvent = {
-	Fire = function(self, actor: Player, noun: any)
+	Fire = function(self, noun: any, actor: Player)
 		-- print("Fired " .. Globals.CONTEXT .. self[1].Name)
 		assert(actor)
 
@@ -144,6 +168,11 @@ local ServerGameEvent = {
 	end
 }
 
+-- TODO: This is a hack to allow runtime connecting/disconnecting
+-- TODO: A disconnect function (I don't want to test it without a real usecase yet)
+setmetatable(ClientGameEvent, { __index = GameEventBuilder })
+setmetatable(ServerGameEvent, { __index = GameEventBuilder })
+
 local mt_GameEventBuilder = { __index = GameEventBuilder}
 mod.client_mt = { __index = ClientGameEvent }
 mod.server_mt = { __index = ServerGameEvent }
@@ -157,6 +186,7 @@ function mod.NewGameEvent(self: Builder, verb: Verb, noun: Noun)
 	event.Verb = verb
 	event.Noun = noun
 	event.Implications = { }
+	event.__RequiresVerification = false
 	event.__ShouldAccept = false
 
 	local _mod = GameEvents.Identifiers:inspect(id)
