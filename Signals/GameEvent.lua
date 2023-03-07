@@ -93,6 +93,8 @@ local GameEventBuilder = {
 		Signals:GetGameEvent(verb, noun, function(E)
 			self.Implications[noun] = E
 		end)
+
+		return self
 	end,
 
 	Build = function(self)
@@ -143,7 +145,7 @@ local ClientGameEvent = {
 	
 			for _, o in self.Implications do
 				--print(v, o.Noun)
-				o[2]:Fire(plr.UserId, noun)
+				o:Fire(plr.UserId, noun)
 			end
 		end
 	end
@@ -163,7 +165,7 @@ local ServerGameEvent = {
 
 		for _, o in self.Implications do
 			--print(v, o.Noun)
-			o[2]:Fire(actor, noun)
+			o:Fire(actor, noun)
 		end
 	end
 }
