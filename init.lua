@@ -75,12 +75,14 @@ local mod = {
 		TESTING = 7,
 
 		FINISHED = 1000
-	}
+	},
+
+	CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 }
 
 local TESTING = true
 local LOAD_CONTEXTS = mod.CONTEXTS
-local CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
+local CONTEXT = mod.CONTEXT
 local SOURCE_NAME = debug.info(function() return end, "s")
 
 local config = require(game.ReplicatedFirst.ClientCore.BUILDCONFIG)
@@ -432,15 +434,12 @@ function mod.Begin(G)
 	set_context(LOAD_CONTEXTS.FINISHED)
 end
 
-
-
-mod.API_Values = {
-	LightLoad = mod.LightLoad,
-	Load = mod.Load,
-	PreLoad = mod.PreLoad,
-	LazyModules = mod,
-	CONTEXT = CONTEXT
-}
+local APIUtils = require(game.ReplicatedFirst.Util.APIUtils)
+APIUtils.EXPORT_LIST(mod)
+	:ADD("LightLoad")
+	:ADD("Load")
+	:ADD("PreLoad")
+	:ADD("CONTEXT")
 
 function mod:__init(G)
 	Globals = G
