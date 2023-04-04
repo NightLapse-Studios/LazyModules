@@ -84,6 +84,9 @@ local ServerTransmitter = {
 	end,
 }
 
+setmetatable(ClientTransmitter, { __index = TransmitterBuilder })
+setmetatable(ServerTransmitter, { __index = TransmitterBuilder })
+
 local mt_TransmitterBuilder = { __index = TransmitterBuilder }
 mod.client_mt = { __index = ClientTransmitter }
 mod.server_mt = { __index = ServerTransmitter }

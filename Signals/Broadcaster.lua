@@ -111,6 +111,9 @@ local BroadcasterServer = {
 	end,
 }
 
+setmetatable(BroadcasterClient, { __index = BroadcastBuilder })
+setmetatable(BroadcasterServer, { __index = BroadcastBuilder })
+
 local mt_BroadcastBuilder = {__index = BroadcastBuilder}
 mod.client_mt = {__index = BroadcasterClient}
 mod.server_mt = {__index = BroadcasterServer}
