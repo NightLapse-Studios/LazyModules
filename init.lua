@@ -402,7 +402,6 @@ function mod.Begin(G)
 		end
 	end
 
-	-- TODO: a dependency system for the __finalize step
 	if not IsServer then
 		local ClientReadyEvent = game.ReplicatedStorage:WaitForChild("ClientReadyEvent")
 		ClientReadyEvent:FireServer()
@@ -414,21 +413,21 @@ function mod.Begin(G)
 	end
 
 	mod:__finalize(G)
-
+	
 	mod:__run(G)
-
-	--We do this last so that UI and stuff can be set up too. Even game processes over large periods of time can
-	-- potentially be tested
-	if config.TESTING ~= false then
-		assert(config.TESTING == true or config.TESTING == "CLIENT" or config.TESTING == "SERVER")
-		mod:__tests(G)
-	end
-
+	
 	--TODO: Clearly something about initialization is still not realized... This is a scuffed post-finalize stage
 	if IsServer then
 		local ClientReadyEvent = Instance.new("RemoteEvent", game.ReplicatedStorage)
 		ClientReadyEvent.Name = "ClientReadyEvent"
 		ClientReadyEvent.OnServerEvent:Connect(G.Players.LoadClientData)
+	end
+	
+	--We do this last so that UI and stuff can be set up too. Even game processes over large periods of time can
+	-- potentially be tested
+	if config.TESTING ~= false then
+		assert(config.TESTING == true or config.TESTING == "CLIENT" or config.TESTING == "SERVER")
+		mod:__tests(G)
 	end
 
 	set_context(LOAD_CONTEXTS.FINISHED)

@@ -38,6 +38,7 @@ local IsServer = game:GetService("RunService"):IsServer()
 local Players = game.Players
 
 local remote_wrapper = require(script.Parent.__remote_wrapper).wrapper
+local GoodSignal = require(game.ReplicatedFirst.Util.GoodSignal)
 
 -- Rare case of inheritance in the wild
 local BroadcastBuilder = {
@@ -49,7 +50,7 @@ local BroadcastBuilder = {
 
 		self.Configured.Client = true
 		self.Connections += 1
-		self[2].Event:Connect(func)
+		self[2]:Connect(func)
 
 		return self
 	end,
@@ -60,7 +61,7 @@ local BroadcastBuilder = {
 
 		self.Configured.Server = true
 		self.Connections += 1
-		self[2].Event:Connect(func)
+		self[2]:Connect(func)
 
 		return self
 	end,
@@ -125,7 +126,7 @@ end
 -- Broadcasters use a client->server?->all-clients model
 function mod.NewBroadcaster(self: Builder, identifier: string)
 	local broadcaster = remote_wrapper(identifier, mt_BroadcastBuilder)
-	broadcaster[2] = Instance.new("BindableEvent")
+	broadcaster[2] = GoodSignal.new()
 	broadcaster.Connections = 0
 	broadcaster.__ShouldAccept = default_should_accept
 	setmetatable(broadcaster, mt_BroadcastBuilder)
