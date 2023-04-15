@@ -12,9 +12,13 @@ function mod.wrapper(identifier: string, builder_mt: table)
 	-- TODO: check that all events made on the server are also made on the client
 	local transmitter
 	if IsServer then
+		local remoteEvent = Instance.new("RemoteEvent")
+		remoteEvent.Name = identifier
+		remoteEvent.Parent = game.ReplicatedStorage
+		
 		transmitter = setmetatable(
 			{
-				Instance.new("RemoteEvent", game.ReplicatedStorage),
+				remoteEvent,
 				Configured = {
 					Server = false,
 					Client = false,
@@ -22,7 +26,6 @@ function mod.wrapper(identifier: string, builder_mt: table)
 			},
 			builder_mt
 		)
-		transmitter[1].Name = identifier
 	else
 		local event = game.ReplicatedStorage:WaitForChild(identifier, 6)
 		
