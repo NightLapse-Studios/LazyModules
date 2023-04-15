@@ -152,7 +152,8 @@ local function warn_load_err(name)
 
 	ret = "\n" .. CONTEXT .. " init: Module `" .. name .. "` isn't in the `Game` object\n" ..
 	"\nSuggested fix:\nGlobals." .. name .. " = LazyModules.PreLoad(game." .. ret .. ")"
-
+	
+	warn(ret)
 	warn("\tRequired from:\n" .. mod.format_lazymodules_traceback())
 end
 
