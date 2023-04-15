@@ -134,12 +134,15 @@ local function reset_context(prev: number)
 	Globals.LOADING_CONTEXT = prev
 end
 
-local function format_load_err(name)
+local function warn_load_err(name)
 	local _script = game.ReplicatedFirst:FindFirstChild(name, true)
 
 	if not _script then
-		return "Search could not find suggested require path for module \"" .. name .. "\""
+		warn("Could not find suggested require path for module \"" .. name .. "\"")
+		return
 	end
+
+	if not config.LogSearchResults then return end
 
 	local ret = _script.Name
 	while _script.Parent and _script.Parent ~= game do
@@ -150,7 +153,7 @@ local function format_load_err(name)
 	ret = "\n" .. CONTEXT .. " init: Module `" .. name .. "` isn't in the `Game` object\n" ..
 	"\nSuggested fix:\nGlobals." .. name .. " = LazyModules.PreLoad(game." .. ret .. ")"
 
-	return ret
+	warn("\tRequired from:\n" .. mod.format_lazymodules_traceback())
 end
 
 function mod.format_lazymodules_traceback()
@@ -330,8 +333,7 @@ function mod.Load(script: (string | Instance)): any?
 		module = Globals[script]
 
 		if not module then
-			warn(format_load_err(script))
-			warn("\tRequired from:\n" .. mod.format_lazymodules_traceback())
+			warn_load_err(script)
 			return
 		end
 	elseif script then
@@ -339,8 +341,7 @@ function mod.Load(script: (string | Instance)): any?
 		module = mod.__raw_load(script, script.Name)
 
 		if not module then
-			warn(format_load_err(script))
-			warn("\tRequired from:\n" .. mod.format_lazymodules_traceback())
+			warn_load_err(script)
 		end
 
 		try_init(module, script.Name, " **FROM INSTANCE**")
