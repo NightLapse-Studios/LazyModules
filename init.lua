@@ -70,9 +70,14 @@ local mod = {
 		PRELOAD = 1,
 		LOAD_INIT = 2,
 		SIGNAL_BUILDING = 4,
-		FINALIZE = 5,
-		RUN = 6,
-		TESTING = 7,
+		
+		AWAITING_SERVER_DATA = 5,
+		LOAD_DATASTORES = 6,
+		LOAD_GAMESTATE = 7,
+		
+		FINALIZE = 8,
+		RUN = 9,
+		TESTING = 10,
 
 		FINISHED = 1000
 	},
@@ -86,6 +91,7 @@ local CONTEXT = mod.CONTEXT
 local SOURCE_NAME = debug.info(function() return end, "s")
 
 local config = require(game.ReplicatedFirst.ClientCore.BUILDCONFIG)
+local AsyncList = require(game.ReplicatedFirst.Util.AsyncList)
 
 local depth = 0
 
@@ -196,6 +202,48 @@ local function signals_wrapper(module, name)
 	-- Pass the builder to the module
 	-- The module will use the builder to register its signals
 	module:__build_signals(Globals, builder)
+	reset_context(prior_context)
+end
+
+local function load_data_wrapper(obj, name, data)
+	local prior_context = set_context(LOAD_CONTEXTS.LOAD_DATASTORES)
+	
+	-- we use the latest version for client loading
+	-- the server is responsible for handling the deserialization of different versions
+	-- the data the client recieves is serialized from the newest function
+	
+	local successA, successB = pcall(obj.DS3Versions[obj.DS3Versions.Latest], obj, data)
+	
+	if (not successA) or (not successB) then
+		warn("Error deserializing " .. name .. " on the client: ")
+		warn(successA)
+		warn(successB)
+	end
+	
+	reset_context(prior_context)
+end
+
+local function get_gamestate_wrapper(module, plr)
+	-- player being necessary for gamestate is unlikely, but incase necessary.
+	-- @param name is a the name of the module on the client that should receive this state via __load_gamestate,
+	-- will default to the name of the module.
+	local state, name = module:__get_gamestate(plr)
+	
+	return state, name
+end
+
+local function load_gamestate_wrapper(module, modulestate, loadedList, moduleName)
+	local prior_context = set_context(LOAD_CONTEXTS.LOAD_GAMESTATE)
+	
+	-- @param1, the state returned by __get_gamestate
+	-- @param2, a function that you MUST call when you have finished loading, see Gamemodes.lua for a good example.
+	-- @param3, a function that you can pass another module name into to ensure its state loades before your callback is called.
+	module:__load_gamestate(modulestate, function()
+		loadedList:provide(true, moduleName)
+	end, function(name, callback)
+		loadedList:get(name, callback)
+	end)
+	
 	reset_context(prior_context)
 end
 
@@ -405,24 +453,52 @@ function mod.Begin(G)
 	end
 
 	if not IsServer then
+		local GameStateLoaded = AsyncList.new(1)
+		
+		local CanContinue = Instance.new("BindableEvent")
+		
 		local ClientReadyEvent = game.ReplicatedStorage:WaitForChild("ClientReadyEvent")
+		ClientReadyEvent.OnClientEvent:Connect(function(packet)
+			local datastores, gamestate = table.unpack(packet)
+			
+			mod:__load_data(datastores)
+			
+			mod:__load_gamestate(gamestate, GameStateLoaded)
+			
+			while GameStateLoaded:is_awaiting() do
+				--print(GameStateLoaded.awaiting.Contents)
+				task.wait()
+			end
+			
+			CanContinue:Fire()
+		end)
+		
+		local prior_context = set_context(LOAD_CONTEXTS.AWAITING_SERVER_DATA)
+		
 		ClientReadyEvent:FireServer()
-
-		while not (G.LoadedFlags.PlayerStats)
-		do
-			task.wait()
-		end
+		
+		CanContinue.Event:Wait()
+		
+		reset_context(prior_context)
 	end
 
 	mod:__finalize(G)
 	
 	mod:__run(G)
 	
-	--TODO: Clearly something about initialization is still not realized... This is a scuffed post-finalize stage
 	if IsServer then
-		local ClientReadyEvent = Instance.new("RemoteEvent", game.ReplicatedStorage)
+		local ClientReadyEvent = Instance.new("RemoteEvent")
 		ClientReadyEvent.Name = "ClientReadyEvent"
-		ClientReadyEvent.OnServerEvent:Connect(G.Players.LoadClientData)
+		ClientReadyEvent.OnServerEvent:Connect(function(player)
+			local data = G.Players.GetClientData(player)
+			if not data then
+				return
+			end
+			local gamestate = mod:__get_gamestate(player)
+			ClientReadyEvent:FireClient(player, {data, gamestate})
+		end)
+		
+		ClientReadyEvent.Parent = game.ReplicatedStorage
 	end
 	
 	--We do this last so that UI and stuff can be set up too. Even game processes over large periods of time can
@@ -467,6 +543,51 @@ function mod:__init(G)
 		UI = mod.PreLoad(script.UI)
 	end
 	self.Initialized = true
+end
+
+
+function mod:__load_data(data)
+	for i = 1, #Globals._data_object_names do
+		local names = Globals._data_object_names[i]
+		
+		local name, storeName = names[1], names[2]
+		
+		load_data_wrapper(Globals[name], name, data[storeName])
+	end
+end
+
+function mod:__get_gamestate(plr)
+	local gamestate = {}
+	
+	for i,v in PreLoads do
+		if typeof(v == "table") then
+			local s, r
+			s, r = pcall(function() return v.__get_gamestate end)
+			if s and r then
+				local state, name = get_gamestate_wrapper(v, plr)
+				
+				if not name then
+					name = i
+				end
+				
+				gamestate[name] = state
+			end
+		end
+	end
+	
+	return gamestate
+end
+
+function mod:__load_gamestate(gamestate, GameStateLoadedList)
+	for i,v in PreLoads do
+		if typeof(v == "table") then
+			local s, r
+			s, r = pcall(function() return v.__load_gamestate end)
+			if s and r then
+				load_gamestate_wrapper(v, gamestate[i], GameStateLoadedList, i)
+			end
+		end
+	end
 end
 
 function mod:__finalize(G)
