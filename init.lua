@@ -59,34 +59,21 @@ __no_preload modules may depend on pre-loaded modules but pre-loaded modules wil
 	A final finalization step, really. Things such as UI all rely on eachother which also all rely on PlayerStats
 		So without this step there would be no UI file capable of setting the initial page of the menu since not even
 		interface.lua can have any guarantees about when it is hit by __finalize relative to other modules
+
+
+	Additionally, LazyModules exposes some other general
 ]]
 local mod = {
 	--TODO: This flag needs to be removed
 	Initialized = false,
 	Signals = false,
 
-	-- This enum must be numerically sorted acording to the order the steps are executed
-	CONTEXTS = {
-		PRELOAD = 1,
-		LOAD_INIT = 2,
-		SIGNAL_BUILDING = 4,
-		
-		AWAITING_SERVER_DATA = 5,
-		LOAD_DATASTORES = 6,
-		LOAD_GAMESTATE = 7,
-		
-		FINALIZE = 8,
-		RUN = 9,
-		TESTING = 10,
-
-		FINISHED = 1000
-	},
-
-	CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
+	CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT",
+	Enums = require(game.ReplicatedFirst.Util.Enums)
 }
 
 local TESTING = true
-local LOAD_CONTEXTS = mod.CONTEXTS
+local LOAD_CONTEXTS = mod.Enums.LOAD_CONTEXTS
 local CONTEXT = mod.CONTEXT
 local SOURCE_NAME = debug.info(function() return end, "s")
 
@@ -96,7 +83,7 @@ local AsyncList = require(game.ReplicatedFirst.Util.AsyncList)
 local depth = 0
 
 
-local Globals
+local Game
 -- This module is required from __run in this module
 -- Because it needs to go through the whole loading process in order to rely on Assets, etc
 local UI
@@ -118,7 +105,7 @@ end
 
 -- Determine for our scripts if they are initializing or not
 local function set_context(context: number)
-	local prior = Globals.LOADING_CONTEXT
+	local prior = Game.LOADING_CONTEXT
 
 	-- Do some additional context considerations and error checking
 	--prior, context = process_context(prior, context)
@@ -131,13 +118,13 @@ local function set_context(context: number)
 		end
 	end
 
-	Globals.LOADING_CONTEXT = context
+	Game.LOADING_CONTEXT = context
 
 	return prior
 end
 
 local function reset_context(prev: number)
-	Globals.LOADING_CONTEXT = prev
+	Game.LOADING_CONTEXT = prev
 end
 
 local function warn_load_err(name)
@@ -189,7 +176,7 @@ local Initialized: {[string]: boolean} = { }
 
 local function init_wrapper(module, name)
 	local prior_context = set_context(LOAD_CONTEXTS.LOAD_INIT)
-	module:__init(Globals)
+	module:__init(Game)
 	reset_context(prior_context)
 end
 
@@ -201,7 +188,7 @@ local function signals_wrapper(module, name)
 
 	-- Pass the builder to the module
 	-- The module will use the builder to register its signals
-	module:__build_signals(Globals, builder)
+	module:__build_signals(Game, builder)
 	reset_context(prior_context)
 end
 
@@ -253,13 +240,13 @@ local function tests_wrapper(module, name)
 	-- Configure the builder for this module
 	local builder = Tests:Builder( name )
 
-	module:__tests(Globals, builder)
+	module:__tests(Game, builder)
 	reset_context(prior_context)
 end
 
 local function finalize_wrapper(module, name)
 	local prior_context = set_context(LOAD_CONTEXTS.FINALIZE)
-	module:__finalize(Globals)
+	module:__finalize(Game)
 	reset_context(prior_context)
 end
 
@@ -273,7 +260,7 @@ local function ui_wrapper(module, name)
 		print(" -- > UI INIT: " .. name)
 	end
 
-	module:__ui(Globals, builder, UI.A, UI.D)
+	module:__ui(Game, builder, UI.A, UI.D)
 	reset_context(prior_context)
 end
 
@@ -281,7 +268,7 @@ local function run_wrapper(module, name)
 	local prior_context = set_context(LOAD_CONTEXTS.RUN)
 
 	-- Note that UI will not exist on server contexts
-	module:__run(Globals, UI)
+	module:__run(Game, UI)
 	reset_context(prior_context)
 end
 
@@ -341,7 +328,7 @@ function mod.__raw_load(script: Instance, name: string): any
 		return module
 	end
 
-	Globals[name] = module
+	Game[name] = module
 	PreLoads[name] = module
 	Initialized[name] = false
 
@@ -357,7 +344,7 @@ function mod.PreLoad(script: Instance, opt_name: string?): any
 
 	opt_name = opt_name or script.Name
 
-	local module = Globals[opt_name] or mod.__raw_load(script, opt_name)
+	local module = Game[opt_name] or mod.__raw_load(script, opt_name)
 
 	local s, r = pcall(function() return module.__no_preload end)
 	if typeof(module) == "table" and r then
@@ -379,7 +366,7 @@ function mod.Load(script: (string | Instance)): any?
 	local module
 	if typeof(script) == "string" then
 		-- A script's name has been passed in
-		module = Globals[script]
+		module = Game[script]
 
 		if not module then
 			warn_load_err(script)
@@ -439,7 +426,7 @@ local IsServer = game:GetService("RunService"):IsServer()
 	These modules can be a problem if their parent scripts have no idea that the it might not be ready to do everything
 ]]
 function mod.Begin(G)
-	G.LOADING_CONTEXT = mod.CONTEXTS.LOAD_INIT
+	G.LOADING_CONTEXT = LOAD_CONTEXTS.LOAD_INIT
 
 	try_init(G.Main, "Main")
 
@@ -517,11 +504,12 @@ APIUtils.EXPORT_LIST(mod)
 	:ADD("Load")
 	:ADD("PreLoad")
 	:ADD("CONTEXT")
+	:ADD("Enums")
 
 function mod:__init(G)
-	Globals = G
+	Game = G
 
-	Globals.LOADING_CONTEXT = -1
+	Game.LOADING_CONTEXT = -1
 	--The one true require tree
 	safe_require = require(script.Parent.SafeRequire)
 	safe_require:__init(G)
@@ -542,17 +530,18 @@ function mod:__init(G)
 	if CONTEXT == "CLIENT" then
 		UI = mod.PreLoad(script.UI)
 	end
+
 	self.Initialized = true
 end
 
 
 function mod:__load_data(data)
-	for i = 1, #Globals._data_object_names do
-		local names = Globals._data_object_names[i]
+	for i = 1, #Game._data_object_names do
+		local names = Game._data_object_names[i]
 		
 		local name, storeName = names[1], names[2]
 		
-		load_data_wrapper(Globals[name], name, data[storeName])
+		load_data_wrapper(Game[name], name, data[storeName])
 	end
 end
 
