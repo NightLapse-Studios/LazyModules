@@ -69,11 +69,9 @@ local mod = {
 	Signals = false,
 
 	CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT",
-	Enums = require(game.ReplicatedFirst.Util.Enums)
 }
 
-local TESTING = true
-local LOAD_CONTEXTS = mod.Enums.LOAD_CONTEXTS
+local LOAD_CONTEXTS = require(game.ReplicatedFirst.Util.Enums).LOAD_CONTEXTS
 local CONTEXT = mod.CONTEXT
 local SOURCE_NAME = debug.info(function() return end, "s")
 
@@ -504,7 +502,6 @@ APIUtils.EXPORT_LIST(mod)
 	:ADD("Load")
 	:ADD("PreLoad")
 	:ADD("CONTEXT")
-	:ADD("Enums")
 
 function mod:__init(G)
 	Game = G
