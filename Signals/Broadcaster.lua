@@ -82,6 +82,10 @@ local BroadcastBuilder = {
 
 				if should_accept then
 					self[2]:Fire(plr, ...)
+					for i,v in game.Players:GetPlayers() do
+						if v == plr then continue end
+						self[1]:FireClient(v, plr, ...)
+					end
 				end
 			end)
 		else
@@ -108,7 +112,7 @@ local BroadcasterServer = {
 		end
 
 		self[2]:Fire(...)
-		self[1]:FireAllClients(...)
+		self[1]:FireAllClients(nil, ...)
 	end,
 }
 
