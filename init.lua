@@ -220,14 +220,21 @@ end
 local function load_gamestate_wrapper(module, modulestate, loadedList, moduleName)
 	local prior_context = set_context(LOAD_CONTEXTS.LOAD_GAMESTATE)
 	
-	-- @param1, the state returned by __get_gamestate
-	-- @param2, a function that you MUST call when you have finished loading, see Gamemodes.lua for a good example.
-	-- @param3, a function that you can pass another module name into to ensure its state loades before your callback is called.
-	module:__load_gamestate(modulestate, function()
+	local loaded_func = function()
 		loadedList:provide(true, moduleName)
-	end, function(name, callback)
+	end
+	local after_func = function(name, callback)
 		loadedList:get(name, callback)
-	end)
+	end
+
+	if not modulestate then
+		loaded_func()
+	else
+		-- @param1, the state returned by __get_gamestate
+		-- @param2, a function that you MUST call when you have finished loading, see Gamemodes.lua for a good example.
+		-- @param3, a function that you can pass another module name into to ensure its state loades before your callback is called.
+		module:__load_gamestate(modulestate, loaded_func, after_func)
+	end
 	
 	reset_context(prior_context)
 end
