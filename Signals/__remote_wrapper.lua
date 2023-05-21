@@ -23,6 +23,7 @@ function mod.wrapper(identifier: string, builder_mt: table)
 					Server = false,
 					Client = false,
 				},
+				Name = identifier
 			},
 			builder_mt
 		)
@@ -40,6 +41,7 @@ function mod.wrapper(identifier: string, builder_mt: table)
 					Server = false,
 					Client = false,
 				},
+				Name = identifier
 			},
 			builder_mt
 		)
