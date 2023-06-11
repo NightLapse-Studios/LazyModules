@@ -37,8 +37,10 @@ sequenceDiagram;
 	deactivate LM
 
 	activate Ctx
-	Ctx -->> Ctx: Expose LazyModules API to Game obj
+	Ctx -->> Ctx: Load LazyModules API into Game obj
 	Note right of Ctx: APIUtils.LOAD_EXPORTS(LazyModules, Globals)<br>result: CONTEXT, LightLoad, Load, PreLoad
+
+	Ctx -->> Ctx: PreLoad StdLib, load its API into Game obj
 	Ctx -->> Ctx: Store custom core-functionality into Game obj
 	Ctx -->> GC: PreLoad Main script
 	Note right of Ctx: Game.Main = LazyModules.PreLoad(<game entry script>)
@@ -62,7 +64,11 @@ sequenceDiagram;
 		end
 
 		opt Is Client?
-			note Right of LM: Wait for server data
+			note Left of LM: Wait for server data
+			LM -->> GC: __load_data(datastore)
+			loop For each PreLoad
+				LM -->> GC: module::__load_gamestate(serial, loaded: func, after: func)
+			end
 		end
 
 		LM -->> GC: Signals::__finalize(Game)
@@ -75,7 +81,10 @@ sequenceDiagram;
 		end
 		
 		opt Is Server?
-			note Right of LM: Collect game state, send to clients
+			note Left of LM: Collect game state, send to clients
+			loop For each PreLoad
+				LM -->> GC: module::__get_gamestate(plr)
+			end
 		end
 
 		opt Is Testing?
@@ -83,5 +92,8 @@ sequenceDiagram;
 				LM -->> GC: module:__tests(G, T)
 			end
 		end
+		LM ->> Ctx: Startup COMPLETE!
 	deactivate LM
+
+	note Right of Ctx: The modules should have performed actions<br>which result in the entire game functioning by this point
 ```
