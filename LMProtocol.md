@@ -40,20 +40,20 @@ sequenceDiagram;
 	Ctx -->> Ctx: Load LazyModules API into Game obj
 	Note right of Ctx: APIUtils.LOAD_EXPORTS(LazyModules, Globals)<br>result: CONTEXT, LightLoad, Load, PreLoad
 
-	Ctx -->> Ctx: PreLoad StdLib, load its API into Game obj
-	Ctx -->> Ctx: Store custom core-functionality into Game obj
+	Ctx ->> Ctx: PreLoad StdLib, load its API into Game obj
+	Ctx ->> Ctx: Store custom core-functionality into Game obj
 	Ctx -->> GC: PreLoad Main script
 	Note right of Ctx: Game.Main = LazyModules.PreLoad(<game entry script>)
 	loop Preload Other modules
 		Ctx ->>+ LM: PreLoad
 		deactivate Ctx
 		Note right of Ctx: Game.XYZ = LazyModules.PreLoad(XYZ)
-		LM -->>- GC: require, compile module
+		LM ->>- GC: require, compile module
 
 		activate GC
-		GC -->>+ LM: return value
+		GC ->>+ LM: return value
 		deactivate GC
-		LM -->> LM: store module value
+		LM ->> LM: store module value
 		deactivate LM
 	end
 	Ctx ->> LM: (Startup->Game->LazyModules).Begin()
