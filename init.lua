@@ -349,7 +349,14 @@ function mod.PreLoad(script: Instance, opt_name: string?): any
 
 	opt_name = opt_name or script.Name
 
-	local module = Game[opt_name] or mod.__raw_load(script, opt_name)
+	local module = Game[opt_name]
+	if not module then
+		if config.LogPreLoads then
+			print(opt_name)
+		end
+
+		module = mod.__raw_load(script, opt_name)
+	end
 
 	local s, r = pcall(function() return module.__no_preload end)
 	if typeof(module) == "table" and r then
