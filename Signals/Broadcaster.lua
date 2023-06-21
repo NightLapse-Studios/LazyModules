@@ -32,13 +32,13 @@ local unwrap_or_warn
 local unwrap_or_error
 local safe_require
 local async_list
+local ClassicSignal
 
 local IsServer = game:GetService("RunService"):IsServer()
 
 local Players = game.Players
 
 local remote_wrapper = require(script.Parent.__remote_wrapper).wrapper
-local GoodSignal = require(game.ReplicatedFirst.Util.GoodSignal)
 
 -- Rare case of inheritance in the wild
 local BroadcastBuilder = {
@@ -115,6 +115,14 @@ local BroadcasterServer = {
 		self[2]:Fire(nil, ...)
 		self[1]:FireAllClients(nil, ...)
 	end,
+	BroadcastLikePlayer = function(self, plr, ...)
+		if self.monitor then
+			self.monitor(self, ...)
+		end
+
+		self[2]:Fire(plr, ...)
+		self[1]:FireAllClients(plr, ...)
+	end,
 }
 
 setmetatable(BroadcasterClient, { __index = BroadcastBuilder })
@@ -131,7 +139,7 @@ end
 -- Broadcasters use a client->server?->all-clients model
 function mod.NewBroadcaster(self: Builder, identifier: string)
 	local broadcaster = remote_wrapper(identifier, mt_BroadcastBuilder)
-	broadcaster[2] = GoodSignal.new()
+	broadcaster[2] = ClassicSignal.new()
 	broadcaster.Connections = 0
 	broadcaster.__ShouldAccept = default_should_accept
 	setmetatable(broadcaster, mt_BroadcastBuilder)
@@ -160,6 +168,7 @@ function mod:__init(G)
 	unwrap_or_error = err.unwrap_or_error
 
 	LazyString = require(game.ReplicatedFirst.Util.LazyString)
+	ClassicSignal = require(game.ReplicatedFirst.Util.LazyModules.Signals.ClassicSignal)
 
 	async_list = require(game.ReplicatedFirst.Util.AsyncList)
 	async_list:__init(G)

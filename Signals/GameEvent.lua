@@ -116,7 +116,7 @@ local GameEventBuilder = {
 			self[1].OnClientEvent:Connect(
 				function(plr, noun: any)
 					for i = 1, #(self[2]) do
-						self[2][i](plr, noun)
+						task.spawn(self[2][i], plr, noun)
 					end
 
 					for _, o in self.Implications do
@@ -140,7 +140,7 @@ local ClientGameEvent = {
 		else
 			local plr = game.Players.LocalPlayer
 			for i = 1, #(self[2]) do
-				self[2][i](plr.UserId, noun)
+				task.spawn(self[2][i], plr.UserId, noun)
 			end
 	
 			for _, o in self.Implications do
@@ -160,7 +160,7 @@ local ServerGameEvent = {
 
 		self[1]:FireAllClients(actor, noun)
 		for i = 1, #(self[2]) do
-			self[2][i](actor, noun)
+			task.spawn(self[2][i], actor, noun)
 		end
 
 		for _, o in self.Implications do

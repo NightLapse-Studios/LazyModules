@@ -4,7 +4,6 @@
 	Events:
 
 	Events function like normal RemoteEvents but cannot cross client-server boundaries
-	Can only have one recieving connected function
 ]]
 
 local mod = {
@@ -68,7 +67,7 @@ local EventWrapper = {
 		end
 
 		for i = 1, #self do
-			self[i](...)
+			task.spawn(self[i], ...)
 		end
 	end,
 	Connect = function(self, func)
