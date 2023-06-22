@@ -82,6 +82,13 @@ local ServerTransmitter = {
 
 		self[1]:FireClient(...)
 	end,
+	TransmitAll = function(self, ...)
+		if self.monitor then
+			self.monitor(self, ...)
+		end
+
+		self[1]:FireAllClients(...)
+	end,
 }
 
 setmetatable(ClientTransmitter, { __index = TransmitterBuilder })
