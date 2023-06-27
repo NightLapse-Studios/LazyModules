@@ -240,13 +240,13 @@ local function load_gamestate_wrapper(module, modulestate, loadedList, moduleNam
 end
 
 local function tests_wrapper(module, name)
-	local prior_context = set_context(LOAD_CONTEXTS.TESTING)
-
 	-- Configure the builder for this module
 	local builder = Tests:Builder( name )
 
+	-- __tests **may** yield, we leverage this as a feature
+	-- However it means that __tests cannot rely on eachother (probably a good thing)
 	module:__tests(Game, builder)
-	reset_context(prior_context)
+	builder:Finished()
 end
 
 local function finalize_wrapper(module, name)
@@ -607,14 +607,14 @@ function mod:__finalize(G)
 end
 
 function mod:__tests(G)
-	print("\n\t\tTESTING\nn")
+	print("\n\t\tTESTING\n")
 
 	for i,v in PreLoads do
 		if typeof(v == "table") then
 			--Roact managed to ruin everything
 			local s, r = pcall(function() return v.__tests end)
 			if s and r then
-				tests_wrapper(v, i)
+				coroutine.resume(coroutine.create(tests_wrapper), v, i)
 			end
 		end
 	end

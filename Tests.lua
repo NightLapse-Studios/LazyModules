@@ -15,39 +15,74 @@ local safe_require
 
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 
-local mt_PreTest
-local mt_DuringTest
 
-local TestName, Situation, HasFailures
-local Outputs = { }
+local Tester = { }
+local mt_Tester = { __index = Tester }
 
-local function NewTest(self, name, test_func)
-	TestName = name
 
-	--switch to testing behavior
-	setmetatable(mod, mt_DuringTest)
+function mod:Builder( module_name: string )
+	assert(module_name)
+	assert(typeof(module_name) == "string")
 
-	test_func(mod)
-	if HasFailures then
-		print("\t❌" .. TestName)
-		for i, v in Outputs do
-			print(Outputs[i])
-		end
-	else
-		print("\t✅" .. TestName)
-	end
+	local t = {
+		CurrentTestName = false,
+		ModuleName = module_name,
+		TestOutputs = { }
+	}
 
-	--revert state
-	setmetatable(mod, mt_PreTest)
-
-	table.clear(Outputs)
-	Situation = ""
-	HasFailures = false
+	return setmetatable(t, mt_Tester)
 end
 
-local function NewSituation(self, description: string?, ...)
-	Situation = description or ""
+function Tester:Finished()
+	print("📃 " .. self.ModuleName .. " should:")
+
+	for test_name, outputs in self.TestOutputs do
+		if outputs.HasFailures then
+			print("\t❌" .. test_name)
+		else
+			print("\t✅" .. test_name)
+		end
+
+		for i, output in outputs do
+			if typeof(output) ~= "string" then
+				continue
+			end
+
+			print(output)
+		end
+	end
+end
+
+function Tester:__try_new_output_buf(name)
+	if self.TestOutputs[name] then
+		error("Reused test name: " .. name .. "in " .. self.ModuleName)
+	end
+
+	-- This will be filled with strings stating success/fail conditions of tests
+	local output_buf = {
+		HasFailures = false
+	}
+	self.TestOutputs[name] = output_buf
+
+	return output_buf
+end
+
+function Tester:Test(name, test_func)
+	self:__try_new_output_buf(name)
+	self.CurrentTestName = name
+
+	-- test_func uses the `self` object to pass the results of tests into `self`s internal state
+	test_func(self)
+	self.CurrentTestName = false
+end
+
+function Tester:Situation(description: string, ...)
 	local conditions = { ... }
+	local output_buf = self.TestOutputs[self.CurrentTestName]
+
+	if not output_buf then
+		error("Tester::Situation must be called from within the body of a test function")
+	end
 
 	assert(#conditions % 2 == 0,
 		"Conditions must be a value, expectation pair. All values must have a corresponding expectation, even if `nil`"
@@ -62,39 +97,39 @@ local function NewSituation(self, description: string?, ...)
 		local actual, expected = conditions[i], conditions[i + 1]
 
 		if actual ~= expected then
-			local sep = if failed == 0 then "" else ", "			
+			local separator = if failed == 0 then "" else ", "			
 
 			local cond = tostring((i + 1) / 2)
-			failures = failures .. sep .. cond
+			failures = failures .. separator .. cond
 			fail_reasons = fail_reasons .. "\n\t\t\tCond. " .. cond .. " expects " .. tostring(expected) .. " got " .. tostring(actual)
 
-			HasFailures = true
 			failed += 1
 		end
 	end
 
 	if failed > 0 then
-		table.insert(Outputs,  "\t\t✖ While " .. Situation)
-		table.insert(Outputs, "\t\t\tDue to " .. failed .. " of " .. num_conditions .. " condition(s): " .. failures .. fail_reasons)
+		output_buf.HasFailures = true
+		table.insert(output_buf,  "\t\t✖ While " .. description)
+		table.insert(output_buf, "\t\t\tDue to " .. failed .. " of " .. num_conditions .. " condition(s): " .. failures .. fail_reasons)
 	else
-		table.insert(Outputs,  "\t\t✔ While " .. Situation)
+		table.insert(output_buf,  "\t\t✔ While " .. description)
 	end
 end
 
+-- This function will insert its output into the "Expect errors" test name, regardless of when it is used in the __tests function
+function Tester:ExpectError(description: string, f, ...)
+	assert(typeof(description) == "string")
+	assert(typeof(f) == "function")
 
-mt_PreTest = { __call = NewTest }
-mt_DuringTest = { __call = NewSituation }
+	local success, ret = pcall(f, ...)
+	local output_buf = self:__try_new_output_buf("Expect errors")
 
-setmetatable(mod, mt_PreTest)
-
-function mod:Builder( module_name: string )
-	assert(module_name)
-	assert(typeof(module_name) == "string")
-
-	mod.CurrentModule = module_name
-	print("📃  " .. module_name .. " should:")
-
-	return mod
+	if success then
+		output_buf.HasFailures = true
+		table.insert(output_buf,  "\t\t✖ While " .. description)
+	else
+		table.insert(output_buf,  "\t\t✔ While " .. description)
+	end
 end
 
 function mod:__init(G)
