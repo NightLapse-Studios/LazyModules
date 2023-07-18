@@ -170,14 +170,7 @@ function Tester:UnlessSituation(description: string, ...)
 	local conditions = { ... }
 	local output_buf = self.TestOutputs[self.CurrentTestName]
 
-	if not output_buf then
-		error("Tester::WhileSituation must be called from within the body of a test function")
-	end
-
-	assert(#conditions % 2 == 0,
-		"Conditions must be a value, expectation pair. All values must have a corresponding expectation, even if `nil`"
-	)
-
+	check_situation_call(conditions, output_buf)
 	check_conditions(conditions, output_buf, description, "Unless ")
 end
 
