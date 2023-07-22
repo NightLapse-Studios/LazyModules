@@ -614,7 +614,7 @@ function mod:__tests(G)
 			--Roact managed to ruin everything
 			local s, r = pcall(function() return v.__tests end)
 			if s and r then
-				coroutine.resume(coroutine.create(tests_wrapper), v, i)
+				tests_wrapper(v, i)
 			end
 		end
 	end

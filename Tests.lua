@@ -117,7 +117,7 @@ end
 
 local ARGS_PER_CONDITION = 3
 local function check_conditions(conditions, output_buf, description: string, predicate: string)
-	local num_conditions = #conditions / ARGS_PER_CONDITION
+	local num_conditions = math.ceil(#conditions / ARGS_PER_CONDITION)
 
 	local failures, failed = "", 0
 	local fail_reasons = ""
@@ -153,9 +153,10 @@ local function check_situation_call(conditions, output_buf)
 		error("Tester situations must be called from within the body of a test function:\n" .. USAGE_EXAMPLE)
 	end
 
-	assert(#conditions % ARGS_PER_CONDITION == 0,
+	-- Can't do this check because lua sucks (trailing nil won't be an argument)
+--[[ 	assert(#conditions % ARGS_PER_CONDITION == 0,
 		"Conditions must be a value, expectation pair. All values must have a corresponding expectation, even if `nil`"
-	)
+	) ]]
 end
 
 function Tester:WhileSituation(description: string, ...)
