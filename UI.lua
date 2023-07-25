@@ -767,23 +767,55 @@ end
 
 local currentCamera = workspace.CurrentCamera
 
-local function calcSize(size)
+local function calcSize(size, rbx: Instance)
+	local min = 0
+	
+	if rbx:IsA("TextSource") or rbx:IsA("TextButton") or rbx:IsA("TextBox") then
+		local font = rbx.Font
+		min = font == Style.LabelFont and 7 or 11
+	end
+	
+	
 	local viewportSize = currentCamera.ViewportSize
-	local newSize = math.max(11, math.ceil(size * viewportSize.X / 1920 * viewportSize.Y / 1080))
+	local newSize = math.max(min, math.ceil(size * viewportSize.X / 1920 * viewportSize.Y / 1080))
 	return newSize
 end
 
 function mod:ScaledTextSize(size)
-	local binding, updBinding = Roact.createBinding(calcSize(size))
+	local binding, updBinding = Roact.createBinding(0)
 	
 	local old = self.Current[Roact.Change.AbsoluteSize]
-	
 	self.Current[Roact.Change.AbsoluteSize] = function(rbx)
 		if old then
 			old(rbx)
 		end
 		
-		updBinding(calcSize(size))
+		if not (rbx and rbx.Parent) then
+			return
+		end
+		
+		updBinding(calcSize(size, rbx))
+	end
+	
+	local old2 = self.Current[Roact.Change.Parent]
+	self.Current[Roact.Change.Parent] = function(rbx)
+		if old2 then
+			old2(rbx)
+		end
+		
+		if not (rbx and rbx.Parent) then
+			return
+		end
+		
+		updBinding(calcSize(size, rbx))
+	end
+	
+	self.Current[Roact.Ref] = function(rbx)
+		if not (rbx and rbx.Parent) then
+			return
+		end
+		
+		updBinding(calcSize(size, rbx))
 	end
 	
 	return binding
