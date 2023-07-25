@@ -769,7 +769,8 @@ local currentCamera = workspace.CurrentCamera
 
 local function calcSize(size)
 	local viewportSize = currentCamera.ViewportSize
-	return math.max(11, math.ceil(size * viewportSize.X / 1920 * viewportSize.Y / 1080))
+	local newSize = math.max(11, math.ceil(size * viewportSize.X / 1920 * viewportSize.Y / 1080))
+	return newSize
 end
 
 function mod:ScaledTextSize(size)
