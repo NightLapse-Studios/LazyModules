@@ -1,5 +1,5 @@
 {
-  "name": "src",
+  "name": "LazyModules Project",
   "tree": {
     "$className": "DataModel",
     "$ignoreUnknownInstances": true,
@@ -15,6 +15,10 @@
     "ServerScriptService": {
       "$className": "ServerScriptService",
       "$path": "src/server"
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "$path": "src/replicated_storage"
     },
     "StarterPlayer": {
       "$className": "StarterPlayer",

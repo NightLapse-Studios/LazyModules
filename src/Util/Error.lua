@@ -6,7 +6,8 @@ local HTTPService = game:GetService("HttpService")
 
 local Secrets
 if RunService:IsServer() then
-	Secrets = require(game.ServerScriptService.Secrets)
+	-- TODO: Generalize secrets so that we can add this back
+	-- Secrets = require(game.ServerScriptService.Secrets)
 end
 
 local Paniced = false
@@ -24,7 +25,9 @@ function mod.Panic(err: string, extra: string, kick_players: boolean?)
 
 	if RunService:IsServer() then
 		--TODO: This depends on the __init step so some stuff 
-		Secrets.SendPanicReport(err, extra)
+		if Secrets then
+			Secrets.SendPanicReport(err, extra)
+		end
 	
 		if kick_players then
 			for i,v in pairs(game.Players:GetPlayers()) do

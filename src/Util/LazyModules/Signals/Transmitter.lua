@@ -121,7 +121,6 @@ function mod:__init(G)
 
 	--The one true require tree
 	safe_require = require(game.ReplicatedFirst.Util.SafeRequire)
-	safe_require:__init(G)
 	safe_require = safe_require.require
 
 	local err = require(game.ReplicatedFirst.Util.Error)

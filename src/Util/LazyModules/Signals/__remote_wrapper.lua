@@ -5,7 +5,7 @@ local mod = { }
 
 local lazymod_traceback
 function mod:__init(G, LazyModules)
-	lazymod_traceback = LazyModules.format_lazymodules_traceback
+	lazymod_traceback = G.LazyModules.format_lazymodules_traceback
 end
 
 function mod.wrapper(identifier: string, builder_mt: table)

@@ -10,7 +10,7 @@ local Libs = {
 	Enums = Game.PreLoad(game.ReplicatedFirst.Util.Enums),
 	Meta = Game.PreLoad(game.ReplicatedFirst.Util.Meta),
 	Debug = Game.PreLoad(game.ReplicatedFirst.Util.Debug),
-	Maskables = Game.PreLoad(game.ReplicatedFirst.Util.Maskables)
+	Maskables = Game.PreLoad(game.ReplicatedFirst.Util.Maskables),
 }
 
 local APIUtils = require(game.ReplicatedFirst.Util.APIUtils)

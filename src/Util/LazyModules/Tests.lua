@@ -14,7 +14,7 @@ local unwrap_or_error
 local safe_require
 
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
-local Config = require(game.ReplicatedFirst.ClientCore.BUILDCONFIG)
+local Config = require(game.ReplicatedFirst.Util.BUILDCONFIG)
 
 local USAGE_EXAMPLE = [[
 	function mod:__tests(G, T)
@@ -224,15 +224,6 @@ end
  
 function mod:__init(G)
 	Globals = G
-
-	--The one true require tree
-	safe_require = require(ReplicatedFirst.Util.SafeRequire)
-	safe_require:__init(G)
-	safe_require = safe_require.require
-
-	Err = require(ReplicatedFirst.Util.Error)
-	unwrap_or_warn = Err.unwrap_or_warn
-	unwrap_or_error = Err.unwrap_or_error
 end
 
 -- TODO: Many safety checks require some meta-communication with the server. eeeeghhh

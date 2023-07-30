@@ -146,7 +146,6 @@ function mod:__init(G, LazyModules)
 	LazyModules = LazyModules
 
 	safe_require = require(ReplicatedFirst.Util.SafeRequire)
-	safe_require:__init(G)
 	safe_require = safe_require.require
 
 	local remote_wrapper = require(ReplicatedFirst.Util.LazyModules.Signals.__remote_wrapper)

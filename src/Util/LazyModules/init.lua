@@ -67,6 +67,7 @@ local mod = {
 	--TODO: This flag needs to be removed
 	Initialized = false,
 	Signals = false,
+	CollectedModules = { },
 
 	CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT",
 }
@@ -75,7 +76,7 @@ local LOAD_CONTEXTS = require(game.ReplicatedFirst.Util.Enums).LOAD_CONTEXTS
 local CONTEXT = mod.CONTEXT
 local SOURCE_NAME = debug.info(function() return end, "s")
 
-local config = require(game.ReplicatedFirst.ClientCore.BUILDCONFIG)
+local config = require(game.ReplicatedFirst.Util.BUILDCONFIG)
 local AsyncList = require(game.ReplicatedFirst.Util.AsyncList)
 
 local depth = 0
@@ -87,8 +88,6 @@ local Game
 local UI
 local Signals
 local Tests
-local unwrap_or_warn
-local unwrap_or_error
 local safe_require
 
 -- Convenience function
@@ -309,12 +308,6 @@ local PreLoads: { [string]: script } = { }
 	A string is also required so that naming overrides are processed by the time __raw_load is called
 ]]
 function mod.__raw_load(script: Instance, name: string): any
---[[ 	unwrap_or_warn(
-		PreLoads[script.Name] == nil,
-		"\n" .. INIT_CONTEXT .. " init: Double pre-load of `" .. script.Name .. "`",
-		"\nRequired from:\n" .. debug.traceback(nil, 2)
-	) ]]
-
 	local prior_context = set_context(LOAD_CONTEXTS.PRELOAD)
 
 	local module = safe_require(script)
@@ -333,7 +326,7 @@ function mod.__raw_load(script: Instance, name: string): any
 		return module
 	end
 
-	Game[name] = module
+	mod.CollectedModules[name] = module
 	PreLoads[name] = module
 	Initialized[name] = false
 
@@ -349,7 +342,7 @@ function mod.PreLoad(script: Instance, opt_name: string?): any
 
 	opt_name = opt_name or script.Name
 
-	local module = Game[opt_name]
+	local module = mod.CollectedModules[opt_name]
 	if not module then
 		if config.LogPreLoads then
 			print(opt_name)
@@ -378,7 +371,7 @@ function mod.Load(script: (string | Instance)): any?
 	local module
 	if typeof(script) == "string" then
 		-- A script's name has been passed in
-		module = Game[script]
+		module = mod.CollectedModules[script]
 
 		if not module then
 			warn_load_err(script)
@@ -428,6 +421,28 @@ end
 
 
 
+function mod.CollectModules(Game)
+	for _, dir in config.ModuleCollectionFolders do
+		for i,v in dir:GetDescendants() do
+			if v == script.Game then
+				continue
+			end
+
+			if typeof(v) == "Instance" and v:IsA("ModuleScript") then
+				-- This is kind of flimsy since PreLoad can do this on its own
+				-- TODO: A Call to PreLoad before we collect can cause false positives
+				if mod.CollectedModules[v.Name] ~= nil then
+					warn("Error durring module collection:\nModule name already used: " .. v.Name)
+				end
+
+				mod.CollectedModules[v.Name] = mod.PreLoad(v)
+			end
+		end
+	end
+end
+
+
+
 
 local IsServer = game:GetService("RunService"):IsServer()
 
@@ -437,10 +452,11 @@ local IsServer = game:GetService("RunService"):IsServer()
 
 	These modules can be a problem if their parent scripts have no idea that the it might not be ready to do everything
 ]]
-function mod.Begin(G)
-	G.LOADING_CONTEXT = LOAD_CONTEXTS.LOAD_INIT
+function mod.Begin(Game, Main)
+	Game.LOADING_CONTEXT = LOAD_CONTEXTS.LOAD_INIT
 
-	try_init(G.Main, "Main")
+	-- TODO: @NoCommit Game.Main junk
+	try_init(Main, "Main")
 
 	for i,v in PreLoads do
 		if typeof(v) ~= "table" or not v.__init then continue end
@@ -481,20 +497,18 @@ function mod.Begin(G)
 		reset_context(prior_context)
 	end
 
-	mod:__finalize(G)
+	mod:__finalize(Game)
 	
-	mod:__run(G)
+	mod:__run(Game)
 	
 	if IsServer then
 		local ClientReadyEvent = Instance.new("RemoteEvent")
 		ClientReadyEvent.Name = "ClientReadyEvent"
 		ClientReadyEvent.OnServerEvent:Connect(function(player)
-			local data = G.Players.GetClientData(player)
-			if not data then
-				return
-			end
+			-- @Setup Collect client data as well
+			local other_client_datas = { }
 			local gamestate = mod:__get_gamestate(player)
-			ClientReadyEvent:FireClient(player, {data, gamestate})
+			ClientReadyEvent:FireClient(player, {other_client_datas, gamestate})
 		end)
 		
 		ClientReadyEvent.Parent = game.ReplicatedStorage
@@ -504,7 +518,7 @@ function mod.Begin(G)
 	-- potentially be tested
 	if config.TESTING ~= false then
 		assert(config.TESTING == true or config.TESTING == "CLIENT" or config.TESTING == "SERVER")
-		mod:__tests(G)
+		mod:__tests(Game)
 	end
 
 	set_context(LOAD_CONTEXTS.FINISHED)
@@ -512,6 +526,7 @@ end
 
 local APIUtils = require(game.ReplicatedFirst.Util.APIUtils)
 APIUtils.EXPORT_LIST(mod)
+	:ADD("LazyModules", mod)
 	:ADD("LightLoad")
 	:ADD("Load")
 	:ADD("PreLoad")
@@ -523,7 +538,6 @@ function mod:__init(G)
 	Game.LOADING_CONTEXT = -1
 	--The one true require tree
 	safe_require = require(script.Parent.SafeRequire)
-	safe_require:__init(G)
 	safe_require = safe_require.require
 
 	Signals = require(script.Signals)
@@ -534,10 +548,6 @@ function mod:__init(G)
 	Tests:__init(G, mod)
 	mod.Tests = Tests
 
-	local err = require(script.Parent.Error)
-	unwrap_or_warn = err.unwrap_or_warn
-	unwrap_or_error = err.unwrap_or_error
-
 	if CONTEXT == "CLIENT" then
 		UI = mod.PreLoad(script.UI)
 	end
@@ -547,13 +557,14 @@ end
 
 
 function mod:__load_data(data)
-	for i = 1, #Game._data_object_names do
+	-- TODO: Bring back this functionality
+--[[ 	for i = 1, #Game._data_object_names do
 		local names = Game._data_object_names[i]
 		
 		local name, storeName = names[1], names[2]
 		
-		load_data_wrapper(Game[name], name, data[storeName])
-	end
+		load_data_wrapper(mod.CollectedModules[name], name, data[storeName])
+	end ]]
 end
 
 function mod:__get_gamestate(plr)

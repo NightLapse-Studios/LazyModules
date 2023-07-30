@@ -88,7 +88,7 @@ function mod.DebugGlobalAxis(model: Model, wait, dist)
 	mod.TempMarkSpotDbg(cf * CFrame.new(z), wait, Color3.new(0, 0, 1), Vector3.new(0.5, 0.5, 0.5))
 end
 
-local ArrowModel = game.ReplicatedStorage.EffectsPrimitives.RectangularArrow
+local ArrowModel = game.ReplicatedStorage.RectangularArrow
 function mod.VisualizeCFrame(cf: CFrame, dur, opt_mag, opt_color, opt_planar_size: Vector2?)
 	opt_color = opt_color or Color3.new(0.560784, 0.066666, 0.066666)
 	opt_planar_size = opt_planar_size or Vector2.new(1, 1)
@@ -187,8 +187,6 @@ function mod.DebugHighlight(model, color, t, occlude)
 	end
 end
 
-local Meta = _G.Game.Meta
-
 
 local function cycle(self, dur, funcs)
 	local len = #funcs
@@ -204,6 +202,8 @@ local function cycle(self, dur, funcs)
 	end
 end
 
+
+local Meta = require(game.ReplicatedFirst.Util.Meta)
 local Cycler = Meta.FUNCTIONAL_METATABLE()
 	:METHOD("Get", function(self, ...)
 		return self.cur_func(...)
@@ -241,7 +241,8 @@ function mod.DebugDiscordMsg(msg: string)
 end
 
 if game:GetService("RunService"):IsServer() then
-	Secrets = require(game.ServerScriptService.Secrets)
+	-- TODO: again, secrets thing
+	-- Secrets = require(game.ServerScriptService.Secrets)
 	DebugDiscordMsgRemote = Instance.new("RemoteEvent", game.ReplicatedStorage)
 	DebugDiscordMsgRemote.Name = "DebugDiscordMsgRemote"
 	DebugDiscordMsgRemote.OnServerEvent:Connect(function(plr, msg) mod.DebugDiscordMsg(msg) end)

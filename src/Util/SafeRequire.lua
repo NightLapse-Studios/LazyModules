@@ -1,6 +1,4 @@
 --!strict
-local Globals
-local Err
 
 local mod = { }
 
@@ -21,11 +19,6 @@ function mod.require(_s: Script)
 	end
 
 	return ret, false, nil
-end
-
-function mod:__init(G)
-	Globals = G
-	Err = require(script.Parent.Error)
 end
 
 return mod
