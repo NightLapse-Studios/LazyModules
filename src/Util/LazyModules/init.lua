@@ -172,12 +172,28 @@ end
 local Initialized: {[string]: boolean} = { }
 
 local function init_wrapper(module, name)
+	local s, r = pcall(function() return module.__no_lazymodules end)
+	if s and r then
+		return
+	end
+
 	local prior_context = set_context(LOAD_CONTEXTS.LOAD_INIT)
+	if typeof(module.__init) ~= "function" then
+		-- Some legacy decisions for Roact's ability to be managed by LM have necessitated this check
+		-- TODO: Fix? Remove?
+		return
+	end
+
 	module:__init(Game)
 	reset_context(prior_context)
 end
 
 local function signals_wrapper(module, name)
+	local s, r = pcall(function() return module.__no_lazymodules end)
+	if s and r then
+		return
+	end
+
 	local prior_context = set_context(LOAD_CONTEXTS.SIGNAL_BUILDING)
 
 	-- Configure the builder for this module
@@ -185,6 +201,12 @@ local function signals_wrapper(module, name)
 
 	-- Pass the builder to the module
 	-- The module will use the builder to register its signals
+	if typeof(module.__build_signals) ~= "function" then
+		-- Some legacy decisions for Roact's ability to be managed by LM have necessitated this check
+		-- TODO: Fix? Remove?
+		print(0)
+		return
+	end
 	module:__build_signals(Game, builder)
 	reset_context(prior_context)
 end
@@ -208,6 +230,11 @@ local function load_data_wrapper(obj, name, data)
 end
 
 local function get_gamestate_wrapper(module, plr)
+	local s, r = pcall(function() return module.__no_lazymodules end)
+	if s and r then
+		return
+	end
+
 	-- player being necessary for gamestate is unlikely, but incase necessary.
 	-- @param name is a the name of the module on the client that should receive this state via __load_gamestate,
 	-- will default to the name of the module.
@@ -217,6 +244,11 @@ local function get_gamestate_wrapper(module, plr)
 end
 
 local function load_gamestate_wrapper(module, modulestate, loadedList, moduleName)
+	local s, r = pcall(function() return module.__no_lazymodules end)
+	if s and r then
+		return
+	end
+
 	local prior_context = set_context(LOAD_CONTEXTS.LOAD_GAMESTATE)
 	
 	local loaded_func = function()
@@ -239,6 +271,11 @@ local function load_gamestate_wrapper(module, modulestate, loadedList, moduleNam
 end
 
 local function tests_wrapper(module, name)
+	local s, r = pcall(function() return module.__no_lazymodules end)
+	if s and r then
+		return
+	end
+
 	-- Configure the builder for this module
 	local builder = Tests:Builder( name )
 
@@ -249,12 +286,22 @@ local function tests_wrapper(module, name)
 end
 
 local function finalize_wrapper(module, name)
+	local s, r = pcall(function() return module.__no_lazymodules end)
+	if s and r then
+		return
+	end
+
 	local prior_context = set_context(LOAD_CONTEXTS.FINALIZE)
 	module:__finalize(Game)
 	reset_context(prior_context)
 end
 
 local function ui_wrapper(module, name)
+	local s, r = pcall(function() return module.__no_lazymodules end)
+	if s and r then
+		return
+	end
+
 	local prior_context = set_context(LOAD_CONTEXTS.RUN)
 
 	local builder = UI:Builder( name )
@@ -269,6 +316,11 @@ local function ui_wrapper(module, name)
 end
 
 local function run_wrapper(module, name)
+	local s, r = pcall(function() return module.__no_lazymodules end)
+	if s and r then
+		return
+	end
+
 	local prior_context = set_context(LOAD_CONTEXTS.RUN)
 
 	-- Note that UI will not exist on server contexts
@@ -312,6 +364,10 @@ function mod.__raw_load(script: Instance, name: string): any
 
 	local module = safe_require(script)
 
+	if typeof(module) ~= "table" then
+		return
+	end
+
 	if config.LogUnfoundLoads then
 		if not module then
 			warn("\n" .. CONTEXT .. " init: Path to `" .. script.Name .. "` not found during PreLoad" ..
@@ -353,7 +409,7 @@ function mod.PreLoad(script: Instance, opt_name: string?): any
 
 	local s, r = pcall(function() return module.__no_preload end)
 	if typeof(module) == "table" and r then
-		try_init(module, opt_name, " **FORCED**")
+		return
 	end
 
 	-- Impl __no_preload
@@ -421,23 +477,34 @@ end
 
 
 
+local CollectionBlacklist = config.ModuleCollectionBlacklist
+
+local function recursive_collect(instance: Instance)
+	for _,v in instance:GetChildren() do
+		if table.find(CollectionBlacklist, v) then
+			continue
+		end
+
+		if typeof(v) ~= "Instance" or not v:IsA("ModuleScript") then
+			continue
+		end
+
+		-- This is kind of flimsy since PreLoad can do this on its own
+		-- TODO: A Call to PreLoad before we collect can cause false positives
+		if mod.CollectedModules[v.Name] ~= nil then
+			warn("Error durring module collection:\nModule name already used: " .. v.Name)
+		end
+
+		mod.CollectedModules[v.Name] = mod.PreLoad(v)
+
+		recursive_collect(v)
+	end
+end
+
+
 function mod.CollectModules(Game)
 	for _, dir in config.ModuleCollectionFolders do
-		for i,v in dir:GetDescendants() do
-			if v == script.Game then
-				continue
-			end
-
-			if typeof(v) == "Instance" and v:IsA("ModuleScript") then
-				-- This is kind of flimsy since PreLoad can do this on its own
-				-- TODO: A Call to PreLoad before we collect can cause false positives
-				if mod.CollectedModules[v.Name] ~= nil then
-					warn("Error durring module collection:\nModule name already used: " .. v.Name)
-				end
-
-				mod.CollectedModules[v.Name] = mod.PreLoad(v)
-			end
-		end
+		recursive_collect(dir)
 	end
 end
 
@@ -505,7 +572,7 @@ function mod.Begin(Game, Main)
 		local ClientReadyEvent = Instance.new("RemoteEvent")
 		ClientReadyEvent.Name = "ClientReadyEvent"
 		ClientReadyEvent.OnServerEvent:Connect(function(player)
-			-- @Setup Collect client data as well
+			-- @Setup Collect other clients' data as well for first arg
 			local other_client_datas = { }
 			local gamestate = mod:__get_gamestate(player)
 			ClientReadyEvent:FireClient(player, {other_client_datas, gamestate})
@@ -602,9 +669,9 @@ function mod:__load_gamestate(gamestate, GameStateLoadedList)
 end
 
 function mod:__finalize(G)
-	-- Signals must be finalized first since it implements the stage which comes before this one.
-	-- It really serves no purpose until its finalized
-	finalize_wrapper(Signals, "Signals")
+	-- Signals must do its thing first since it implements the stage which comes before this one.
+	-- It really serves no purpose until its "finalized"
+	Signals.BuildSignals(G)
 
 	for i,v in PreLoads do
 		if typeof(v == "table") then

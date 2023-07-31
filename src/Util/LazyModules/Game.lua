@@ -1,7 +1,7 @@
 local Game = { }
 Game.LOADING_CONTEXT = -100
 
--- Do not access this field unless absolutely necessary
+-- Expose StdLib and etc to any LM-managed modules
 _G.Game = Game
 
 local APIUtils = require(game.ReplicatedFirst.Util.APIUtils)

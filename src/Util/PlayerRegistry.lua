@@ -12,7 +12,6 @@
 
 local mod = { }
 local mt_PlayerRegistry = { __index = mod }
-local PlayerLib
 local Registry = _G.Game.PreLoad(script.Parent.Registry)
 
 local Registries = { }
@@ -53,7 +52,6 @@ function mod:__build_signals(G, B)
 end
 
 function mod:__init(G)
-	PlayerLib = G.Load("PlayerLib")
 	Registry = G.Load("Registry")
 end
 

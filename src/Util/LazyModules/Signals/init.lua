@@ -211,7 +211,7 @@ local function wait_for(async_table)
 end
 
 -- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
-function mod:__finalize(G)
+function mod:BuildSignals(G)
 	task.desynchronize()
 
 	local wait_dur = 0

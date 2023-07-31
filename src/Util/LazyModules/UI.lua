@@ -72,9 +72,6 @@ local AsyncList
 local Roact
 local Flipper
 local Style
-local Assets
-local unwrap_or_warn
-local unwrap_or_error
 local safe_require
 
 Instance.new("PathfindingLink")
@@ -1151,16 +1148,11 @@ function mod:__init(G)
 
 	safe_require = G.Load(game.ReplicatedFirst.Util.SafeRequire).require
 
-	local err = G.Load(game.ReplicatedFirst.Util.Error)
-	unwrap_or_warn = err.unwrap_or_warn
-	unwrap_or_error = err.unwrap_or_error
-
 	LazyString = G.Load(game.ReplicatedFirst.Util.LazyString)
 
 	AsyncList = G.Load(game.ReplicatedFirst.Util.AsyncList)
 	Roact = G.Load(game.ReplicatedFirst.Modules.Roact)
 	Style = G.Load(game.ReplicatedFirst.Modules.GUI.Style)
-	Assets = G.Load(game.ReplicatedFirst.Modules.Assets)
 	Flipper = G.Load(game.ReplicatedFirst.Modules.Flipper)
 end
 
