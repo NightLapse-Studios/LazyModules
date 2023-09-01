@@ -407,19 +407,6 @@ function mod.PreLoad(script: Instance, opt_name: string?): any
 		module = mod.__raw_load(script, opt_name)
 	end
 
-	local s, r = pcall(function() return module.__no_preload end)
-	if typeof(module) == "table" and r then
-		return
-	end
-
-	-- Impl __no_preload
-	-- Indicates that a module cannot be required without initialization
---[[ 	unwrap_or_error(
-		if typeof(module) == "table" then module.__no_preload == nil else true,
-		"\n" .. INIT_CONTEXT .. " init: Module `" .. opt_name .. "` cannot be pre-loaded",
-		"Hint: Use `G.Load` during runtime instead"
-	) ]]
-
 	return module
 end
 
@@ -526,7 +513,7 @@ function mod.Begin(Game, Main)
 	try_init(Main, "Main")
 
 	for i,v in PreLoads do
-		if typeof(v) ~= "table" or not v.__init then continue end
+		if typeof(v) ~= "table" then continue end
 
 		local did_init = Initialized[i]
 		if did_init == false then

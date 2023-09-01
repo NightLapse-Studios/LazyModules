@@ -41,12 +41,7 @@ local TransmitterBuilder = {
 	ClientConnection = function(self, func: opt_func)
 		if not func then return self end
 		if IsServer then return self end
-		unwrap_or_error(
-			self.Configured.Client == false,
-			"Cannot have multiple recievers of a transmission object"
-		)
 
-		self.Configured.Client = true
 		self[1].OnClientEvent:Connect(func)
 
 		return self
@@ -54,12 +49,7 @@ local TransmitterBuilder = {
 	ServerConnection = function(self, func: opt_func)
 		if not func then return self end
 		if not IsServer then return self end
-		unwrap_or_error(
-			self.Configured.Server == false,
-			"Cannot have multiple recievers of a transmission object"
-		)
 
-		self.Configured.Server = true
 		self[1].OnServerEvent:Connect(func)
 
 		return self
