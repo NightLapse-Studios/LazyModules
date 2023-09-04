@@ -13,7 +13,7 @@ local RunService = game:GetService("RunService")
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 
 if RunService:IsServer() then
-	return
+	return { }
 end
 
 local Assets = require(ReplicatedFirst.Modules.Assets)
