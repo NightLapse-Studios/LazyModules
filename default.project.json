@@ -5,6 +5,7 @@
     "$ignoreUnknownInstances": true,
     "ReplicatedFirst": {
       "$className": "ReplicatedFirst",
+      "$path": "src/replicated_first",
       "Modules": {
         "$path": "src/shared"
       },

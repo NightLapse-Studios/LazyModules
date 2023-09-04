@@ -10,7 +10,9 @@ local Libs = {
 	Enums = Game.PreLoad(game.ReplicatedFirst.Util.Enums),
 	Meta = Game.PreLoad(game.ReplicatedFirst.Util.Meta),
 	Debug = Game.PreLoad(game.ReplicatedFirst.Util.Debug),
+	DebugMenu = Game.PreLoad(game.ReplicatedFirst.Util.Debug.DebugMenu),
 	Maskables = Game.PreLoad(game.ReplicatedFirst.Util.Maskables),
+	Config = Game.PreLoad(game.ReplicatedFirst.Util.BUILDCONFIG),
 }
 
 local APIUtils = require(game.ReplicatedFirst.Util.APIUtils)
@@ -18,7 +20,9 @@ local exports = APIUtils.EXPORT_LIST(Libs)
 	:ADD("Enums")
 	:ADD("Meta")
 	:ADD("Debug")
+	:ADD("DebugMenu")
 	:ADD("Maskables")
+	:ADD("Config")
 	:ADD("empty_table", { })
 	:ADD("no_op_func", function() end)
 

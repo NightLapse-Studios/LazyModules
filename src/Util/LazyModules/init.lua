@@ -465,10 +465,11 @@ end
 
 
 local CollectionBlacklist = config.ModuleCollectionBlacklist
+local ContextCollectionBlacklist = if CONTEXT == "SERVER" then config.ModuleCollectionBlacklist.Server else config.ModuleCollectionBlacklist.Client
 
 local function recursive_collect(instance: Instance)
 	for _,v in instance:GetChildren() do
-		if table.find(CollectionBlacklist, v) then
+		if table.find(CollectionBlacklist, v) or table.find(ContextCollectionBlacklist, v) then
 			continue
 		end
 

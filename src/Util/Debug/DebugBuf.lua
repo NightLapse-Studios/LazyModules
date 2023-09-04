@@ -1,6 +1,8 @@
 --!strict
 
 --[[
+	An early mockup of an idea for a buffer of text output as an alternative to just printing to console
+	This way server logs of some sort can be sent to e.g. discord on error
 ]]
 
 local mod = { }

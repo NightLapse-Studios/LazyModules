@@ -11,8 +11,8 @@ local config = { }
 --=============================================--
 
 -- Run lazymodules tests stage
-config.TESTING = false
-config.FocusTestOn = false
+config.TESTING = true
+config.FocusTestOn = "Main"
 
 -- The `Load` tree
 config.LogLoads = false
@@ -51,6 +51,12 @@ config.ModuleCollectionFolders = {
 config.ModuleCollectionBlacklist = {
     game.ReplicatedFirst.Modules.Roact,
     game.ReplicatedFirst.Util.LazyModules,
+    Server = {
+        game.ReplicatedFirst.Modules.GUI
+    },
+    Client = {
+        
+    }
 }
 
 
