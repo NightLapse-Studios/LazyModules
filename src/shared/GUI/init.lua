@@ -16,7 +16,7 @@ local GuiService = game:GetService("GuiService")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 
-local I, A, D
+local I, P, D
 
 local RoactEvents
 local ButtonIcon = nil
@@ -601,14 +601,14 @@ local function DisplayLocked(I, element, props)
 			:BackgroundColor3(Style.DisabledColor)
 			:BackgroundTransparency(0.65)
 			:Children(
-				D(A(),I
+				D(P(),I
 				:ImageLabel()
 					:Image(Assets.Images.Locked)
 					:Size(1,-8,1,-8)
 					:Center()
 					:BackgroundTransparency(1)
 				:Children(
-					D(A(),I
+					D(P(),I
 					:UIAspectRatioConstraint()
 						:AspectType(Enum.AspectType.ScaleWithParentSize)
 						:DominantAxis(Enum.DominantAxis.Width)
@@ -630,10 +630,9 @@ end
 local ScalePixelSize = module.ScalePixelSize
 
 local empty_table = { }
-function module:__ui(G, i, a, d)
+function module:__ui(G, i, p)
 	I = i
-	A = a
-	D = d
+	P = p
 
 	-- This one inserts children into the props for you
 	I:RegisterStdModifier("DisplayLocked", DisplayLocked)
@@ -648,7 +647,7 @@ function module:__ui(G, i, a, d)
 			:ClipsDescendants(false)
 			:BackgroundTransparency(1)
 		:Children(
-			I:ImageLabel(D(A(), I
+			I:ImageLabel(P()
 				:Size(1, 0, 0.5, 0)
 				:AnchorPoint(1, 0)
 				:Position(1, 0, .5, 0)
@@ -656,7 +655,7 @@ function module:__ui(G, i, a, d)
 				:BackgroundTransparency(1)
 				:ImageTransparency(0)
 				:AspectRatioProp(1)
-			)),
+			),
 			I:TextLabel()
 				:Size(1, 0, 1, 0)
 				:AnchorPoint(1, 0)
@@ -675,40 +674,40 @@ function module:__ui(G, i, a, d)
 
 	I:NewStdElement("VerticalSeperator", function(props)
 		return
-		I:Frame()
-			:Size(1, 0, 0, 5)
-			:BorderSizePixel(0)
-			:BackgroundTransparency(1)
-			:Position(props.Position)
-			:AnchorPoint(props.AnchorPoint)
-			:LayoutOrder(props.LayoutOrder)
-		:Children(
-			I:Frame(D(A(), I
-				:BackgroundColor3_Raw(Style.ActiveTextColor)
-				:Size(1, -8, 0, 1)
-				:Center()
+			I:Frame()
+				:Size(1, 0, 0, 5)
 				:BorderSizePixel(0)
-			))
-		)
+				:BackgroundTransparency(1)
+				:Position(props.Position)
+				:AnchorPoint(props.AnchorPoint)
+				:LayoutOrder(props.LayoutOrder)
+			:Children(
+				I:Frame(P()
+					:BackgroundColor3_Raw(Style.ActiveTextColor)
+					:Size(1, -8, 0, 1)
+					:Center()
+					:BorderSizePixel(0)
+				)
+			)
 	end)
 	
 	I:NewStdElement("HorizontalSeperator", function(props)
 		return
-		I:Frame()
-			:Size(0, 5, 1, 0)
-			:BorderSizePixel(0)
-			:BackgroundTransparency(1)
-			:Position(props.Position)
-			:AnchorPoint(props.AnchorPoint)
-			:LayoutOrder(props.LayoutOrder)
-		:Children(
-			I:Frame(D(A(), I
-				:BackgroundColor3_Raw(Style.ActiveTextColor)
-				:Size(0, 1, 1, -8)
-				:Center()
+			I:Frame()
+				:Size(0, 5, 1, 0)
 				:BorderSizePixel(0)
-			))
-		)
+				:BackgroundTransparency(1)
+				:Position(props.Position)
+				:AnchorPoint(props.AnchorPoint)
+				:LayoutOrder(props.LayoutOrder)
+			:Children(
+				I:Frame(P()
+					:BackgroundColor3_Raw(Style.ActiveTextColor)
+					:Size(0, 1, 1, -8)
+					:Center()
+					:BorderSizePixel(0)
+				)
+			)
 	end)
 	
 	I:NewStdElement("VisibleFrame", function(props)
@@ -718,7 +717,7 @@ function module:__ui(G, i, a, d)
 			aspect = I:UIAspectRatioConstraint():AspectRatio(props.AspectRatio)
 		end
 		
-		return I:Frame(D(A(),I
+		return I:Frame(P()
 			:RoundCorners()
 			:BorderSizePixel(0)
 			:BackgroundColor3_Raw(props.BackgroundColor3 or props.Color or Style.SecondaryColor1)
@@ -728,12 +727,12 @@ function module:__ui(G, i, a, d)
 			:LayoutOrder(props.LayoutOrder)
 			:ClipsDescendants(props.ClipsDescendants)
 			:Border()
-		)):Children(
-			I:Frame(D(A(),I
+		):Children(
+			I:Frame(P()
 				:Invisible()
 				:Inset(0, 4)
 				:Center()
-			)):Children(
+			):Children(
 				I:Fragment(props.Children)
 			),
 			aspect
@@ -743,7 +742,7 @@ function module:__ui(G, i, a, d)
 	I:NewStdElement("VisibleScrollingFrame", function(props)
 		local notAtEnd, updNotAtEnd = I:Binding(true)
 		
-		return I:Frame(D(A(),I
+		return I:Frame(P()
 			:RoundCorners()
 			:BorderSizePixel(0)
 			:BackgroundColor3_Raw(props.BackgroundColor3 or props.Color or Style.SecondaryColor1)
@@ -753,8 +752,8 @@ function module:__ui(G, i, a, d)
 			:Border()
 			:ClipsDescendants(true)
 			:BackgroundTransparency(props.BackgroundTransparency)
-		)):Children(
-			I:ScrollingFrame(D(A(),I
+		):Children(
+			I:ScrollingFrame(P()
 				:Invisible()
 				:Inset(0, 4)
 				:Center()
@@ -770,23 +769,23 @@ function module:__ui(G, i, a, d)
 						updNotAtEnd(false)
 					end
 				end)
-			)):Children(
+			):Children(
 				I:Fragment(props.Children)
 			),
-			I:Frame(D(A(), I
+			I:Frame(P()
 				:Size(1, 0, 0.1, 0)
 				:JustifyBottom(0,0)
 				:BorderSizePixel(0)
 				:BackgroundColor3(1,1,1)
 				:Visible(notAtEnd)
-			)):Children(
-				I:UIGradient(D(A(), I
+			):Children(
+				I:UIGradient(P()
 					:Rotation(-90)
 					:Color_Raw(Style.SecondaryColor1:map(function(v)
 						return ColorSequence.new(v)
 					end))
 					:Transparency(0, 1)
-				))
+				)
 			)
 		)
 	end)
@@ -806,11 +805,10 @@ function module:__ui(G, i, a, d)
 		local props = self.props
 		local thirdColor = self.UsePrimaryColor and Style.PrimaryFocusColor or Style.ActiveTextColor
 		
-		A()
-		
-		I:Size(1,4,1,4)
-		:Center()
-		:BorderSizePixel(0)
+		P()
+			:Size(1,4,1,4)
+			:Center()
+			:BorderSizePixel(0)
 		
 		if self.Focused then
 			I:Name(self.Focused:map(function(v)
@@ -834,15 +832,14 @@ function module:__ui(G, i, a, d)
 		
 		local overlay = I:Frame(D())
 		
-		A()
-		
-		I:Size_Raw(props.Size)
-		:AnchorPoint_Raw(props.AnchorPoint)
-		:Position_Raw(props.Position)
-		:AutoButtonColor(false)
-		:Name(props.Name)
-		:LayoutOrder(props.LayoutOrder)
-		:BackgroundTransparency(props.BackgroundTransparency)
+		P()
+			:Size_Raw(props.Size)
+			:AnchorPoint_Raw(props.AnchorPoint)
+			:Position_Raw(props.Position)
+			:AutoButtonColor(false)
+			:Name(props.Name)
+			:LayoutOrder(props.LayoutOrder)
+			:BackgroundTransparency(props.BackgroundTransparency)
 		
 		if props._type == "Image" then
 			I:Image(props.Image)
@@ -920,14 +917,14 @@ function module:__ui(G, i, a, d)
 	
 	--This is more suitable when the element may change its locked status without re-rendering
 	I:NewStdElement("DisplayLocked", function(props)
-		local tree = I:Frame()
+		local tree = I:Frame(P()
 			:Size(1,0,1,0)
 			:BackgroundColor3(Style.DisabledColor)
 			:BackgroundTransparency(props.Locked:map(function(locked)
 				return if locked then 0.55 else 1
 			end))
-		:Children(
-			I:ImageLabel()
+		):Children(
+			I:ImageLabel(P()
 				:Image(Assets.Images.Lock)
 				:Size(1,-8,1,-8)
 				:Center()
@@ -936,70 +933,83 @@ function module:__ui(G, i, a, d)
 				:ImageTransparency(props.Locked:map(function(locked)
 					return if locked then 0.2 else 1
 				end))
+			)
 		)
 
 		return tree
 	end)
 
-	I:NewStdElement("SpawnPointsIcon", I:ImageLabel()
-		:Image(Assets.Images.SpawnPoints)
-		:BackgroundTransparency(1)
-		:Children(
-			I:UIAspectRatioConstraint()
-				:AspectRatio(1)
-				:AspectType(Enum.AspectType.FitWithinMaxSize)
+	I:NewStdElement("SpawnPointsIcon", 
+		I:ImageLabel(P()
+			:Image(Assets.Images.SpawnPoints)
+			:BackgroundTransparency(1)
+			:Children(
+				I:UIAspectRatioConstraint(P()
+					:AspectRatio(1)
+					:AspectType(Enum.AspectType.FitWithinMaxSize)
+				)
+			)
 		)
 	)
 	
-	I:NewStdElement("GoldIcon", I:ImageLabel()
-		:Image(Assets.Images.Gold)
-		:BackgroundTransparency(1)
-		:Children(
-			I:UIAspectRatioConstraint()
-				:AspectRatio(1)
-				:AspectType(Enum.AspectType.FitWithinMaxSize)
+	I:NewStdElement("GoldIcon", 
+		I:ImageLabel(P()
+			:Image(Assets.Images.Gold)
+			:BackgroundTransparency(1)
+			:Children(
+				I:UIAspectRatioConstraint(P()
+					:AspectRatio(1)
+					:AspectType(Enum.AspectType.FitWithinMaxSize)
+				)
+			)
 		)
 	)
 
-	I:NewStdElement("ScrollingFrame", I:ScrollingFrame(
-		D(A(),I
-		:CanvasSize(0, 0, 0, 0)
-		:BackgroundColor3_Raw(Style.SecondaryColor1)
-		:BorderSizePixel(0)
-		:ScrollBarThickness(Style.ScrollBarSize)
-		:VerticalScrollBarInset(Enum.ScrollBarInset.ScrollBar)
-		:ScrollingDirection(Enum.ScrollingDirection.Y)
-		:BottomImage("")
-		:TopImage("")
-		:AutomaticCanvasSize(Enum.AutomaticSize.Y)
-	)))
+	I:NewStdElement("ScrollingFrame",
+		I:ScrollingFrame(P()
+			:CanvasSize(0, 0, 0, 0)
+			:BackgroundColor3_Raw(Style.SecondaryColor1)
+			:BorderSizePixel(0)
+			:ScrollBarThickness(Style.ScrollBarSize)
+			:VerticalScrollBarInset(Enum.ScrollBarInset.ScrollBar)
+			:ScrollingDirection(Enum.ScrollingDirection.Y)
+			:BottomImage("")
+			:TopImage("")
+			:AutomaticCanvasSize(Enum.AutomaticSize.Y)
+		)
+	)
 
-	I:NewStdElement("ContainerFrame", I:Frame(
-		D(A(),I
-		:Size(1,0,1,0)
-		:BackgroundTransparency(1)
-		:BorderSizePixel(0)
-	)))
+	I:NewStdElement("ContainerFrame",
+		I:Frame(P()
+			:Size(1,0,1,0)
+			:BackgroundTransparency(1)
+			:BorderSizePixel(0)
+		)
+	)
 
-	I:NewStdElement("VisibleContainerFrame", I:Frame(
-		D(A(),I
-		:Size(1,0,1,0)
-		:BackgroundColor3_Raw(Style.SecondaryColor1)
-		:BorderSizePixel(0)
-	)))
+	I:NewStdElement("VisibleContainerFrame",
+		I:Frame(P()
+			:Size(1,0,1,0)
+			:BackgroundColor3_Raw(Style.SecondaryColor1)
+			:BorderSizePixel(0)
+		)
+	)
 
-	I:NewStdElement("VerticalLayout", I:UIListLayout(
-        D(A(),I
-        :FillDirection(Enum.FillDirection.Vertical)
-        :SortOrder(Enum.SortOrder.LayoutOrder)
-        :Padding(0, 2)
-    )))
-    I:NewStdElement("HorizontalLayout", I:UIListLayout(
-        D(A(),I
-        :FillDirection(Enum.FillDirection.Horizontal)
-        :SortOrder(Enum.SortOrder.LayoutOrder)
-        :Padding(0, 2)
-    )))
+	I:NewStdElement("VerticalLayout",
+		I:UIListLayout(P()
+			:FillDirection(Enum.FillDirection.Vertical)
+			:SortOrder(Enum.SortOrder.LayoutOrder)
+			:Padding(0, 2)
+		)
+	)
+
+    I:NewStdElement("HorizontalLayout",
+		I:UIListLayout(P()
+			:FillDirection(Enum.FillDirection.Horizontal)
+			:SortOrder(Enum.SortOrder.LayoutOrder)
+			:Padding(0, 2)
+		)
+	)
 end
 
 function module:__init(G)

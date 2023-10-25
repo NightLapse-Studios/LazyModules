@@ -19,7 +19,7 @@ local entries = { }
 
 local override_layout_order = 1
 
-local I,A,D
+local I,P,D
 
 function mod.GetOverrideBinding(name)
 	return if entries[name] then entries[name].binding else nil
@@ -96,7 +96,7 @@ function mod.RegisterButton(name, callback, opt_menu_name)
 	end
 	
 	local override = new_entry(name, opt_menu_name, 0)
-	local button = I:StdElement("ImageButton", D(A(), I
+	local button = I:StdElement("ImageButton", P()
 		:Prop("Activated", function(rbx)
 			DebugMenuValueChangedEvent:Transmit(name)
 			callback(nil, Players.LocalPlayer)
@@ -107,7 +107,7 @@ function mod.RegisterButton(name, callback, opt_menu_name)
 		:AnchorPoint(1, 0)
 		:Position(1, 0, 0, 0)
 		:Size(0.4, 0, 1, 0)
-	))
+	)
 
 	override.element = button
 end
@@ -119,7 +119,7 @@ function mod.RegisterToggle(name, val): Binding
 	end
 
 	local override = new_entry(name, "Togglers", val)
-	local button = I:StdElement("ImageButton", D(A(), I
+	local button = I:StdElement("ImageButton", P()
 		:Prop("Activated", function(rbx)
 			local updFunc = override_bindings:get(override.binding)
 			updFunc(not override.binding:getValue())
@@ -133,7 +133,7 @@ function mod.RegisterToggle(name, val): Binding
 		:AnchorPoint(1, 0)
 		:Position(1, 0, 0, 0)
 		:Size(1, 0, 1, 0)
-	))
+	)
 
 	override.element = button
 	
@@ -192,12 +192,12 @@ function mod:__build_signals(G, B)
 		:ServerConnection(handleDebugMenuValueChangedEvent)
 end
 
-function mod:__ui(G, i, a, d)
+function mod:__ui(G, i, p)
 	if not RunService:IsStudio() then
 		return
 	end
 
-	I,A,D = i,a,d
+	I,P = i,p
 
 	local function render_DebugMenu(self)
 		if self.state.visible ~= true then
@@ -215,17 +215,17 @@ function mod:__ui(G, i, a, d)
 				local element = binding_data.element
 
 				local full_element =
-					I:StdElement("ContainerFrame", D(A(), I
+					I:StdElement("ContainerFrame", P()
 						:Size(1, 0, 0, 25)
 						:LayoutOrder(binding_data.layout_order)
-					)):Children(
-						I:TextLabel()
+					):Children(
+						I:TextLabel(P()
 							:Size(1/3, 0, 1, 0)
 							:JustifyLeft(0, 0)
 							:Text(label)
 							:TextColor3(0,0,0)
-							:BackgroundTransparency(1),
-
+							:BackgroundTransparency(1)
+						),
 						element
 					)
 
@@ -234,7 +234,7 @@ function mod:__ui(G, i, a, d)
 		end
 
 		local function new_sub_menu(name, entry_frames)
-			return I:StdElement("ContainerFrame", D(A(), I
+			return I:StdElement("ContainerFrame", P()
 				:AnchorPoint(0, 0)
 				-- :Position(0, 5, 0, 5)
 				-- :Size(0.3, 0, 0.5, 0)
@@ -242,7 +242,7 @@ function mod:__ui(G, i, a, d)
 				:BackgroundTransparency(1)
 				:Children(
 					-- menu label
-					I:TextLabel(D(A(), I
+					I:TextLabel(P()
 						:Text(name)
 						:TextXAlignment(Enum.TextXAlignment.Left)
 						:TextStrokeColor3(1, 1, 1)
@@ -250,46 +250,46 @@ function mod:__ui(G, i, a, d)
 						:Size(1, 0, 0, 25)
 						:BackgroundColor3_Raw(Color3.new(0, 0.458823, 0.541176))
 						:BackgroundTransparency(0.65)
-					)),
+					),
 					-- body
-					I:StdElement("ScrollingFrame", D(A(), I
+					I:StdElement("ScrollingFrame", P()
 						:Size(1, 0, 1, -25)
 						:CanvasSize(1, 0, 1, -25)
 						:Position(0, 0, 0, 25)
 						:BackgroundTransparency(1)
 						:Children(
-							I:StdElement("VerticalLayout", D(A(), I
+							I:StdElement("VerticalLayout", P()
 								:HorizontalAlignment(Enum.HorizontalAlignment.Center)
 								:VerticalAlignment(Enum.VerticalAlignment.Top)
-							)),
+							),
 
 							I:Fragment(entry_frames)
 						)
-					))
+					)
 				)
-			))
+			)
 		end
 
 		for i,v in sub_menu_fragments do
 			table.insert(sub_menus, new_sub_menu(i, v))
 		end
 
-		return I:StdElement("ScrollingFrame", D(A(), I
+		return I:StdElement("ScrollingFrame", P()
 			:CanvasSize(1, 0, 1, -68)
 			-- Decent size to not occlude important UI
 			:Size(1, 0, 3/4, -68)
 			:Position(0, 0, 0, 34)
 			:BackgroundTransparency(1)
 			:Children(
-				I:UIGridLayout(D(A(), I
+				I:UIGridLayout(P()
 					:StartCorner(Enum.StartCorner.TopLeft)
 					:FillDirection(Enum.FillDirection.Horizontal)
 					:CellSize(1/3, 0, 1/4, 0)
 					:CellPadding(0, 5, 0, 5)
-				)),
+				),
 				I:Fragment(sub_menus)
 			)
-		))
+		)
 	end
 
 	local DebugMenuUI = I:Stateful("DebugMenuUI", I
@@ -301,7 +301,6 @@ function mod:__ui(G, i, a, d)
 
 	local visible = false
 	local UserInput = G.Load("UserInput")
-	local Views = G.Load("Views")
 
 	local HasControl = false
 	UserInput:Handler(Enum.KeyCode.LeftControl,
@@ -319,9 +318,10 @@ function mod:__ui(G, i, a, d)
 
 		visible = not visible
 		if visible then
-			Views.OverrideMouseBehavior(Enum.MouseBehavior.Default)
+			-- TODO: Mouse behavior system
+			-- Views.OverrideMouseBehavior(Enum.MouseBehavior.Default)
 		else
-			Views.StopMouseBehaviorOverride()
+			-- Views.StopMouseBehaviorOverride()
 		end
 
 		component:setState({ visible = visible })

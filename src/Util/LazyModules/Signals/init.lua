@@ -212,8 +212,6 @@ end
 
 -- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
 function mod:BuildSignals(G)
-	task.desynchronize()
-
 	local wait_dur = 0
 	wait_dur += wait_for(Event.Events.Identifiers)
 	wait_dur += wait_for(GameEvent.GameEvents.Identifiers)
@@ -221,8 +219,6 @@ function mod:BuildSignals(G)
 	wait_dur += wait_for(Broadcaster.Broadcasters.Identifiers)
 
 	print("Waited " .. wait_dur .. " ticks")
-
-	task.synchronize()
 
 	for module, identifers in Transmitters.Modules.provided do
 		for ident, transmitter in identifers do

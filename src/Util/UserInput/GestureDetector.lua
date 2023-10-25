@@ -15,7 +15,7 @@ local CircleBuffer = Game.PreLoad(game.ReplicatedFirst.Util.CircleBuffer)
 local DebugMenu = _G.Game.DebugMenu
 local Enums = Game.PreLoad(game.ReplicatedFirst.Util.Enums)
 local Tweens = Game.PreLoad(game.ReplicatedFirst.Modules.Tweens)
-local I, A, D
+local I, P, D
 
 local SIG_SAMPLE_LEN = 32
 local DETECTION_SAMPLES = 5
@@ -309,10 +309,9 @@ end
 
 
 local VisualizerComponent
-function mod:__ui(G, i, a, d)
+function mod:__ui(G, i, p)
 	I = i
-	A = a
-	D = d
+	P = p
 
 	local function init_signal(sig)
 		for i = 1, SIG_SAMPLE_LEN do
@@ -320,13 +319,14 @@ function mod:__ui(G, i, a, d)
 			local binding, updBinding = Roact.createBinding(0)
 			table.insert(sig.MagnitudeBindings, updBinding)
 
-			local f = I:Frame()
+			local f = I:Frame(P()
 				:Size(0, 5, 0, 5)
 				:BackgroundColor3_Raw(sig.Color)
 				:AnchorPoint(0.5, 0.5)
 				:Position_Raw(binding:map(function(v)
 					return UDim2.new(i / SIG_SAMPLE_LEN, 0, 0.5 + v, 0)
 				end))
+			)
 
 			table.insert(sig.SampleFrames, f)
 		end
@@ -350,14 +350,15 @@ function mod:__ui(G, i, a, d)
 
 	local function vis_render(self)
 		local group_containers = {
-			I:StdElement("VerticalLayout")
+			I:StdElement("VerticalLayout", P()
 				:Padding(0, 8)
+			)
 		}
 		for i, v in SignalTree do
-			local c = I:StdElement("VisibleContainerFrame", D(A(), I
+			local c = I:StdElement("VisibleContainerFrame", P()
 				:Size(1, 0, 1 / #SignalTree, -8)
 				:LayoutOrder(i)
-			))
+			)
 
 			local function insert_tree(sig)
 				c:InsertChild(I:Fragment(sig.SampleFrames))
@@ -371,11 +372,11 @@ function mod:__ui(G, i, a, d)
 			table.insert(group_containers, c)
 		end
 		
-		local container = I:StdElement("VisibleContainerFrame", D(A(), I
+		local container = I:StdElement("VisibleContainerFrame", P()
 			:Size(0.42, 0, 0.6, 0)
 			:AnchorPoint(1, 1)
 			:Position(1, -5, 0.9, 0)
-		)):Children(
+		):Children(
 			I:Fragment(group_containers)
 		)
 
@@ -386,12 +387,6 @@ function mod:__ui(G, i, a, d)
 		:Init(vis_init)
 		:Render(vis_render)
 	)
-
-	local a = UserInput:Handler(Enum.KeyCode.R, function(input)
-		IsPaused = not IsPaused
-
-		return false
-	end)
 end
 
 function mod:__run()

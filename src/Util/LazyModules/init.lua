@@ -67,10 +67,13 @@ local mod = {
 	--TODO: This flag needs to be removed
 	Initialized = false,
 	Signals = false,
-	CollectedModules = { },
 
 	CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT",
 }
+
+local CollectedModules: { [string]: script }  = { }
+local PreLoads: { [string]: script } = { }
+local Initialized: {[string]: boolean} = { }
 
 local LOAD_CONTEXTS = require(game.ReplicatedFirst.Util.Enums).LOAD_CONTEXTS
 local CONTEXT = mod.CONTEXT
@@ -168,8 +171,6 @@ function mod.format_lazymodules_traceback()
 
 	return traceback
 end
-
-local Initialized: {[string]: boolean} = { }
 
 local function init_wrapper(module, name)
 	local s, r = pcall(function() return module.__no_lazymodules end)
@@ -311,7 +312,7 @@ local function ui_wrapper(module, name)
 		print(" -- > UI INIT: " .. name)
 	end
 
-	module:__ui(Game, builder, UI.A, UI.D)
+	module:__ui(Game, builder, UI.P)
 	reset_context(prior_context)
 end
 
@@ -352,8 +353,6 @@ local function try_init(module, name, astrisk)
 	end
 end
 
-local PreLoads: { [string]: script } = { }
-
 --[[
 	Some modules return using metatables that allows PreLoad to have side effects
 	This avoids indexing
@@ -382,7 +381,7 @@ function mod.__raw_load(script: Instance, name: string): any
 		return module
 	end
 
-	mod.CollectedModules[name] = module
+	CollectedModules[name] = module
 	PreLoads[name] = module
 	Initialized[name] = false
 
@@ -398,7 +397,7 @@ function mod.PreLoad(script: Instance, opt_name: string?): any
 
 	opt_name = opt_name or script.Name
 
-	local module = mod.CollectedModules[opt_name]
+	local module = CollectedModules[opt_name]
 	if not module then
 		if config.LogPreLoads then
 			print(opt_name)
@@ -414,7 +413,7 @@ function mod.Load(script: (string | Instance)): any?
 	local module
 	if typeof(script) == "string" then
 		-- A script's name has been passed in
-		module = mod.CollectedModules[script]
+		module = CollectedModules[script]
 
 		if not module then
 			warn_load_err(script)
@@ -479,11 +478,13 @@ local function recursive_collect(instance: Instance)
 
 		-- This is kind of flimsy since PreLoad can do this on its own
 		-- TODO: A Call to PreLoad before we collect can cause false positives
-		if mod.CollectedModules[v.Name] ~= nil then
-			warn("Error durring module collection:\nModule name already used: " .. v.Name)
+		if CollectedModules[v.Name] ~= nil then
+			if PreLoads[v.Name] ~= CollectedModules[v.Name] then
+				warn("Error durring module collection:\nModule name already used: " .. v.Name)
+			end
 		end
 
-		mod.CollectedModules[v.Name] = mod.PreLoad(v)
+		CollectedModules[v.Name] = mod.PreLoad(v)
 
 		recursive_collect(v)
 	end
@@ -618,7 +619,7 @@ function mod:__load_data(data)
 		
 		local name, storeName = names[1], names[2]
 		
-		load_data_wrapper(mod.CollectedModules[name], name, data[storeName])
+		load_data_wrapper(CollectedModules[name], name, data[storeName])
 	end ]]
 end
 

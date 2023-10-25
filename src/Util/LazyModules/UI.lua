@@ -17,39 +17,39 @@
 	** See Menu.lua for some usage examples, including StdElements.
 
 	** See GUI.lua for examples of how to register StdElements.
-	
+
 	Tweens:
 			Tweens play when they are mounted, they are bindings.
 			If they are unmounted, their motor still runs, but the sequence will not advance to the next step until mounted again.
-			
+
 			@param start default 0, should be a number
 			@return a tween sequence for chain definitions
 			I:Tween(start)
-			
+
 			--Motor chains, occur when the previous step is complete.
 			:spring(target, frequency, dampingRatio)
 			:linear(target, velocity)
 			:instant(target)
-			
+
 			to tween non numbers it is recommended to append at the end of the chain with :map(I:ColorMap(c1, c2))
-			
+
 			-- other chainable functions
 			@param count can be -1 for infinite
 			:repeatAll(count) -- repeats the entire chain defined for count times.
 			:repeatThis(count) -- repeats the last chained object for count times.
 			:pause(t) -- adds a chain which pauses the tween sequence for t seconds before continuing.
-			
+
 			-- external use
 			:wipe() -- clears the tween sequence
 			:reset() -- resets the tween sequence completely.
 			:pause() -- pauses the playing of the chain and and the motor and all.
 			:resume() -- resumes playing of the chain.
-			
+
 			most likely you will do like this
 				local tween = I:Tween():[initial chain played upon mount]
-				
+
 				TextColor = tween:map(I:ColorMap(c1, c2)),
-				
+
 				eg_playerClicked = function()
 					tween:wipe():linear()
 					or just
@@ -64,24 +64,14 @@ local mod = {
 	}
 }
 
-local UIs = mod.Events
-
-local Globals
-local LazyString
-local AsyncList
-local Roact
-local Flipper
 local Style
+local unwrap_or_warn
+local unwrap_or_error
 local safe_require
 
-Instance.new("PathfindingLink")
-
-local LocalizationService = game:GetService("LocalizationService")
 local IsServer = game:GetService("RunService"):IsServer()
 
-local ServerScriptService, ReplicatedStorage = game:GetService("ServerScriptService"), game.ReplicatedStorage
-
-local PlayerScripts = if IsServer then false else game.Players.LocalPlayer.PlayerScripts
+local Roact = require(game.ReplicatedFirst.Modules.Roact)
 local CONTEXT = IsServer and "SERVER" or "CLIENT"
 
 local TypeBindings = {
@@ -122,8 +112,6 @@ local TypeBindings = {
 	PageEnter = "Event",
 	PageLeave = "Event",
 	Stopped = "Event",
-	ColorSequence = ColorSequence.new,
-	NumberSequence = NumberSequence.new,
 --[[ 	Color = "ColorSequence",
 	Enabled = "bool",
 	Offset = "Vector2",
@@ -198,6 +186,9 @@ local TypeBindings = {
 	NextSelectionUp = "reference",
 }
 
+-- @TODO @IMPORTANT: fix same property different types. currently for these you must do _Raw for function types or just provide the raw for primitive types,
+-- next to them there is a comment saying what they ACTUALLY are.
+
 local Classes = {
 	GuiButton = {
 		AutoButtonColor = "bool",
@@ -250,13 +241,32 @@ local Classes = {
 		MouseButton2Click = "Event",
 		MouseButton2Down = "Event",
 		MouseButton2Up = "Event",
+		InputBegan = "Event",
+		InputEnded = "Event",
+		InputChanged = "Event",
+		TouchLongPress = "Event",
+		TouchPan = "Event",
+		TouchPinch = "Event",
+		TouchRotate = "Event",
+		TouchSwipe = "Event",
+		TouchTap = "Event",
 	},
 	CanvasGroup = {
 		GroupColor3 = "Color3",
 		GroupTransparency = "float"
 	},
 	Frame = {
-		Style = Enum.FrameStyle
+
+	},
+	BillboardGui = {
+		Adornee = "Instance",
+		AlwaysOnTop = "bool",
+		LightInfluence = "float",
+		Size = "UDim2",
+		SizeOffset = "Vector2",
+		StudsOffset = "Vector3",
+		ExtentsOffsetWorldSpace = "Vector3",
+		MaxDistance = "float",
 	},
 	ImageButton = {
 		HoverImage = "Content",
@@ -388,11 +398,11 @@ local Classes = {
 	},
 
 	UIGradient = {
-		Color = "ColorSequence",
+		Color = "Color3", -- Sequence
 		Enabled = "bool",
 		Offset = "Vector2",
 		Rotation = "float",
-		Transparency = "NumberSequence"
+		Transparency = "float" -- Sequence
 	},
 	UICorner = {
 		CornerRadius = "UDim",
@@ -442,7 +452,7 @@ local Classes = {
 	UITableLayout = {
 		FillEmptySpaceColumns = "bool",
 		FillEmptySpaceRows = "bool",
-		Padding = "UDim2",
+		Padding = "UDim",-- UDim2
 		MajorAxis = "Enum"
 	},
 	UIPadding = {
@@ -518,15 +528,18 @@ local UIBuilder = {
 
 	--TextToSize
 }
+UIBuilder.__index = UIBuilder
 
-local elements_set_list = UIBuilder.BuildingElements
+--[[ local elements_set_list = UIBuilder.BuildingElements
 local function alloc_prop_set()
 	local new = { }
 	table.insert(elements_set_list, new)
 	UIBuilder.Current = new
-end
 
-local function dealloc_prop_set()
+	return new
+end ]]
+
+--[[ local function dealloc_prop_set()
 	if UIBuilder.Current == nil then
 		error("UIBuilder: Current is nil")
 	end
@@ -534,135 +547,151 @@ local function dealloc_prop_set()
 	UIBuilder.FinishedSet = table.remove(elements_set_list)
 
 	return UIBuilder.FinishedSet
-end
+end ]]
 
-mod.A = alloc_prop_set
-mod.D = dealloc_prop_set
+-- mod.A = alloc_prop_set
+-- mod.D = dealloc_prop_set
 
 --Some ham fisted logic to allow stuff to work
-local next_alloc_call = true
 
-local mt_EventBuilder = {
-	__index = UIBuilder
-}
+local PropSet = { }
+local mt_PropSet = { __index = PropSet }
 
-function mod:RoundCorners(scale, pixels)
+
+
+function mod.P()
+	local set = {
+		props = { }
+	}
+
+	setmetatable(set, mt_PropSet)
+	return set
+end
+
+function PropSet:RoundCorners(scale, pixels)
+--[[ 	local old_pos = self.Position
+	if old_pos then
+		self:Position(scaling, spacing, old_pos.Y.Scale, old_pos.Y.Offset)
+	end ]]
 	self:Children(
-		UIBuilder:UICorner()
+		self:UICorner(mod.P()
 			:CornerRadius(scale or 0, pixels or 4)
+		)
 	)
-	
+
 	return self
 end
 
-function mod:Border(thick, color)
+function PropSet:Border(thick, color)
 	self:Children(
-		UIBuilder:UIStroke()
+		self:UIStroke(mod.P()
 			:ApplyStrokeMode(Enum.ApplyStrokeMode.Border)
 			:Color_Raw(color or Style.SecondaryColor2)
 			:Thickness(thick or 2)
+		)
 	)
-	
+
 	return self
 end
 
-function mod:Invisible()
+function PropSet:Invisible()
 	self:BackgroundTransparency(1)
 	self:BorderSizePixel(0)
 	return self
 end
 
-function mod:Line(fromPos: UDim2, toPos: UDim2, thick)
+function PropSet:Line(fromPos: UDim2, toPos: UDim2, thick)
 	local size, updSize = Roact.createBinding(UDim2.new(0,0,0,0))
 	local rotation, updRotation = Roact.createBinding(0)
 	local position, updPosition = Roact.createBinding(UDim2.new(0,0,0,0))
-	
+
 	local function updateBindings(rbx)
 		if not (rbx and rbx.Parent) then
 			return
 		end
-		
+
 		local absoluteSize = rbx.Parent.AbsoluteSize
-		
+
 		local x1 = fromPos.X.Scale * absoluteSize.X + fromPos.X.Offset
 		local y1 = fromPos.Y.Scale * absoluteSize.Y + fromPos.Y.Offset
 		local x2 = toPos.X.Scale * absoluteSize.X + toPos.X.Offset
 		local y2 = toPos.Y.Scale * absoluteSize.Y + toPos.Y.Offset
 		local dx = x2 - x1
 		local dy = y2 - y1
-		
+
 		local distance = math.sqrt(dx * dx + dy * dy)
 		updSize(UDim2.new(0, distance, 0, thick))
-		
+
 		updPosition(UDim2.new(0, (x1 + x2)/2, 0, (y1 + y2)/2))
-		
+
 		updRotation(math.deg(math.atan2(y2 - y1, x2 - x1)))
 	end
-	
-	local old = self.Current[Roact.Change.AbsoluteSize]
-	self.Current[Roact.Change.AbsoluteSize] = function(rbx)
+
+	local old = self.props[Roact.Change.AbsoluteSize]
+	self.props[Roact.Change.AbsoluteSize] = function(rbx)
 		if old then
 			old(rbx)
 		end
 		updateBindings(rbx)
 	end
-	
-	local old2 = self.Current[Roact.Change.AbsolutePosition]
-	self.Current[Roact.Change.AbsolutePosition] = function(rbx)
+
+	local old2 = self.props[Roact.Change.AbsolutePosition]
+	self.props[Roact.Change.AbsolutePosition] = function(rbx)
 		if old2 then
 			old2(rbx)
 		end
 		updateBindings(rbx)
 	end
-	
-	local old3 = self.Current[Roact.Change.Parent]
-	self.Current[Roact.Change.Parent] = function(rbx)
+
+	local old3 = self.props[Roact.Change.Parent]
+	self.props[Roact.Change.Parent] = function(rbx)
 		if old3 then
 			old3(rbx)
 		end
-		
+
 		updateBindings(rbx)
 	end
-	
-	self.Current[Roact.Ref] = function(rbx)
+
+	self.props[Roact.Ref] = function(rbx)
 		updateBindings(rbx)
 	end
-	
+
 	self:AnchorPoint(0.5, 0.5)
 	self:Size_Raw(size)
 	self:Rotation(rotation)
 	self:Position_Raw(position)
-	
+
 	return self
 end
 
-function mod:AspectRatioProp(ratio)
+function PropSet:AspectRatioProp(ratio)
 	-- Aspect Ratio is X/Y, so the larger the ratio, the larger Width.
 	self:Children(
-		UIBuilder:UIAspectRatioConstraint()
+		UIBuilder:UIAspectRatioConstraint(mod.D(mod.A(), UIBuilder
 			:AspectRatio(ratio)
+		))
 	)
-	
+
 	return self
 end
 
-function mod:MoveBy(xs, xo, ys, yo)
-	local pos = self.Current.Position or UDim2.new()
+function PropSet:MoveBy(xs, xo, ys, yo)
+	local pos = self.props.Position or UDim2.new()
 	pos += UDim2.new(xs, xo, ys, yo)
 	self:Position_Raw(pos)
 	return self
 end
 
-function mod:Center()
+function PropSet:Center()
 	self:AnchorPoint(0.5, 0.5)
 	self:Position(0.5, 0, 0.5, 0)
 	return self
 end
 
-function mod:JustifyLeft(scaling, spacing)
+function PropSet:JustifyLeft(scaling, spacing)
 	self:AnchorPoint(0, 0.5)
 
-	local old_pos = self.Current.Position
+	local old_pos = self.props.Position
 	if old_pos then
 		self:Position(scaling, spacing, old_pos.Y.Scale, old_pos.Y.Offset)
 	else
@@ -671,10 +700,10 @@ function mod:JustifyLeft(scaling, spacing)
 
 	return self
 end
-function mod:JustifyRight(scaling, spacing)
+function PropSet:JustifyRight(scaling, spacing)
 	self:AnchorPoint(1, 0.5)
 
-	local old_pos = self.Current.Position
+	local old_pos = self.props.Position
 	if old_pos then
 		self:Position(1 - scaling, -spacing, old_pos.Y.Scale, old_pos.Y.Offset)
 	else
@@ -683,10 +712,10 @@ function mod:JustifyRight(scaling, spacing)
 
 	return self
 end
-function mod:JustifyTop(scaling, spacing)
+function PropSet:JustifyTop(scaling, spacing)
 	self:AnchorPoint(0.5, 0)
 
-	local old_pos = self.Current.Position
+	local old_pos = self.props.Position
 	if old_pos then
 		self:Position(old_pos.X.Scale, old_pos.X.Offset, scaling, spacing)
 	else
@@ -695,10 +724,10 @@ function mod:JustifyTop(scaling, spacing)
 
 	return self
 end
-function mod:JustifyBottom(scaling, spacing)
+function PropSet:JustifyBottom(scaling, spacing)
 	self:AnchorPoint(0.5, 1)
 
-	local old_pos = self.Current.Position
+	local old_pos = self.props.Position
 	if old_pos then
 		self:Position(old_pos.X.Scale, old_pos.X.Offset, 1 - scaling, -spacing)
 	else
@@ -708,10 +737,10 @@ function mod:JustifyBottom(scaling, spacing)
 	return self
 end
 
-function mod:OutsideLeft(scaling, spacing)
+function PropSet:OutsideLeft(scaling, spacing)
 	self:AnchorPoint(1, 0.5)
 
-	local old_pos = self.Current.Position
+	local old_pos = self.props.Position
 	if old_pos then
 		self:Position(-scaling, -spacing, old_pos.Y.Scale, old_pos.Y.Offset)
 	else
@@ -720,10 +749,10 @@ function mod:OutsideLeft(scaling, spacing)
 
 	return self
 end
-function mod:OutsideRight(scaling, spacing)
+function PropSet:OutsideRight(scaling, spacing)
 	self:AnchorPoint(0, 0.5)
 
-	local old_pos = self.Current.Position
+	local old_pos = self.props.Position
 	if old_pos then
 		self:Position(1 + scaling, spacing, old_pos.Y.Scale, old_pos.Y.Offset)
 	else
@@ -732,10 +761,10 @@ function mod:OutsideRight(scaling, spacing)
 
 	return self
 end
-function mod:OutsideTop(scaling, spacing)
+function PropSet:OutsideTop(scaling, spacing)
 	self:AnchorPoint(0.5, 1)
 
-	local old_pos = self.Current.Position
+	local old_pos = self.props.Position
 	if old_pos then
 		self:Position(old_pos.X.Scale, old_pos.X.Offset, -scaling, -spacing)
 	else
@@ -744,10 +773,10 @@ function mod:OutsideTop(scaling, spacing)
 
 	return self
 end
-function mod:OutsideBottom(scaling, spacing)
+function PropSet:OutsideBottom(scaling, spacing)
 	self:AnchorPoint(0.5, 0)
 
-	local old_pos = self.Current.Position
+	local old_pos = self.props.Position
 	if old_pos then
 		self:Position(old_pos.X.Scale, old_pos.X.Offset, 1 + scaling, spacing)
 	else
@@ -757,7 +786,7 @@ function mod:OutsideBottom(scaling, spacing)
 	return self
 end
 
-function mod:Inset(scaling, spacing)
+function PropSet:Inset(scaling, spacing)
 	self:Size(1 - scaling, -spacing, 1 - scaling, -spacing)
 	return self
 end
@@ -766,126 +795,79 @@ local currentCamera = workspace.CurrentCamera
 
 local function calcSize(size, rbx: Instance)
 	local min = 0
-	
+
 	if rbx:IsA("TextSource") or rbx:IsA("TextButton") or rbx:IsA("TextBox") then
 		local font = rbx.Font
 		min = font == Style.LabelFont and 7 or 11
 	end
-	
-	
+
+
 	local viewportSize = currentCamera.ViewportSize
 	local newSize = math.max(min, math.ceil(size * viewportSize.X / 1920 * viewportSize.Y / 1080))
 	return newSize
 end
 
-function mod:ScaledTextSize(size)
+function PropSet:ScaledTextSize(size)
 	local binding, updBinding = Roact.createBinding(0)
-	
-	local old = self.Current[Roact.Change.AbsoluteSize]
-	self.Current[Roact.Change.AbsoluteSize] = function(rbx)
+
+	local old = self.props[Roact.Change.AbsoluteSize]
+	self.props[Roact.Change.AbsoluteSize] = function(rbx)
 		if old then
 			old(rbx)
 		end
-		
+
 		if not (rbx and rbx.Parent) then
 			return
 		end
-		
+
 		updBinding(calcSize(size, rbx))
 	end
-	
-	local old2 = self.Current[Roact.Change.Parent]
-	self.Current[Roact.Change.Parent] = function(rbx)
+
+	local old2 = self.props[Roact.Change.Parent]
+	self.props[Roact.Change.Parent] = function(rbx)
 		if old2 then
 			old2(rbx)
 		end
-		
+
 		if not (rbx and rbx.Parent) then
 			return
 		end
-		
+
 		updBinding(calcSize(size, rbx))
 	end
-	
-	self.Current[Roact.Ref] = function(rbx)
+
+	self.props[Roact.Ref] = function(rbx)
 		if not (rbx and rbx.Parent) then
 			return
 		end
-		
+
 		updBinding(calcSize(size, rbx))
 	end
-	
+
 	return binding
 end
 
---Sets up a named list in the props table, which gains the functionality of the UIBuilder
--- Essentially nesting custom props into the props list, by a specified name
--- Intended use is such as in the StdElements `TextButton` and `ImageButton` in GUI.lua
-function UIBuilder:Props(name, ...)
---[[ 	local props = {
-		-- Hacky but necessary to isolate the props from the metatable
-		-- This means that StdElements which expect a custom props table must index `.Current` to access the props
-		Current = UIBuilder.FinishedSet
-	} ]]
-	UIBuilder.Current[name] = UIBuilder.FinishedSet
-	UIBuilder.FinishedSet = { }
-	--setmetatable(props, mt_EventBuilder)
+function PropSet:Attribute(name, value)
+	self.props[Roact.Attribute[name]] = value
 	return self
 end
 
-function UIBuilder:AppendProps(other_props: table)
-	if not other_props then return self end
-
-	for i,v in other_props do
-		UIBuilder.Current[i] = v
-	end
+function PropSet:Prop(name, value)
+	self.props[name] = value
 	return self
 end
 
-function UIBuilder:Attribute(name, value)
-	UIBuilder.Current[Roact.Attribute[name]] = value
+function PropSet:Ref(value)
+	self.props[Roact.Ref] = value
 	return self
-end
-
-function UIBuilder:Prop(name, value)
-	UIBuilder.Current[name] = value
-	return self
-end
-
-function UIBuilder:Ref(value)
-	UIBuilder.Current[Roact.Ref] = value
-	return self
-end
-
-function UIBuilder:CreateRef()
-	return Roact.createRef()
-end
-
-function UIBuilder:Tween(start)
-	start = start or 0
-	
-	local binding, updBinding = Roact.createBinding(start)
-	return binding:getTween()
-end
-
-function UIBuilder:NumberMap(n1, n2)
-	return function(v)
-		return n1 * (1 - v) + n2 * v
-	end
-end
-
-function UIBuilder:LerpMap(c1, c2)
-	return function(v)
-		return c1:Lerp(c2, v)
-	end
 end
 
 
 --[[ function UIBuilder:ColorSequenceMap(...)
 	local args = {...}
-	
+
 	local colors = { }
-	
+
 	local i = 1
 	while i < #args do
 		local arg = args[i]
@@ -897,7 +879,7 @@ end
 		end
 		i += 1
 	end
-	
+
 	return function(v)
 		return ColorSequence.new(colors[1]:Lerp(colors[3], v), colors[2]:Lerp(colors[4], v))
 	end
@@ -907,44 +889,75 @@ end ]]
 	return Roact.forwardRef(func)
 end ]]
 
-function UIBuilder:InsertChild(child)
-	local _current = self.Current
-	_current[Roact.Children] = _current[Roact.Children] or { }
-	table.insert(_current, child)
+
+function PropSet:Children(...)
+	local existing_children = self.props[Roact.Children]
+	local new_children = { ... }
+
+	if not existing_children then
+		self.props[Roact.Children] = new_children
+	else
+		for i,v in new_children do
+			table.insert(existing_children, v)
+		end
+		self.props[Roact.Children] = existing_children
+	end
+
 	return self
 end
 
-function UIBuilder:Binding(default)
+function PropSet:InsertChild(child)
+	self.props[Roact.Children] = self.props[Roact.Children] or { }
+	table.insert(self, child)
+	return self
+end
+
+function mod:Binding(default)
 	return Roact.createBinding(default)
 end
 
-function UIBuilder:JoinBindings(bindings)
+function mod:JoinBindings(bindings)
 	return Roact.joinBindings(bindings)
 end
 
-function UIBuilder:Fragment(t: table)
+function mod:Fragment(t: table)
 	return Roact.createFragment(t)
 end
 
+function PropSet:Change(name, callback)
+	self.props[Roact.Change[name]] = callback
+	return self
+end
 
-function UIBuilder:Dynamic(func, ...)
---[[ 		for i,v in {...} do
-		UIBuilder.Current[i] = v
-	end ]]
+function mod:CreateRef()
+	return Roact.createRef()
+end
+
+function mod:Tween(start)
+	start = start or 0
+
+	local binding, _ = Roact.createBinding(start)
+	return binding:getTween()
+end
+
+function mod:NumberMap(n1, n2)
+	return function(v)
+		return n1 * (1 - v) + n2 * v
+	end
+end
+
+function mod:LerpMap(c1, c2)
+	return function(v)
+		return c1:Lerp(c2, v)
+	end
+end
+
+
+function mod:Dynamic(func, ...)
 	local element = Roact.createElement(func, UIBuilder.FinishedSet)
 	UIBuilder.FinishedSet = { }
 	return element
 end
-
-function UIBuilder:Bind(name, binding)
-	assert(binding[Roact.Type] == Roact.Type.Binding)
-	UIBuilder.Current[name] = binding
-	return self
-end
-
-local StdElement = { }
-
-local mt_StdElementUtil = { __index = StdElement}
 
 local StandardElements = { }
 
@@ -954,12 +967,9 @@ function mod:NewStdElement(name, element_prototype)
 	StandardElements[name] = element_prototype
 end
 
-function mod:StdElement(name, _)
+function mod:StdElement(name, prop_set)
 	assert(StandardElements[name] ~= nil)
 	local element_prototype = StandardElements[name]
-
-	local props = UIBuilder.FinishedSet
-	UIBuilder.FinishedSet = { }
 
 	--Elements not assigned to functions will do a deep clone
 	-- functional elements will function like normal roact elements
@@ -968,10 +978,10 @@ function mod:StdElement(name, _)
 	-- as far as how they acquire props.
 	local element
 	if typeof(element_prototype) == "function" then
-		element = element_prototype(props)
+		element = element_prototype(prop_set.props)
 	else
 		element = element_prototype:Clone()
-		element:Overrides(props)
+		element:Overrides(prop_set.props)
 	end
 
 	return element
@@ -986,7 +996,6 @@ end ]]
 
 --A small system which allows us to register external functions which modify the props of the element being built
 function mod:RegisterStdModifier(name, func)
-	Roact.elementModule[name] = func
 	UIBuilder[name] = func
 end
 
@@ -1002,93 +1011,81 @@ function mod:Builder( module_name: string )
 	assert(typeof(module_name) == "string")
 
 	mod.CurrentModule = module_name
-	setmetatable(mod, mt_EventBuilder)
+	setmetatable(mod, UIBuilder)
 
 	return mod
 end
 
 local PropFuncs = { }
-local empty_table = { }
 
-function mod:Children(...)
-	local existing_children = UIBuilder.Current[Roact.Children]
-	local new_children = { ... }
+function mod:__init(G)
+	safe_require = G.Load(game.ReplicatedFirst.Util.SafeRequire).require
 
-	if not existing_children then
-		UIBuilder.Current[Roact.Children] = new_children
-	else
-		for i,v in new_children do
-			table.insert(existing_children, v)
+	local err = G.Load(game.ReplicatedFirst.Util.Error)
+	unwrap_or_warn = err.unwrap_or_warn
+	unwrap_or_error = err.unwrap_or_error
+
+	Style = G.Load(game.ReplicatedFirst.Modules.GUI.Style)
+
+	--check if same props exist with different types
+	local hash = {}
+	for class, properties in pairs(Classes) do
+		for prop_name, type in properties do
+			if hash[prop_name] and hash[prop_name] ~= type then
+				error("Same Property, different types: ", prop_name)
+			end
+
+			hash[prop_name] = type
 		end
-		UIBuilder.Current[Roact.Children] = existing_children
 	end
-	return self
-end
 
-function mod:Change(name, callback)
-	UIBuilder.Current[Roact.Change[name]] = callback
-	return self
-end
+	hash = nil
 
-function mod:__finalize(G)
-	for class, properties in Classes do
+	-- create :[propName]() functions
+	for class, properties in pairs(Classes) do
 		for prop_name, type in properties do
 			local ctor = TypeBindings[type]
 
 			if typeof(ctor) == "function" then
-				Roact.elementModule[prop_name] = function(_self, ...)
+				PropSet[prop_name] = function(_self, ...)
 					local value = ctor(...)
 					_self.props[prop_name] = value
-					return _self
-				end
-				UIBuilder[prop_name] = function(_self, ...)
-					local value = ctor(...)
-					UIBuilder.Current[prop_name] = value
 					return _self
 				end
 
 				--
 				local raw_name = prop_name .. "_Raw"
-				Roact.elementModule[raw_name] = function(_self, value)
+				PropSet[raw_name] = function(_self, value)
 					_self.props[prop_name] = value
-					return _self
-				end
-				UIBuilder[raw_name] = function(_self, value)
-					UIBuilder.Current[prop_name] = value
 					return _self
 				end
 
 				--Deprecated, this was used when this module was a state maachine that compiled to roact
-				UIBuilder["Get" .. prop_name] = function(_self, ...)
+				PropSet["Get" .. prop_name] = function(_self, ...)
 					return ctor(...)
 				end
 			elseif ctor == "Event" then
 				local event_key = Roact.Event[prop_name]
-				Roact.elementModule[prop_name] = function(_self, value)
+				PropSet[prop_name] = function(_self, value)
 					_self.props[event_key] = value
-					return _self
-				end
-				UIBuilder[prop_name] = function(_self, value)
-					UIBuilder.Current[event_key] = value
 					return _self
 				end
 			elseif ctor == "Change" then
 				local event_key = Roact.Change[prop_name]
-				Roact.elementModule[prop_name] = function(_self, value)
+				PropSet[prop_name] = function(_self, value)
 					_self.props[event_key] = value
 					return _self
 				end
-				UIBuilder[prop_name] = function(_self, value)
-					UIBuilder.Current[event_key] = value
-					return _self
-				end
 			else
-				Roact.elementModule[prop_name] = function(_self, value)
+				PropSet[prop_name] = function(_self, value)
 					_self.props[prop_name] = value
 					return _self
 				end
-				UIBuilder[prop_name] = function(_self, value)
-					UIBuilder.Current[prop_name] = value
+
+				-- Raw versions of primitive values are used for passing in bindings
+				local raw_name = prop_name .. "_Raw"
+				PropSet[raw_name] = function(_self, value)
+					_self.props[prop_name] = value
 					return _self
 				end
 			end
@@ -1097,7 +1094,7 @@ function mod:__finalize(G)
 		--[[
 			This is where most of the magic happens.
 			This set of functions can be used in two ways:
-			
+
 		**Roact-based Usage**
 			To return an element to be built on the roact side (which is possible because of
 			the above functions inserted into the roact module)
@@ -1132,28 +1129,13 @@ function mod:__finalize(G)
 				Roact.createElement at the last second. The args themselves are NOT EVER used.
 		]]
 
-		UIBuilder[class] = function(_self, ...)
-			local element = Roact.createElement(class, UIBuilder.FinishedSet)
-			UIBuilder.FinishedSet = { }
+		UIBuilder[class] = function(_self, prop_set: table)
+			local props = prop_set.props
+			local element = Roact.createElement(class, props)
+			--setmetatable(element, PropSet)
 			return element
 		end
 	end
-end
-
-function mod:__init(G)
-	Globals = G
-
-	--Allocate an empty prop set so that elements can be made without any props or host elements
-	alloc_prop_set()
-
-	safe_require = G.Load(game.ReplicatedFirst.Util.SafeRequire).require
-
-	LazyString = G.Load(game.ReplicatedFirst.Util.LazyString)
-
-	AsyncList = G.Load(game.ReplicatedFirst.Util.AsyncList)
-	Roact = G.Load(game.ReplicatedFirst.Modules.Roact)
-	Style = G.Load(game.ReplicatedFirst.Modules.GUI.Style)
-	Flipper = G.Load(game.ReplicatedFirst.Modules.Flipper)
 end
 
 --This function takes in a table of names of instance types and scans for ones which are GuiObjects
@@ -1187,9 +1169,6 @@ local function scan_instances()
 	end
 end
 
-function mod:__run()
-	
-end
 
 --[[
 	Can't use this because of the upvalue problem with names of classes
@@ -1205,7 +1184,7 @@ end
 			UIBuilder.Current[name] = value
 			return _self
 		end
-	
+
 		PropFuncsCache[ctor] = func
 		UIBuilder[name] = func
 	end
@@ -1229,5 +1208,7 @@ else
 	end
 end
 ]]
+
+setmetatable(Roact.elementModule, {__index = mod})
 
 return mod

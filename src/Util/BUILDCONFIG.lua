@@ -4,6 +4,79 @@ local IsStudio = RunService:IsStudio()
 
 local config = { }
 
+
+--=============================================--
+--=                                           =--
+--=          Runtime configuration            =--
+--=                                           =--
+--=============================================--
+-- Must point to the one main place, no matter what.
+config.PlaceId = 8256020164
+config.TestPlaceId = 13489727259
+config.MaxPlayers = 35
+config.GroupID = 5418470
+
+-- Set up ContextVar for StdLib
+-- This file can't rely on StdLib so functions it needs from StdLib are actually defined here and StdLib will load them
+do
+    -- Fun optimization to make the function never have to check values
+    -- Instead, we give each path of the ContextVar function an equivalent function here, and set the exposed func to it
+    local function return_prod_value(prod, _, _, _)
+        return prod
+    end
+    local function return_debug_value(_, debug, _, _)
+        return debug
+    end
+    local function return_test_realm_value(_, _, test_realm, _)
+        return test_realm
+    end
+    local function return_other_value(_, _, _, other)
+        return other
+    end
+
+    local function __context_var(prod, debug, test_realm, other)
+        if IsStudio then
+            return return_debug_value
+        elseif config.TestPlaceId == game.PlaceId then
+            return return_test_realm_value
+        elseif config.PlaceId == game.PlaceId then
+            return return_prod_value
+        else
+            return return_other_value
+        end
+    end
+
+    config.ContextVar = __context_var()
+end
+
+local ContextVar = config.ContextVar
+
+-- This won't work unless you are also doing device test in studio
+-- However some things rely on this flag alone, so the game will be in an undefined-ish state if set true and not doing device emulation
+config.EmulateMobile = ContextVar(false, false, false, false)
+
+do
+    local function return_mobile_value(_, mobile)
+        return mobile 
+    end
+    local function return_desktop_value(desktop, _)
+        return desktop 
+    end
+
+    local UserInputService = game:GetService("UserInputService")
+    local function __platform_var(desktop, mobile)
+        if (UserInputService.TouchEnabled and not UserInputService.MouseEnabled) or config.EmulateMobile then
+            return return_mobile_value
+        else
+            return return_desktop_value
+        end
+    end
+
+    config.PlatformVar = __platform_var()
+end
+
+
+
 --=============================================--
 --=                                           =--
 --=           LazyModules variables           =--
@@ -11,21 +84,18 @@ local config = { }
 --=============================================--
 
 -- Run lazymodules tests stage
-config.TESTING = true
-config.FocusTestOn = "Main"
+config.TESTING = false
+config.FocusTestOn = false
 
 -- The `Load` tree
 config.LogLoads = false
 config.LogPreLoads = false
--- Files which are not in the `Game` object
-config.LogReallyLazyLoads = false
 -- Files which are not in the `Game` object and could not be found by LazyModules
 config.LogUnfoundLoads = false
 config.LogUIInit = false
 config.LogSearchResults = false
 
 config.LogNewAbilities = false
-config.FreePowerUps = if not IsStudio then false else true
 
 -- UserInput handlers
 config.LogInputListeners = false
@@ -68,20 +138,6 @@ config.ModuleCollectionBlacklist = {
 --=============================================--
 
 -- Debug hooks features for adjusting values at runtime from DebugMenu
-config.VolumeOverrides = if not IsStudio then false else false
-
-config.TestMap = if not IsStudio then false else false
-
-
-
---=============================================--
---=                                           =--
---=          Runtime configuration            =--
---=                                           =--
---=============================================--
--- Must point to the one main place, no matter what.
-config.PlaceId = 8256020164
-config.MaxPlayers = 35
-config.GroupID = 5418470
+config.VolumeOverrides = ContextVar(false, true, false, false)
 
 return config

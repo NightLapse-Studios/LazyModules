@@ -1,7 +1,5 @@
 --!strict
 
-local Globals
-
 --[[
 
 @important, note that
@@ -56,19 +54,17 @@ function mod:provide(value: any, ...)
 		error("Value provided to AsyncValue list has the wrong number of indexers")
 	end
 
-	local t = self:__fill_indices(self.provided, indexers, value)
+	self:__fill_indices(self.provided, indexers, value)
 end
 
 function mod:__await(t, index, callback, id)
 	local waiting_idx = self.awaiting:insert(id)
 
 	if t[index] == nil then
-		task.desynchronize()
 		while t[index] == nil do
 			task.wait()
 			-- print(index)
 		end
-		task.synchronize()
 	end
 
 	if callback then
@@ -205,8 +201,7 @@ function mod:__tests(G, T)
 		)
 
 		async_list:provide(45, "zxcv")
-		task.desynchronize()
-		task.synchronize()
+		task.wait()
 
 		T:WhileSituation("receiving",
 			T.Equal, a, 45
@@ -243,7 +238,6 @@ function mod:__tests(G, T)
 end
 
 function mod:__init(G)
-	Globals = G
 	SparseList = require(game.ReplicatedFirst.Util.SparseList)
 end
 
