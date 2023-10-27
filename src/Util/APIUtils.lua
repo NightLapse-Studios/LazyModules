@@ -15,8 +15,8 @@ function mod.EXPORT_LIST(module)
 end
 
 function API_EXPORTER:ADD(name, opt_value: any?)
-	local thing = if opt_value then opt_value else self.module[name]
-	assert(thing, "API_EXPORTER:ADD: `" .. name .. "` not found in `" .. debug.info(2, "s"))
+	local thing = if opt_value ~= nil then opt_value else self.module[name]
+	assert(thing ~= nil, "API_EXPORTER:ADD: `" .. name .. "` not found in `" .. debug.info(2, "s"))
 
 	self.module.API_EXPORTS[name] = thing
 

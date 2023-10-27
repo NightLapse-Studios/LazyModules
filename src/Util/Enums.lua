@@ -12,11 +12,11 @@ local Enums: NLEnums = {
 		PRELOAD = 1,
 		LOAD_INIT = 2,
 		SIGNAL_BUILDING = 4,
-		
+
 		AWAITING_SERVER_DATA = 5,
 		LOAD_DATASTORES = 6,
 		LOAD_GAMESTATE = 7,
-		
+
 		FINALIZE = 8,
 		RUN = 9,
 
@@ -57,6 +57,7 @@ local Enums: NLEnums = {
 
 	UserInputType = {
 		Gesture = 2001,
+		DPad = 2002,
 	},
 
 	GestureDisplayMode = {
@@ -66,7 +67,7 @@ local Enums: NLEnums = {
 	},
 
 	AllInputs = { },
-	
+
 	EmissionShape = {
 		Edge = 0,
 		Disc = 1,
@@ -94,7 +95,7 @@ local Enums: NLEnums = {
 		Linear = 0,
 		Complete = 1,
 	},
-	
+
 	CameraMode = {
 		Studio = 2,
 		Constant = 3,
@@ -107,17 +108,17 @@ local Enums: NLEnums = {
 		Tertiary = 3,
 		Special = 4,
 	},
-	
+
 	ResetType = {
 		OnDeath = 1,
 		EachRound = 2,
 		Both = 3,
 	},
-	
+
 	DataTypes = {
 		RbxEnum = 0,
 		EnumItem = 0,
-		
+
 		Enums = 1,
 		boolean = 2,
 		string = 3,
@@ -125,7 +126,7 @@ local Enums: NLEnums = {
 		number = 5,
 		UDim2 = 6,
 	},
-	
+
 	WidgetPositions = {
 		TopCenter = 0,
 		RightCenter = 1,
@@ -137,13 +138,13 @@ local Enums: NLEnums = {
 		BottomRight = 7,
 		Center = 8,
 	},
-	
+
 	Notifications = {
 		TypeWriter = 1,
 		Reward = 2,
 		Extreme = 3,
 	},
-	
+
 	TypeWriter = {
 		TeamFull = 1,
 		NearFinish = 2,
@@ -152,20 +153,27 @@ local Enums: NLEnums = {
 		TeamFire = 5,
 		NotInGroup = 6,
 		MathAnswer = 11,
+		MaxBlueprints = 12,
+		OutOfAmmo = 15,
 		
+		CTFDestination = 16,
+		
+		TeamWon = 13,
+		TeamLost = 14,
+
 		FriendRewardWillWork = 7,
 		CannotPromptFriends = 8,
 		FriendJoinedReward = 9,
-		
+
 		MustUnequipPowerUp = 10,
 	},
-	
+
 	Reward = {
 		Kill = 1,
 		Major = 2,
 		Minor = 3,
 	},
-	
+
 	InputDeclinedReason = {
 		TooLong = 0,
 		TooShort = 1,
@@ -179,16 +187,16 @@ local Enums: NLEnums = {
 		Filtered = 9,
 		TeamFire = 10
 	},
-	
+
 	MouseIconTypes = {
 		Projectile = 1,
 	},
-	
+
 	GraphStatOptions = {
 		AllTimeKDR = 15,
 		AllTimeEDR = 16,
 	},
-	
+
 	-- Related to Interactables within the world
 	InteractShowType = {
 		Enabled = 1,
@@ -219,12 +227,12 @@ local Enums: NLEnums = {
 		NPC = 9,
 		GraveStone = 10,
 	},
-	
+
 	VoteType = {
 		Standard = 1,
 		Weighted = 2,
 	},
-	
+
 	GameState = {
 		MapVoting = 1,
 		GamemodeVoting = 2,

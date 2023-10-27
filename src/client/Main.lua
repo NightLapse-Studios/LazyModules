@@ -13,15 +13,9 @@ do
 	local PlayerGUI = game.Players.LocalPlayer.PlayerGui
 	local GUIDir = game.ReplicatedStorage.GUIs
 
-	local BaseInterface = GUIDir.BaseInterface
-	local BaseInterface_NoInset = GUIDir.BaseInterface_NoInset
-	local ToolTip = GUIDir.ToolTip
-	local Windows = GUIDir.Windows
-
-	BaseInterface.Parent = PlayerGUI
-	BaseInterface_NoInset.Parent = PlayerGUI
-	ToolTip.Parent = PlayerGUI
-	Windows.Parent = PlayerGUI
+	for i,v in GUIDir:GetChildren() do
+		v.Parent = PlayerGUI
+	end
 end
 
 function mod:__init(G)

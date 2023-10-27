@@ -1,6 +1,6 @@
 --[[
 	Loads a set of modules, places their API exports in the Game object on __init
- ]]
+]]
 
 local Game = _G.Game
 assert(Game, "StdLib is running prior to LazyModules initialization\n\tOr LazyModules is not running as expected")
@@ -16,7 +16,6 @@ local Libs = {
 	Maskables = Game.PreLoad(game.ReplicatedFirst.Util.Maskables),
 	Config = Game.PreLoad(game.ReplicatedFirst.Util.BUILDCONFIG),
 }
-
 
 local function print_s(...)
 	if Game.CONTEXT == "SERVER" then
@@ -43,6 +42,7 @@ local exports = APIUtils.EXPORT_LIST(Libs)
 	:ADD("no_op_func", function() end)
 	:ADD("ContextVar", Config.ContextVar)
 	:ADD("PlatformVar", Config.PlatformVar)
+	:ADD("IsMobile", Config.PlatformVar(false, true))
 	:ADD("print_s", print_s)
 	:ADD("print_c", print_c)
 
@@ -58,7 +58,7 @@ end
 
 function mod.LoadExports(G)
 	APIUtils.LOAD_EXPORTS(Libs, Game)
-	
+
 	for i,v in Libs do
 		if APIUtils.HAS_API_EXPORTS(v) then
 			APIUtils.LOAD_EXPORTS(v, Game)

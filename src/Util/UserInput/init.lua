@@ -23,7 +23,7 @@
 	Custom KeyCodes:
 		Not easily converted to a string, these are currently just stored as numbers in Enums.lua
 		Enum items typically have a .Name or .Value field, these don't
-	
+
 	Auxiliary KeyCodes:
 		A more complex grouping of input types or key codes
 		E.G. Enums.AuxiliaryInputCodes.KeyCodes.Any
@@ -43,25 +43,34 @@
 	Hooks cannot be blocked by handlers or intercepts
 ]]
 
-local Game
 local Config
-local MouseIcon
 local GestureDetector = _G.Game.PreLoad(script.GestureDetector)
 local Enums = _G.Game.Enums
 local AssociativeList = require(game.ReplicatedFirst.Util.AssociativeList)
+local Mobile = _G.Game.PreLoad(script.Mobile)
+local Game
 
+local Camera = workspace.CurrentCamera
+
+local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 -- TODO @2.0 Port mobile functionality of ContextActionService
 local mod = {
 	Handlers = { },
 	Intercepts = { },
-	Hooks = { }
+	Hooks = { },
+	IsMobile = _G.Game.PlatformVar(false, true)
 }
 
 
 mod.SetGestureDisplayMode = GestureDetector.SetDisplayMode
 mod.UnsetGestureDisplayMode = GestureDetector.UnsetDisplayMode
+
+mod.AddMobileButton = Mobile.AddButton
+mod.RemoveMobileButton = Mobile.RemoveButton
+mod.DoesMobileButtonExist = Mobile.DoesButtonExist
+
 
 local PendingCustomInputs = { }
 
@@ -76,14 +85,14 @@ local CustomKeycodes = {
 	[Enum.UserInputType.Focus] = true,
 	[Enum.UserInputType.Accelerometer] = true,
 	[Enum.UserInputType.Gyro] = true,
-	[Enum.UserInputType.Gamepad1] = true,
+	--[[ [Enum.UserInputType.Gamepad1] = true,
 	[Enum.UserInputType.Gamepad2] = true,
 	[Enum.UserInputType.Gamepad3] = true,
 	[Enum.UserInputType.Gamepad4] = true,
 	[Enum.UserInputType.Gamepad5] = true,
 	[Enum.UserInputType.Gamepad6] = true,
 	[Enum.UserInputType.Gamepad7] = true,
-	[Enum.UserInputType.Gamepad8] = true,
+	[Enum.UserInputType.Gamepad8] = true, ]]
 --[[ 	[Enum.UserInputType.TextInput] = true,
 	[Enum.UserInputType.InputMethod] = true, ]]
 	[Enum.UserInputType.None] = true,
@@ -95,6 +104,7 @@ local CustomKeycodes = {
 	[Enums.AuxiliaryInputCodes.InputGestures.Total] = true,
 	[Enums.AuxiliaryInputCodes.InputGestures.Last] = true,
 	[Enums.AuxiliaryInputCodes.KeyCodes.Any] = true,
+	[Enums.UserInputType.DPad] = true,
 }
 
 local EnumAssociations = AssociativeList.new()
@@ -171,13 +181,92 @@ end
 
 mod.EnumAssociations = EnumAssociations
 
+local ListenerCreatedCallbacks = {
+	[Enums.UserInputType.DPad] = Mobile.PushDPadUser
+}
+
+local ListenerDestroyedCallbacks = {
+	[Enums.UserInputType.DPad] = Mobile.RemoveDPadUser
+}
+
+
+
+local function AnyGestureCfg(self, ...)
+	local dir_list = { ... }
+	for i,v in dir_list do
+		local maskable = { v }
+		Mobile.PushGestureButton(self, maskable)
+		table.insert(self.extra, maskable)
+	end
+end
+
+local function SpecificGestureCfg(self)
+	local maskable = { self.keycode }
+	Mobile.PushGestureButton(self, maskable)
+	table.insert(self.extra, maskable)
+end
+
+local MobileCfgFuncs = {
+	[Enums.AuxiliaryInputCodes.InputGestures.Any] = AnyGestureCfg,
+	[Enums.InputGestures.Left] = SpecificGestureCfg,
+	[Enums.InputGestures.Right] = SpecificGestureCfg,
+	[Enums.InputGestures.Up] = SpecificGestureCfg,
+	[Enums.InputGestures.Down] = SpecificGestureCfg,
+}
+
+
+
+local function AnyGestureCleanup(self)
+	for i,v in self.extra do
+		Mobile.RemoveGestureButton(self, v)
+	end
+
+	table.clear(self.extra)
+end
+
+local function SpecificGestureCleanup(self)
+	local maskable = self.extra[1]
+	Mobile.RemoveGestureButton(self, maskable)
+	table.clear(self.extra)
+end
+
+local MobileCfgCleanup = {
+	[Enums.AuxiliaryInputCodes.InputGestures.Any] = AnyGestureCleanup,
+	[Enums.InputGestures.Left] = SpecificGestureCleanup,
+	[Enums.InputGestures.Right] = SpecificGestureCleanup,
+	[Enums.InputGestures.Up] = SpecificGestureCleanup,
+	[Enums.InputGestures.Down] = SpecificGestureCleanup,
+}
+
+
 local ListenerType = { }
-local mt_ListenerType = { __index = ListenerType }
+ListenerType.__index = ListenerType
+
+function ListenerType:MobileCfg(...)
+	local f = MobileCfgFuncs[self.keycode]
+
+	if not f then
+		error("Attempt to mobile-configure keycode " .. self.keycode .. " that has no associated cfg funcs")
+	end
+
+	f(self, ...)
+
+	return self
+end
+
 
 
 function ListenerType:Disconnect()
 	if self.disconnected_callback then
 		self:disconnected_callback()
+	end
+
+	if ListenerDestroyedCallbacks[self.keycode] then
+		ListenerDestroyedCallbacks[self.keycode](self)
+	end
+
+	if MobileCfgCleanup[self.keycode] then
+		MobileCfgCleanup[self.keycode](self)
 	end
 
 	local list = mod[self.Type][self.keycode]
@@ -186,14 +275,19 @@ function ListenerType:Disconnect()
 			table.remove(list, i)
 		end
 	end
-	
+
 	return nil
+end
+
+function ListenerType:SetRunsRobloxProcessed(doRun)
+	self.runsOnProcessed = doRun
 end
 
 function ListenerType:SetDisconnectCallback(callback)
 	self.disconnected_callback = callback
 	return self
 end
+
 
 function ListenerType.new(type, down_callback, up_callback, keycode, max_ct)
 	local listener = {
@@ -205,9 +299,16 @@ function ListenerType.new(type, down_callback, up_callback, keycode, max_ct)
 		up_callback = up_callback or false,
 		disconnected_callback = false,
 		keycode = keycode,
+		
+		runsOnProcessed = false,
 		-- For intercepts which also listen for releases, we track if they sank the input first via this `armed` value
-		armed = false
+		armed = false,
+		extra = { }
 	}
+
+	if ListenerCreatedCallbacks[keycode] then
+		ListenerCreatedCallbacks[keycode](listener)
+	end
 
 	if Config.LogInputProcessing then
 		local s,l,n = debug.info(3, "sln")
@@ -218,7 +319,7 @@ function ListenerType.new(type, down_callback, up_callback, keycode, max_ct)
 		warn("Key up callback provided to mousewheel event, but only key down will be called")
 	end
 
-	setmetatable(listener, mt_ListenerType)
+	setmetatable(listener, ListenerType)
 
 	return listener
 end
@@ -269,7 +370,6 @@ end
 
 
 
-local GestureDataSubmittedThisTick = false
 
 function mod.CustomInputObject(keycode, opt_aux_code, input_state, input_type)
 	assert(keycode)
@@ -298,14 +398,28 @@ function mod.GetLastGesture()
 	return GestureDetector.Last
 end
 
+local function desktop_mouse_pos()
+	local Mouse = game.Players.LocalPlayer:GetMouse()
+	return Vector2.new(Mouse.X, Mouse.Y)
+end
+
+-- we must enforce lockcenter on mobile, because roblox does some weird thing
+local TouchResponsibleForMouse: InputObject|false = false
+local function mobile_mouse_pos()
+	local inset = GuiService:GetGuiInset()
+	return Camera.ViewportSize/2 - inset
+end
+
+function mod.GetMousePos()
+	return Game.PlatformVar(desktop_mouse_pos, mobile_mouse_pos)()
+end
+
 
 
 function mod:__init(G)
 	Game = G
-
 	local Stack = G.Load("Stack")
 	Config = G.Load("BUILDCONFIG")
-	MouseIcon = G.Load("MouseIcon")
 	GestureDetector = G.Load("GestureDetector")
 
 	for i,v in Enum.KeyCode:GetEnumItems() do
@@ -324,62 +438,72 @@ end
 
 local empty_table = { }
 function mod:__build_signals(G, B)
-	Game = G
-
-	local DynamicThumbstick = false--_G.Game.PreLoad(game.Players.LocalPlayer.PlayerScripts.ControlScript.MasterControl.DynamicThumbstick)
-	
 	local a = 1
 	game:GetService("RunService").Stepped:Connect(function()
 		a += 1
 	end)
 
-	local function TransformTouch(original_input, new_input)
-		-- @2.0 test if MouseMovement ends on mobile
-		if original_input.UserInputType == Enum.UserInputType.Touch then
-			local is_thumbstick_touch = false --(DynamicThumbstick.GetInputObject() == original_input)
-
-			if original_input.UserInputState == Enum.UserInputState.Begin then
-				if is_thumbstick_touch then
-					-- Touch began in the thumbstick area
-					new_input.KeyCode = Enum.KeyCode.Thumbstick1
-					new_input.UserInputType = Enum.UserInputType.Gamepad1
-					new_input.Position = DynamicThumbstick.GetRelativePosition()
-				else
-					-- Touch began
-					new_input.UserInputType = Enum.UserInputType.MouseButton1
-				end
-			elseif original_input.UserInputState == Enum.UserInputState.Change then
-				if is_thumbstick_touch then
-					-- Touch changed but it's owned by the thumbstick
-					new_input.KeyCode = Enum.KeyCode.Thumbstick1
-					new_input.UserInputType = Enum.UserInputType.Gamepad1
-					new_input.Position = DynamicThumbstick.GetRelativePosition()
-				else
-					-- Touch changed, not associated with player movement; convert to mouse movement (panning)
-					new_input.UserInputType = Enum.UserInputType.MouseMovement
-				end
-			elseif original_input.UserInputState == Enum.UserInputState.End then
-				if not is_thumbstick_touch then
-					new_input.UserInputType = Enum.UserInputType.MouseButton1
-				end
-			end
-		end
-	end
-
-	local function DetectGestures(original_input, new_input)
-		if new_input.UserInputType == Enum.UserInputType.MouseMovement then
-			GestureDataSubmittedThisTick = true
-
-			if GestureDetector.IsReady == true then
-				if UserInputService.MouseBehavior == Enum.MouseBehavior.Default then
-					GestureDetector.ConsumePosition(original_input.Position)
-				else
-					GestureDetector.ConsumeDelta(original_input.Delta)
-				end
-			end
+	local function TransformTriggers(original_input, new_input)
+		if original_input.KeyCode == Enum.KeyCode.ButtonR2 and original_input.UserInputState ~= Enum.UserInputState.Change then
+			new_input.KeyCode = Enum.KeyCode.Unknown
+			new_input.UserInputType = Enum.UserInputType.MouseButton1
+		elseif original_input.KeyCode == Enum.KeyCode.ButtonL2 and original_input.UserInputState ~= Enum.UserInputState.Change then
+			new_input.KeyCode = Enum.KeyCode.Unknown
+			new_input.UserInputType = Enum.UserInputType.MouseButton2
 		end
 	end
 	
+	local function TransformTouch(original_input, new_input)
+		-- @2.0 test if MouseMovement ends on mobile
+		if original_input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+
+		if Mobile.IsInputBoundToDetector("MovementDetector", original_input) then
+			return
+		end
+
+		if original_input.UserInputState == Enum.UserInputState.Begin then
+			if TouchResponsibleForMouse == false then
+				new_input.UserInputType = Enum.UserInputType.MouseButton1
+				TouchResponsibleForMouse = original_input
+			end
+		elseif TouchResponsibleForMouse == original_input then
+			if original_input.UserInputState == Enum.UserInputState.Change then
+				new_input.UserInputType = Enum.UserInputType.MouseMovement
+			elseif original_input.UserInputState == Enum.UserInputState.End then
+				new_input.UserInputType = Enum.UserInputType.MouseButton1
+				TouchResponsibleForMouse = false
+			end
+		end
+	end
+
+	-- This function is handled customly in Mobile.lua if IsMobile == true
+	-- Via the GestureDetector container within the file
+	local function DetectGestures(original_input, new_input)
+		if new_input.UserInputType == Enum.UserInputType.MouseMovement then
+			GestureDetector.GestureDataSubmittedThisTick = true
+
+			if GestureDetector.IsReady ~= true then
+				return
+			end
+
+			if UserInputService.MouseBehavior == Enum.MouseBehavior.Default then
+				GestureDetector.ConsumePosition(original_input.Position)
+			else
+				GestureDetector.ConsumeDelta(original_input.Delta)
+			end
+		elseif new_input.KeyCode == Enum.KeyCode.Thumbstick2 then
+			GestureDetector.GestureDataSubmittedThisTick = true
+
+			if GestureDetector.IsReady ~= true then
+				return
+			end
+			
+			GestureDetector.ConsumeDelta(original_input.Position * 30)
+		end
+	end
+
 	local function TransformInput(original_input: InputObject)
 		local new_input = {
 			Delta = original_input.Delta,
@@ -394,7 +518,8 @@ function mod:__build_signals(G, B)
 		-- Anyway here's how mobile touches are converted into more generic inputs
 		TransformTouch(original_input, new_input)
 		DetectGestures(original_input, new_input)
-		
+
+		TransformTriggers(original_input, new_input)
 		--DetectGesturesStage2(original_input, new_input)
 
 		return new_input
@@ -408,16 +533,16 @@ function mod:__build_signals(G, B)
 		end
 	end
 
-	local function do_up_callback(input, pool: table, logging: boolean?, return_on_handle: boolean?)
+	local function do_up_callback(input, pool: table, logging: boolean?, return_on_handle: boolean?, processed)
 		for i = #pool, 1, -1 do
 			local listener: Listener = pool[i]
 			local relevant_callback = listener.up_callback
-			if relevant_callback then
+			if relevant_callback and ((not processed) or listener.runsOnProcessed) then
 				if logging then
 					print("\t\t\t" .. listener.__SourceFile)
 				end
 
-				local ret = relevant_callback(input)
+				local ret = relevant_callback(input, processed)
 				if ret == true and return_on_handle == true then
 					return ret, listener
 				end
@@ -426,16 +551,16 @@ function mod:__build_signals(G, B)
 
 		return false, nil
 	end
-	local function do_down_callback(input, pool: table, logging: boolean?, return_on_handle: boolean?)
+	local function do_down_callback(input, pool: table, logging: boolean?, return_on_handle: boolean?, processed)
 		for i = #pool, 1, -1 do
 			local listener: Listener = pool[i]
 			local relevant_callback = listener.down_callback
-			if relevant_callback then
+			if relevant_callback and ((not processed) or listener.runsOnProcessed) then
 				if logging then
 					print("\t\t\t" .. listener.__SourceFile)
 				end
 
-				local ret = relevant_callback(input)
+				local ret = relevant_callback(input, processed)
 				if ret == true and return_on_handle == true then
 					return ret, listener
 				end
@@ -456,7 +581,7 @@ function mod:__build_signals(G, B)
 		end
 	end
 
-	local function do_hooks(input, down: boolean, logging: boolean)
+	local function do_hooks(input, down: boolean, logging: boolean, processed: boolean)
 		local hooks, aux_hooks = get_group(input, mod.Hooks, false), get_group(input, mod.Hooks, true)
 
 		logging = logging and (#hooks > 0 or #aux_hooks > 0)
@@ -465,15 +590,15 @@ function mod:__build_signals(G, B)
 		end
 
 		if down then
-			do_down_callback(input, hooks, logging, false)
-			do_down_callback(input, aux_hooks, logging, false)
+			do_down_callback(input, hooks, logging, false, processed)
+			do_down_callback(input, aux_hooks, logging, false, processed)
 		else
-			do_up_callback(input, hooks, logging, false)
-			do_up_callback(input, aux_hooks, logging, false)
+			do_up_callback(input, hooks, logging, false, processed)
+			do_up_callback(input, aux_hooks, logging, false, processed)
 		end
 	end
 
-	local function do_intercepts(input, down: boolean, logging: boolean)
+	local function do_intercepts(input, down: boolean, logging: boolean, processed: boolean)
 		local intercepted = false
 		local intercepts, aux_intercepts = get_group(input, mod.Intercepts, false), get_group(input, mod.Intercepts, true)
 
@@ -484,25 +609,29 @@ function mod:__build_signals(G, B)
 
 		if down then
 			local sinker: Listener? = nil
-			intercepted, sinker = do_down_callback(input, intercepts, logging, true)
+			intercepted, sinker = do_down_callback(input, intercepts, logging, true, processed)
 			if intercepted and sinker then
 				process_interception(sinker)
 			end
 
-			local did_sink, sinker = nil, nil
-			did_sink, sinker = do_down_callback(input, aux_intercepts, logging, true)
+			sinker = nil
+			local did_sink = nil
+
+			did_sink, sinker = do_down_callback(input, aux_intercepts, logging, true, processed)
 			if did_sink and sinker then
 				process_interception(sinker)
 			end
 		else
 			local sinker: Listener? = nil
-			intercepted, sinker = do_up_callback(input, intercepts, logging, true)
+			intercepted, sinker = do_up_callback(input, intercepts, logging, true, processed)
 			if intercepted and sinker then
 				process_interception(sinker)
 			end
-			
-			local did_sink, sinker = nil, nil
-			did_sink, sinker = do_up_callback(input, aux_intercepts, logging, true)
+
+			sinker = nil
+			local did_sink = nil
+
+			did_sink, sinker = do_up_callback(input, aux_intercepts, logging, true, processed)
 			if did_sink and sinker then
 				process_interception(sinker)
 			end
@@ -511,7 +640,7 @@ function mod:__build_signals(G, B)
 		return intercepted
 	end
 
-	local function do_handlers(input, down: boolean, logging: boolean)
+	local function do_handlers(input, down: boolean, logging: boolean, processed: boolean)
 		local handlers, aux_handlers = get_group(input, mod.Handlers, false), get_group(input, mod.Handlers, true)
 
 		logging = logging and (#handlers > 0 or #aux_handlers > 0)
@@ -520,21 +649,17 @@ function mod:__build_signals(G, B)
 		end
 
 		if down then
-			do_down_callback(input, handlers, logging, true)
-			do_down_callback(input, aux_handlers, logging, true)
+			do_down_callback(input, handlers, logging, true, processed)
+			do_down_callback(input, aux_handlers, logging, true, processed)
 		else
-			do_up_callback(input, handlers, logging, true)
-			do_up_callback(input, aux_handlers, logging, true)
+			do_up_callback(input, handlers, logging, true, processed)
+			do_up_callback(input, aux_handlers, logging, true, processed)
 		end
 	end
 
 	-- TODO @2.0 fire off key up events when we open a menu
 	-- TODO @Important testing the intercept functionality in regards to key up and down "armed" thing
 	local function InputBegan(input: InputObject, processed: boolean, already_transformed: boolean?)
-		if processed then
-			return
-		end
-		
 		if not already_transformed then
 			input = TransformInput(input)
 		end
@@ -543,7 +668,7 @@ function mod:__build_signals(G, B)
 		if logging then
 			local should_ignore: boolean? = Config.LogInputProcessingFilters.UserInputType[input.UserInputType]
 			if should_ignore then logging = false end
-			
+
 			if logging then
 				local kc = if typeof(input.KeyCode) == "EnumItem" then input.KeyCode.Name else input.KeyCode
 				local it = if typeof(input.UserInputType) == "EnumItem" then input.UserInputType.Name else input.UserInputType
@@ -551,20 +676,16 @@ function mod:__build_signals(G, B)
 			end
 		end
 
-		do_hooks(input, true, logging)
+		do_hooks(input, true, logging, processed)
 
-		local intercepted = do_intercepts(input, true, logging)
+		local intercepted = do_intercepts(input, true, logging, processed)
 
 		if intercepted == false then
-			do_handlers(input, true, logging)
+			do_handlers(input, true, logging, processed)
 		end
 	end
 
 	local function InputEnded(input: InputObject, processed: boolean, already_transformed: boolean?)
-		if processed then
-			return
-		end
-		
 		if not already_transformed then
 			input = TransformInput(input)
 		end
@@ -573,7 +694,7 @@ function mod:__build_signals(G, B)
 		if logging then
 			local should_ignore: boolean? = Config.LogInputProcessingFilters.UserInputType[input.UserInputType]
 			if should_ignore then logging = false end
-			
+
 			if logging then
 				local kc = if typeof(input.KeyCode) == "EnumItem" then input.KeyCode.Name else input.KeyCode
 				local it = if typeof(input.UserInputType) == "EnumItem" then input.UserInputType.Name else input.UserInputType
@@ -581,12 +702,12 @@ function mod:__build_signals(G, B)
 			end
 		end
 
-		do_hooks(input, false, logging)
+		do_hooks(input, false, logging, processed)
 
-		local intercepted = do_intercepts(input, false, logging)
+		local intercepted = do_intercepts(input, false, logging, processed)
 
 		if intercepted == false then
-			do_handlers(input, false, logging)
+			do_handlers(input, false, logging, processed)
 		end
 	end
 
@@ -595,31 +716,22 @@ function mod:__build_signals(G, B)
 
 	-- This connection handles the mousewheel
 	UserInputService.InputChanged:Connect(function(input: InputObject, processed: boolean)
-		if processed then
-			return
-		end
-		
 		input = TransformInput(input)
 		
-		if (input.KeyCode ~= Enum.KeyCode.Unknown) or (input.UserInputState ~= Enum.UserInputState.Change) then
+		if input.UserInputState ~= Enum.UserInputState.Change then
 			return
 		end
-
+		
 		InputBegan(input, processed, true)
 	end)
 
 	RunService:BindToRenderStep("CustomInput", Enum.RenderPriority.Input.Value - 1, function()
-		-- A hack to detect when the mouse stops moving
-		if GestureDataSubmittedThisTick == false then
-			if GestureDetector.IsReady == true then
-				GestureDetector.ConsumeDelta(Vector3.new(0,0,0))
-			end
-		end
-		
-		GestureDataSubmittedThisTick = false
-
 		for i,v in PendingCustomInputs do
-			InputBegan(v, false, true)
+			if v.UserInputState == Enum.UserInputState.End then
+				InputEnded(v, false, true)
+			else
+				InputBegan(v, false, true)
+			end
 		end
 
 		table.clear(PendingCustomInputs)
