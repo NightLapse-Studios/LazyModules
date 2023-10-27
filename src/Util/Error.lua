@@ -37,7 +37,7 @@ function mod.Panic(err: string, extra: string, kick_players: boolean?)
 	end
 end
 
-function mod.unwrap_or_panic(succ: any?, err: string, scope: string?): any?
+function mod.assert_or_panic(succ: any?, err: string, scope: string?): any?
 	if not succ then
 		mod.Panic(err, scope, true)
 	end
