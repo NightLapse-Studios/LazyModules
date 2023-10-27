@@ -27,8 +27,6 @@ local Broadcasters = mod.Broadcasters
 --local INIT_CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 
 local Globals
-local unwrap_or_warn
-local unwrap_or_error
 local safe_require
 local async_list
 local ClassicSignal
@@ -66,10 +64,10 @@ local BroadcastBuilder = {
 	end,
 
 	ShouldAccept = function(self, func)
-		unwrap_or_error(
-			typeof(func) == "function",
-			"Missing func for Broadcaster"
-		)
+		if typeof(func) ~= "function" then
+			error("Missing func for Broadcaster")
+		end
+
 		self.__ShouldAccept = func
 		return self
 	end,
@@ -159,10 +157,6 @@ function mod:__init(G)
 	--The one true require tree
 	safe_require = require(game.ReplicatedFirst.Util.SafeRequire)
 	safe_require = safe_require.require
-
-	local err = require(game.ReplicatedFirst.Util.Error)
-	unwrap_or_warn = err.unwrap_or_warn
-	unwrap_or_error = err.unwrap_or_error
 
 	ClassicSignal = require(game.ReplicatedFirst.Util.LazyModules.Signals.ClassicSignal)
 

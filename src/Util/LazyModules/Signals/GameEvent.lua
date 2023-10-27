@@ -19,8 +19,6 @@ local mt = { __index = mod }
 
 local Globals
 local Signals
-local unwrap_or_warn
-local unwrap_or_error
 local safe_require
 local async_list
 
@@ -69,10 +67,9 @@ local GameEventBuilder = {
 	end,
 
 	ShouldAccept = function(self, func)
-		unwrap_or_error(
-			typeof(func) == "function",
-			"Missing func for GameEvent"
-		)
+		if typeof(func) ~= "function" then
+			error("Missing func for GameEvent")
+		end
 
 		self.__ShouldAccept = func
 		return self
@@ -210,10 +207,6 @@ function mod:__init(G, S)
 	--The one true require tree
 	safe_require = require(game.ReplicatedFirst.Util.SafeRequire)
 	safe_require = safe_require.require
-
-	local err = require(game.ReplicatedFirst.Util.Error)
-	unwrap_or_warn = err.unwrap_or_warn
-	unwrap_or_error = err.unwrap_or_error
 
 	async_list = require(game.ReplicatedFirst.Util.AsyncList)
 	async_list:__init(G)

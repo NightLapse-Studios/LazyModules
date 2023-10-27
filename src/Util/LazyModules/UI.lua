@@ -65,8 +65,6 @@ local mod = {
 }
 
 local Style
-local unwrap_or_warn
-local unwrap_or_error
 local safe_require
 
 local IsServer = game:GetService("RunService"):IsServer()
@@ -1020,10 +1018,6 @@ local PropFuncs = { }
 
 function mod:__init(G)
 	safe_require = G.Load(game.ReplicatedFirst.Util.SafeRequire).require
-
-	local err = G.Load(game.ReplicatedFirst.Util.Error)
-	unwrap_or_warn = err.unwrap_or_warn
-	unwrap_or_error = err.unwrap_or_error
 
 	Style = G.Load(game.ReplicatedFirst.Modules.GUI.Style)
 

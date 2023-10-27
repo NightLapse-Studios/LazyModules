@@ -37,23 +37,6 @@ function mod.Panic(err: string, extra: string, kick_players: boolean?)
 	end
 end
 
-function mod.unwrap_or_warn(succ: any?, err: string, scope: string?): any?
-	scope = scope or debug.traceback(nil, 2)
-	if not succ then
-		warn(tostring(err) .. "\n\t" .. tostring(scope))
-	end
-
-	return succ
-end
-function mod.unwrap_or_error(succ: any?, err: string, scope: string?): any?
-	scope = scope or ""
-	if not succ then
-		error(tostring(err) .. "\n\t" .. tostring(scope))
-	end
-
-	return succ
-end
-
 function mod.unwrap_or_panic(succ: any?, err: string, scope: string?): any?
 	if not succ then
 		mod.Panic(err, scope, true)

@@ -30,8 +30,6 @@ local Globals
 local LazyModules
 local PSA
 local Err
-local unwrap_or_warn
-local unwrap_or_error
 local safe_require
 
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
@@ -153,10 +151,6 @@ function mod:__init(G, LazyModules)
 	PSA = require(ReplicatedFirst.Util.SparseList)
 	WaitingList = PSA.new()
 
-	Err = require(ReplicatedFirst.Util.Error)
-	unwrap_or_warn = Err.unwrap_or_warn
-	unwrap_or_error = Err.unwrap_or_error
-
 	GameEvent = require(script.GameEvent)
 	Transmitter = require(script.Transmitter)
 	Broadcaster = require(script.Broadcaster)
@@ -187,17 +181,20 @@ function mod:__init(G, LazyModules)
 	Events = Event.Events
 end
 
+-- In practice, the number 32 appears to be able to be 1
+-- But I have a gut feeling that it's possible to validly use LazyModules but have delayed signals declared
+local WAIT_LIMIT = 32
+
 local function wait_for(async_table)
 	local waited = 0
 	while
 		async_table:is_awaiting()
 	do
 		waited += 1
-		local too_long = waited > 32
-		unwrap_or_warn(
-			too_long == false,
-			"Took too long to resolve signals (should usually be 1 tick)\n\nContents:\n" .. WaitingList:dump()
-		)
+		local too_long = waited > WAIT_LIMIT
+		if too_long ~= false then
+			error("Took too long to resolve signals (should usually be 1 tick)\n\nContents:\n" .. WaitingList:dump())
+		end
 
 		if too_long then break end
 
@@ -222,16 +219,8 @@ function mod:BuildSignals(G)
 			local transmitter_str = "Transmitter `" .. module .. "::" .. ident
 
 			if CONTEXT == "CLIENT" then
---[[ 				unwrap_or_error(
-					transmitter.Configured.Client == false,
-					transmitter_str .. "` is not configured on the client"
-				) ]]
 				setmetatable(transmitter, mt_ClientTransmitter)
 			else
---[[ 				unwrap_or_error(
-					transmitter.Configured.Server == false,
-					transmitter_str .. "` is not configured on the server"
-				) ]]
 				setmetatable(transmitter, mt_ServerTransmitter)
 			end
 		end
@@ -247,16 +236,14 @@ function mod:BuildSignals(G)
 				setmetatable(broadcaster, mt_ClientBroadcaster)
 			elseif CONTEXT == "SERVER" then
 				if broadcaster.Connections > 0 then
-					unwrap_or_warn(
-						broadcaster.__ShouldAccept ~= false,
-						transmitter_str .. "has no config call to Builder:ShouldAccept(func)\nTherefore any client firing this event will be trusted!"
-					)
+					if broadcaster.__ShouldAccept == false then
+						warn(transmitter_str .. "has no config call to Builder:ShouldAccept(func)\nTherefore any client firing this event will be trusted!")
+					end
 
 					if broadcaster.__ShouldAccept then
-						unwrap_or_error(
-							typeof(broadcaster.__ShouldAccept) == "function",
-							transmitter_str .. "passed value is not a function"
-						)
+						if typeof(broadcaster.__ShouldAccept) ~= "function" then
+							error(transmitter_str .. "passed value is not a function")
+						end
 					end
 				end
 
@@ -280,13 +267,6 @@ function mod:BuildSignals(G)
 			if CONTEXT == "CLIENT" then
 				setmetatable(event, mt_ClientGameEvent)
 			elseif CONTEXT == "SERVER" then
---[[ 				if event.Connections > 0 then
-					unwrap_or_warn(
-						event.__ShouldAccept ~= false,
-						transmitter_str .. "needs a config call to Builder:ShouldAccept(func) (due to server connection)"
-					)
-				end ]]
-
 				setmetatable(event, mt_ServerGameEvent)
 			end
 		end
@@ -296,18 +276,16 @@ function mod:BuildSignals(G)
 		for ident, event in identifers do
 			if CONTEXT == "CLIENT" then
 				local event_str = "Event `" .. module .. "::" .. ident
-				unwrap_or_error(
-					event.Type == "Builder",
-					event_str .. "` is not a Builder (what did you do?)"
-				)
+				if event.Type ~= "Builder" then
+					error(event_str .. "` is not a Builder (what did you do?)")
+				end
 
 				setmetatable(event, mt_ClientEvent)
 			elseif CONTEXT == "SERVER" then
 				local event_str = "Event `" .. module .. "::" .. ident
-				unwrap_or_error(
-					event.Type == "Builder",
-					event_str .. "` is not a Builder (what did you do?)"
-				)
+				if event.Type ~= "Builder" then
+					error(event_str .. "` is not a Builder (what did you do?)")
+				end
 
 				setmetatable(event, mt_ServerEvent)
 			end

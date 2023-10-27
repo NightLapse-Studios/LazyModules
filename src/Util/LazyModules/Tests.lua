@@ -6,14 +6,6 @@ local mod = {
 	Nouns = { },
 }
 
-local Globals
-local PSA
-local Err
-local unwrap_or_warn
-local unwrap_or_error
-local safe_require
-
-local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local Config = require(game.ReplicatedFirst.Util.BUILDCONFIG)
 
 local USAGE_EXAMPLE = [[

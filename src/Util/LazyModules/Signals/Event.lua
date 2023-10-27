@@ -16,8 +16,6 @@ local mod = {
 local Events = mod.Events
 
 local Globals
-local unwrap_or_warn
-local unwrap_or_error
 local safe_require
 local async_list
 
@@ -105,11 +103,6 @@ function mod:__init(G)
 
 	safe_require = require(game.ReplicatedFirst.Util.SafeRequire)
 	safe_require = safe_require.require
-
-	local err = require(game.ReplicatedFirst.Util.Error)
-	unwrap_or_warn = err.unwrap_or_warn
-	unwrap_or_error = err.unwrap_or_error
-
 
 	async_list = require(game.ReplicatedFirst.Util.AsyncList)
 	async_list:__init(G)
