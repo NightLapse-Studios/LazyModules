@@ -23,7 +23,6 @@ local Transmitters = mod.Transmitters
 --local INIT_CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 
 local Globals
-local LazyString
 local unwrap_or_warn
 local unwrap_or_error
 local safe_require
@@ -95,10 +94,9 @@ function mod.NewTransmitter(self: Builder, identifier: string)
 	Modules[self.CurrentModule] = Modules[self.CurrentModule] or { } ]]
 
 	local _mod = Transmitters.Identifiers:inspect(identifier)
-	unwrap_or_error(
-		_mod == nil,
-		LazyString.new("Re-declared event `", identifier, "` in `", self.CurrentModule, "`.\nOriginally declared here: `", _mod, "`")
-	)
+	if _mod ~= nil then
+		error("Re-declared event `" .. identifier .. "` in `" .. self.CurrentModule .. "`.\nOriginally declared here: `" .. _mod .. "`")
+	end
 
 	Transmitters.Identifiers:provide(transmitter, identifier)
 	Transmitters.Modules:provide(transmitter, self.CurrentModule, identifier)
@@ -122,8 +120,6 @@ function mod:__init(G)
 
 	mod.Transmitters.Identifiers = async_list.new(1)
 	mod.Transmitters.Modules = async_list.new(2)
-
-	LazyString = require(game.ReplicatedFirst.Util.LazyString)
 end
 
 return mod

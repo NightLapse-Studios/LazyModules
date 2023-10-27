@@ -18,7 +18,6 @@ local mt = { __index = mod }
 --local INIT_CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 
 local Globals
-local LazyString
 local Signals
 local unwrap_or_warn
 local unwrap_or_error
@@ -192,10 +191,9 @@ function mod.NewGameEvent(self: Builder, verb: Verb, noun: Noun)
 	event.__ShouldAccept = false
 
 	local _mod = GameEvents.Identifiers:inspect(id)
-	unwrap_or_error(
-		_mod == nil,
-		LazyString.new("Re-declared GameEvent `", id, "` in `", self.CurrentModule, "`.\nOriginally declared here: `", _mod, "`")
-	)
+	if _mod ~= nil then
+		error("Re-declared GameEvent `" .. id .. "` in `" .. self.CurrentModule .. "`.\nOriginally declared here: `" .. _mod .. "`")
+	end
 
 	GameEvents.Identifiers:provide(event, id)
 
@@ -216,8 +214,6 @@ function mod:__init(G, S)
 	local err = require(game.ReplicatedFirst.Util.Error)
 	unwrap_or_warn = err.unwrap_or_warn
 	unwrap_or_error = err.unwrap_or_error
-
-	LazyString = require(game.ReplicatedFirst.Util.LazyString)
 
 	async_list = require(game.ReplicatedFirst.Util.AsyncList)
 	async_list:__init(G)

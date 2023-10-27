@@ -28,7 +28,6 @@ local mod = {
 
 local Globals
 local LazyModules
-local LazyString
 local PSA
 local Err
 local unwrap_or_warn
@@ -186,8 +185,6 @@ function mod:__init(G, LazyModules)
 	Broadcasters = Broadcaster.Broadcasters
 	GameEvents = GameEvent.GameEvents
 	Events = Event.Events
-
-	LazyString = require(ReplicatedFirst.Util.LazyString)
 end
 
 local function wait_for(async_table)
@@ -275,10 +272,9 @@ function mod:BuildSignals(G)
 			event:Build()
 
 			for i,v in event.Implications do
-				unwrap_or_warn(
-					typeof(v) ~= "string",
-					LazyString.new(transmitter_str, "has unresolved implication for `", event.Verb, "`\n\n(GameEvent `", event.Verb, " ", i, "` does not exist)\n")
-				)
+				if typeof(v) == "string" then
+					warn(transmitter_str .. "has unresolved implication for `" .. event.Verb .. "`\n\n(GameEvent `" .. event.Verb .. " " .. i .. "` does not exist)\n")
+				end
 			end
 
 			if CONTEXT == "CLIENT" then

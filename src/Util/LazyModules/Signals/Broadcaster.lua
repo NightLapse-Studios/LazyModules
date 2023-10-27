@@ -27,7 +27,6 @@ local Broadcasters = mod.Broadcasters
 --local INIT_CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 
 local Globals
-local LazyString
 local unwrap_or_warn
 local unwrap_or_error
 local safe_require
@@ -144,10 +143,9 @@ function mod.NewBroadcaster(self: Builder, identifier: string)
 	broadcaster.__ShouldAccept = default_should_accept
 	setmetatable(broadcaster, mt_BroadcastBuilder)
 
-	unwrap_or_error(
-		Broadcasters.Identifiers:inspect(identifier) == nil,
-		"Re-declared broadcaster `" .. identifier .. "` in `" .. self.CurrentModule .. "`"
-	)
+	if Broadcasters.Identifiers:inspect(identifier) ~= nil then
+		error("Re-declared broadcaster `" .. identifier .. "` in `" .. self.CurrentModule .. "`")
+	end
 
 	Broadcasters.Identifiers:provide(broadcaster, identifier)
 	Broadcasters.Modules:provide(broadcaster, self.CurrentModule, identifier)
@@ -166,7 +164,6 @@ function mod:__init(G)
 	unwrap_or_warn = err.unwrap_or_warn
 	unwrap_or_error = err.unwrap_or_error
 
-	LazyString = require(game.ReplicatedFirst.Util.LazyString)
 	ClassicSignal = require(game.ReplicatedFirst.Util.LazyModules.Signals.ClassicSignal)
 
 	async_list = require(game.ReplicatedFirst.Util.AsyncList)
