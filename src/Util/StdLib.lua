@@ -47,6 +47,8 @@ local exports = APIUtils.EXPORT_LIST(Libs)
 	:ADD("print_c", print_c)
 
 if game:GetService("RunService"):IsClient() then
+	-- These are unreliable if the screen changes size, but they work in a quick pinch.
+	-- TODO: A real solution to this
 	local mouse = game.Players.LocalPlayer:GetMouse()
 
 	exports:ADD("ScreenSizeXRatio", mouse.ViewSizeX / 1920)

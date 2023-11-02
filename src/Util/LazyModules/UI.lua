@@ -1086,6 +1086,7 @@ function mod:__init(G)
 		end
 
 		--[[
+		TODO: These docs may be out of date
 			This is where most of the magic happens.
 			This set of functions can be used in two ways:
 

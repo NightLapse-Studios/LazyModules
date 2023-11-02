@@ -3,6 +3,8 @@
 --[[
 	An early mockup of an idea for a buffer of text output as an alternative to just printing to console
 	This way server logs of some sort can be sent to e.g. discord on error
+
+	Left here as brain juice I guess. TODO: Remove this file?
 ]]
 
 local mod = { }
