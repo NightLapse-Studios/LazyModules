@@ -112,4 +112,4 @@ function CRC.Hash(str: string): number
     return crc
 end
 
-return CRC.Hash
+return CRC

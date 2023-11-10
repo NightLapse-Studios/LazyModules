@@ -363,7 +363,7 @@ end
 function mod.LoopAnimsRandomly(model: Model, loopName: String, PR: FastProbabilityRange)
 	--Note that using a model's name, and some loop name, will generate collisions if the model's name doesn't embedd
 	-- some sort of ID the way that mobs do.
-	local loopID = CRC(string.format("%f", tick()) .. loopName)
+	local loopID = CRC.Hash(string.format("%f", tick()) .. loopName)
 
 	if RandomAnimLoops[loopID] then
 		return
