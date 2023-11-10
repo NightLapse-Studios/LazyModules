@@ -192,6 +192,15 @@ function mod:__build_signals(G, B)
 		:ServerConnection(handleDebugMenuValueChangedEvent)
 end
 
+function mod:__run(G)
+	local Entity = G.Load("Entity")
+	mod.RegisterButton("DamagePlayer", function(_, plr)
+		if RunService:IsServer() then
+			Entity.Damage(Entity.GetFromPlayer(plr), nil, 10)
+		end
+	end)
+end
+
 function mod:__ui(G, i, p)
 	if not RunService:IsStudio() then
 		return
@@ -319,9 +328,9 @@ function mod:__ui(G, i, p)
 		visible = not visible
 		if visible then
 			-- TODO: Mouse behavior system
-			-- Views.OverrideMouseBehavior(Enum.MouseBehavior.Default)
+			-- View.OverrideMouseBehavior(Enum.MouseBehavior.Default)
 		else
-			-- Views.StopMouseBehaviorOverride()
+			-- View.StopMouseBehaviorOverride()
 		end
 
 		component:setState({ visible = visible })

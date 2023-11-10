@@ -2,9 +2,7 @@
 local Style
 local Roact
 local Assets
-local Enums = _G.Game.Enums
 local String
-local EffectUtil
 local Audio
 local Globals
 
@@ -12,40 +10,17 @@ local module = {}
 
 local RunService = game:GetService("RunService")
 local TextService = game:GetService("TextService")
-local GuiService = game:GetService("GuiService")
-local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 
 local I, P, D
 
-local RoactEvents
 local ButtonIcon = nil
 local MouseIcon
 
-local updServerTime
-local updPlayTime
-local rightclickBind
 local TeamFireLimit = 0
 local SpamPassRate = 60*5 -- if being spammed, a notification will pass this often
 local SpamPassRateAppliesAt = SpamPassRate * 2-- * number of messages that can get through before PassRate limit takes affect
 local plr = game.Players.LocalPlayer
-
-local StandardAnchorPoint = Vector2.new(0, 0)
-local StandardPosition = UDim2.new(0, 0, 0, 0)
-
-local updTime
---[[ module.CurrentTime, updTime = Roact.createBinding(0)
-module.CurrentTime = Roact.joinBindings({module.CurrentTime, Settings.GetSettingsRoactBinding("DisplayTime")}):map(function(values)
-	local set = values[2]
-	
-	if set == Enums.DisplayTimes["12Hour"] then
-		return os.date("%I:%M:%S %p")
-	elseif set == Enums.DisplayTimes["24Hour"] then
-		return os.date("%X")
-	else
-		return "ERR: " .. (set or "")
-	end
-end) ]]
 
 
 function module.HideUI()
@@ -504,8 +479,6 @@ local function button(props)
 	local oldClick2 = props[Roact.Event.MouseButton2Click]
 	local oldEnter = props[Roact.Event.MouseEnter]
 	props[Roact.Event.MouseEnter] = function(rbx, ...)
-		Globals.UpdatedButtonUnderMouseEvent.Event:Wait()
-		
 		if Globals.ButtonUnderMouse == rbx then
 			if oldEnter then
 				oldEnter(rbx, ...)
@@ -805,13 +778,18 @@ function module:__ui(G, i, p)
 		local props = self.props
 		local thirdColor = self.UsePrimaryColor and Style.PrimaryFocusColor or Style.ActiveTextColor
 		
-		P()
+		local prop_set = P()
 			:Size(1,4,1,4)
 			:Center()
 			:BorderSizePixel(0)
+			:BackgroundColor3_Raw(thirdColor)
+			:BackgroundTransparency(Roact.joinBindings({self.HoveredOverlay, self.PressedOverlay, self.FocusedOverlay}):map(function(v)
+				return 1 - (v[1] + v[2] + v[3]) / 100
+			end))
+			:RoundCorners()
 		
 		if self.Focused then
-			I:Name(self.Focused:map(function(v)
+			prop_set:Name(self.Focused:map(function(v)
 	
 				if v == self.id then
 					self.FocusedOverlay:skip():skip():spring(12, 9, 2)
@@ -823,75 +801,64 @@ function module:__ui(G, i, p)
 			end))
 		end
 		
-		I:BackgroundColor3_Raw(thirdColor)
-		:BackgroundTransparency(Roact.joinBindings({self.HoveredOverlay, self.PressedOverlay, self.FocusedOverlay}):map(function(v)
-			return 1 - (v[1] + v[2] + v[3]) / 100
-		end))
-		
-		:RoundCorners()
-		
-		local overlay = I:Frame(D())
-		
-		P()
-			:Size_Raw(props.Size)
-			:AnchorPoint_Raw(props.AnchorPoint)
-			:Position_Raw(props.Position)
-			:AutoButtonColor(false)
+		local overlay_props = P()
 			:Name(props.Name)
 			:LayoutOrder(props.LayoutOrder)
 			:BackgroundTransparency(props.BackgroundTransparency)
 		
 		if props._type == "Image" then
-			I:Image(props.Image)
-			:ImageTransparency(props.ImageTransparency)
+			overlay_props:Image(props.Image)
+				:ImageTransparency(props.ImageTransparency)
 		else
-			I:Text(props.Text)
-			:TextColor3_Raw(thirdColor)
-			:TextTransparency(props.TextTransparency)
-			:TextSize(props.TextSize)
-			:Font(props.Font)
+			overlay_props:Text(props.Text)
+				:TextColor3_Raw(thirdColor)
+				:TextTransparency(props.TextTransparency)
+				:TextSize(props.TextSize)
+				:Font(props.Font)
 		end
 		
-		I:MouseEnter(function(rbx)
-			self.HoveredOverlay:skip():spring(5, 9, 2)
-		end)
-		:MouseLeave(function(rbx)
-			self.HoveredOverlay:skip():spring(0, 9, 2)
-		end)
-		
-		:MouseButton1Down(function(rbx)
-			self.PressedOverlay:skip():spring(7, 9, 2)
-		end)
-		:MouseButton1Up(function(rbx)
-			self.PressedOverlay:skip():spring(0, 4, 2)
-		end)
-		
-		:Activated(function(rbx)
-			if not self.Focused then
-				self.FocusedOverlay:skip():skip():instant(12):spring(0, 6, 2)
-			end
-			props.Activated(rbx)
-		end)
-		
-		:Change("AbsoluteSize", props[Roact.Change.AbsoluteSize])
-		:Change("Parent", props[Roact.Change.Parent])
-		:Ref(props[Roact.Ref])
-		
-		:BackgroundColor3_Raw(Style.SecondaryColor1)
-		
-		:Border(2, Roact.joinBindings({self.FocusedOverlay, Style.SecondaryColor2, thirdColor}):map(function(v)
-			return v[2]:Lerp(v[3], v[1]/12)
-		end))
-		:RoundCorners()
-		:Modal(props.Modal)
+		local button_props = P()
+			:AutoButtonColor(false)
+			:AnchorPoint_Raw(props.AnchorPoint)
+			:Position_Raw(props.Position)
+			:Size_Raw(props.Size)
+			:MouseEnter(function(rbx)
+				self.HoveredOverlay:skip():spring(5, 9, 2)
+			end)
+			:MouseLeave(function(rbx)
+				self.HoveredOverlay:skip():spring(0, 9, 2)
+			end)
+			:MouseButton1Down(function(rbx)
+				self.PressedOverlay:skip():spring(7, 9, 2)
+			end)
+			:MouseButton1Up(function(rbx)
+				self.PressedOverlay:skip():spring(0, 4, 2)
+			end)
+			:Activated(function(rbx)
+				if not self.Focused then
+					self.FocusedOverlay:skip():skip():instant(12):spring(0, 6, 2)
+				end
+				props.Activated(rbx)
+			end)
+			:Change("AbsoluteSize", props[Roact.Change.AbsoluteSize])
+			:Change("Parent", props[Roact.Change.Parent])
+			:Ref(props[Roact.Ref])
+			:BackgroundColor3_Raw(Style.SecondaryColor1)
+			:Border(2, Roact.joinBindings({self.FocusedOverlay, Style.SecondaryColor2, thirdColor}):map(function(v)
+				return v[2]:Lerp(v[3], v[1]/12)
+			end))
+			:RoundCorners()
+			:Modal(props.Modal)
+
+		local overlay = I:Frame(overlay_props)
 		
 		if props._type == "Image" then
-			return I:ImageButton(D()):Children(
+			return I:ImageButton(button_props):Children(
 				I:Fragment(props.Children),
 				overlay
 			)
 		else
-			return I:TextButton(D()):Children(
+			return I:TextButton(button_props):Children(
 				I:Fragment(props.Children),
 				overlay
 			)

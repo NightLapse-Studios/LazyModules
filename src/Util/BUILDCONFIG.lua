@@ -16,6 +16,8 @@ config.TestPlaceId = 13489727259
 config.MaxPlayers = 35
 config.GroupID = 5418470
 
+config.AnimationFadeTime = 0.1
+
 -- Set up ContextVar for StdLib
 -- This file can't rely on StdLib so functions it needs from StdLib are actually defined here and StdLib will load them
 do
@@ -85,17 +87,16 @@ end
 
 -- Run lazymodules tests stage
 config.TESTING = false
+-- Optional string, a module name
 config.FocusTestOn = false
 
 -- The `Load` tree
 config.LogLoads = false
 config.LogPreLoads = false
--- Files which are not in the `Game` object and could not be found by LazyModules
-config.LogUnfoundLoads = false
 config.LogUIInit = false
-config.LogSearchResults = false
 
-config.LogNewAbilities = false
+-- Log when a network signal is fired (Signals.Monitor(...Signals) can be used for individual events)
+config.MonitorAllSignals = false
 
 -- UserInput handlers
 config.LogInputListeners = false
@@ -122,7 +123,8 @@ config.ModuleCollectionBlacklist = {
     game.ReplicatedFirst.Modules.Roact,
     game.ReplicatedFirst.Util.LazyModules,
     Server = {
-        game.ReplicatedFirst.Modules.GUI
+        game.ReplicatedFirst.Modules.GUI,
+        game.ReplicatedFirst.Util.UserInput
     },
     Client = {
         

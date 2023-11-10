@@ -32,6 +32,10 @@ function MaskableStack:remove(thing: any)
 	end
 end
 
+function MaskableStack:forceUpdate()
+	self.__OnTopValueChanged(self.stack[#self.stack])
+end
+
 function mod.Stack()
 	local t = {
 		stack = { },

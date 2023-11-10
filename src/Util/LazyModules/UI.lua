@@ -572,7 +572,7 @@ function PropSet:RoundCorners(scale, pixels)
 		self:Position(scaling, spacing, old_pos.Y.Scale, old_pos.Y.Offset)
 	end ]]
 	self:Children(
-		self:UICorner(mod.P()
+		mod:UICorner(mod.P()
 			:CornerRadius(scale or 0, pixels or 4)
 		)
 	)
@@ -582,7 +582,7 @@ end
 
 function PropSet:Border(thick, color)
 	self:Children(
-		self:UIStroke(mod.P()
+		mod:UIStroke(mod.P()
 			:ApplyStrokeMode(Enum.ApplyStrokeMode.Border)
 			:Color_Raw(color or Style.SecondaryColor2)
 			:Thickness(thick or 2)
@@ -1047,7 +1047,6 @@ function mod:__init(G)
 					return _self
 				end
 
-				--
 				local raw_name = prop_name .. "_Raw"
 				PropSet[raw_name] = function(_self, value)
 					_self.props[prop_name] = value

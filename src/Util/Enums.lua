@@ -1,6 +1,6 @@
 
 
-local Enums: NLEnums = {
+local Enums = {
 	DataStores = {
 		Players = "Players",
 		Test = "TestStore"
@@ -139,41 +139,6 @@ local Enums: NLEnums = {
 		Center = 8,
 	},
 
-	Notifications = {
-		TypeWriter = 1,
-		Reward = 2,
-		Extreme = 3,
-	},
-
-	TypeWriter = {
-		TeamFull = 1,
-		NearFinish = 2,
-		Capture = 3,
-		Neutralize = 4,
-		TeamFire = 5,
-		NotInGroup = 6,
-		MathAnswer = 11,
-		MaxBlueprints = 12,
-		OutOfAmmo = 15,
-		
-		CTFDestination = 16,
-		
-		TeamWon = 13,
-		TeamLost = 14,
-
-		FriendRewardWillWork = 7,
-		CannotPromptFriends = 8,
-		FriendJoinedReward = 9,
-
-		MustUnequipPowerUp = 10,
-	},
-
-	Reward = {
-		Kill = 1,
-		Major = 2,
-		Minor = 3,
-	},
-
 	InputDeclinedReason = {
 		TooLong = 0,
 		TooShort = 1,
@@ -186,15 +151,6 @@ local Enums: NLEnums = {
 		Unknown = 8,
 		Filtered = 9,
 		TeamFire = 10
-	},
-
-	MouseIconTypes = {
-		Projectile = 1,
-	},
-
-	GraphStatOptions = {
-		AllTimeKDR = 15,
-		AllTimeEDR = 16,
 	},
 
 	-- Related to Interactables within the world
@@ -226,40 +182,7 @@ local Enums: NLEnums = {
 		Shrine = 8,
 		NPC = 9,
 		GraveStone = 10,
-	},
-
-	VoteType = {
-		Standard = 1,
-		Weighted = 2,
-	},
-
-	GameState = {
-		MapVoting = 1,
-		GamemodeVoting = 2,
-		Intermission = 3,
-		Building = 4,
-		Match = 5,
-		Siege = 6,
-		RoundFinish = 7,
-		Cleanup = 8,
-	},
-	-- Character Hacking
-	CheatReason = {
-		OffOfYAxis = 1,
-		TooFast = 2,
-		OutOfBounds = 3,
-		Flying = 4,
-		NoClipping = 5,
-		RemovingParts = 6,
-	},
-	CheatReasonStrings = {
-		[1] = "OffOfYAxis",
-		[2] = "TooFast",
-		[3] = "OutOfBounds",
-		[4] = "Flying",
-		[5] = "NoClipping",
-		[6] = "RemovingParts",
-	},
+	}
 }
 
 for _, enums in Enum:GetEnums() do

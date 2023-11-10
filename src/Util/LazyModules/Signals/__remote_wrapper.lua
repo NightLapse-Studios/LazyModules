@@ -28,7 +28,7 @@ function mod.wrapper(identifier: string, builder_mt: table)
 			builder_mt
 		)
 	else
-		local event = game.ReplicatedStorage:WaitForChild(identifier, 6)
+		local event = game.ReplicatedStorage:WaitForChild(identifier, 4)
 		
 		if not event then
 			warn("Waiting for event timed out! - " .. identifier .. "\n" .. lazymod_traceback())

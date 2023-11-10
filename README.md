@@ -8,7 +8,7 @@ What has become the LM environment started as a need to report errors from `requ
 
 LM first searches for all module scripts and `require`s them. It then makes these modules available to other modules by passing them in to standardized callbacks that can be defined in any module script. These standardized callbacks are the bread and butter of LM; they are the foundation of the structure of LM games.
 
-LM is the only system which should use `require`; as such it can be fully deprecated in LM games, and its usage is discouraged. As a result of *that*, it is discouraged to make modules which return values other than tables, because they cannot be managed by LM.
+LM is the only system which should use `require`; as such it can be fully deprecated in LM games, and its usage is discouraged. As a result of *that*, it is discouraged to make modules which return values other than tables, because they cannot be managed by LM. Other libraries which still use `require` can still work, e.g. Roact and Flipper are included in LM, you just sometimes have to tinker with them to get them to work 100% properly.
 
 The standardized callbacks are executed across all scripts on a per-callback basis I.E. every `__init` function will be called in every module, and then the next callback, `__build_signals` is called in every module, up to the `__run` step. The order of module execution is undefined.
 
@@ -83,7 +83,7 @@ function mod:__init(G)
 end
 ```
 
-6) Signals & single-file all-context paradigm
+5) Signals & single-file all-context paradigm
 
 	Signals are an abstraction on top of remote events which classifies their usage based on communication patterns. Even though there are only two main use cases currently, they have proven helpful in preventing networking spaghetti. Transmitters indicate simple client->server or server->client communication. Broadcasters are used for client->server->all-clients communication, and feature "ShouldAccept" functionality that inspects data from the client to give it the go-ahead to continue on to server processing and replication.
 

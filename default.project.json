@@ -6,6 +6,7 @@
     "ReplicatedFirst": {
       "$className": "ReplicatedFirst",
       "$path": "src/replicated_first",
+      "$ignoreUnknownInstances": true,
       "Modules": {
         "$path": "src/shared"
       },
@@ -19,7 +20,8 @@
     },
     "ReplicatedStorage": {
       "$className": "ReplicatedStorage",
-      "$path": "src/replicated_storage"
+      "$path": "src/replicated_storage",
+      "$ignoreUnknownInstances": true
     },
     "StarterPlayer": {
       "$className": "StarterPlayer",
@@ -27,7 +29,17 @@
         "$className": "StarterPlayerScripts",
         "$path": "src/client",
         "$ignoreUnknownInstances": true
+      },
+      "StarterCharacterScripts": {
+        "$className": "StarterCharacterScripts",
+        "$path": "src/starter_character_scripts",
+        "$ignoreUnknownInstances": true
       }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$ignoreUnknownInstances": true,
+      "$path": "src/workspace"
     }
   }
 }

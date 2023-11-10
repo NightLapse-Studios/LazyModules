@@ -127,27 +127,8 @@ local function reset_context(prev: number)
 	Game.LOADING_CONTEXT = prev
 end
 
-local function warn_load_err(name)
-	local _script = game.ReplicatedFirst:FindFirstChild(name, true)
-
-	if not _script then
-		warn("Could not find suggested require path for module \"" .. name .. "\"")
-		return
-	end
-
-	if not config.LogSearchResults then return end
-
-	local ret = _script.Name
-	while _script.Parent and _script.Parent ~= game do
-		ret = _script.Parent.Name .. "." .. ret
-		_script = _script.Parent
-	end
-
-	ret = "\n" .. CONTEXT .. " init: Module `" .. name .. "` isn't in the `Game` object\n" ..
-	"\nSuggested fix:\nGlobals." .. name .. " = LazyModules.PreLoad(game." .. ret .. ")"
-	
-	warn(ret)
-	warn("\tRequired from:\n" .. mod.format_lazymodules_traceback())
+local function warn_load_err(name: string)
+	warn("Module \"" .. name .. "\" wasn't found by LazyModules. Use `ModuleCollectionFolders` & `ModuleCollectionBlacklist` to control what LazyModules sees")
 end
 
 function mod.format_lazymodules_traceback()
@@ -367,13 +348,6 @@ function mod.__raw_load(script: Instance, name: string): any
 		return
 	end
 
-	if config.LogUnfoundLoads then
-		if not module then
-			warn("\n" .. CONTEXT .. " init: Path to `" .. script.Name .. "` not found during PreLoad" ..
-			"\nRequired from:\n" .. mod.format_lazymodules_traceback())
-		end
-	end
-
 	reset_context(prior_context)
 	
 	-- Guard against multiple inits on one module
@@ -424,7 +398,7 @@ function mod.Load(script: (string | Instance)): any?
 		module = mod.__raw_load(script, script.Name)
 
 		if not module then
-			warn_load_err(script)
+			warn_load_err(script.Name)
 		end
 
 		try_init(module, script.Name, " **FROM INSTANCE**")
@@ -472,7 +446,16 @@ local function recursive_collect(instance: Instance)
 			continue
 		end
 
-		if typeof(v) ~= "Instance" or not v:IsA("ModuleScript") then
+		if typeof(v) ~= "Instance" then
+			continue
+		end
+
+		if v:IsA("Folder") then
+			recursive_collect(v)
+			continue
+		end
+
+		if not v:IsA("ModuleScript") then
 			continue
 		end
 

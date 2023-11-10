@@ -119,11 +119,15 @@ local function monitor_func(signal, ...)
 	print(signal[1].Name)
 end
 
+local function __monitor(signal)
+	signal.monitor = monitor_func
+end
+
 function mod:Monitor( ... )
 	-- TODO: You can't put Signals.Events in here. We should probably sunset Events
 	local signals = { ... }
 	for i,v in signals do
-		v.monitor = monitor_func
+		__monitor(v)
 	end
 end
 
@@ -183,7 +187,7 @@ end
 
 -- In practice, the number 32 appears to be able to be 1
 -- But I have a gut feeling that it's possible to validly use LazyModules but have delayed signals declared
-local WAIT_LIMIT = 32
+local WAIT_LIMIT = 4
 
 local function wait_for(async_table)
 	local waited = 0
@@ -205,7 +209,7 @@ local function wait_for(async_table)
 end
 
 -- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
-function mod:BuildSignals(G)
+function mod.BuildSignals(G)
 	local wait_dur = 0
 	wait_dur += wait_for(Event.Events.Identifiers)
 	wait_dur += wait_for(GameEvent.GameEvents.Identifiers)
@@ -288,6 +292,29 @@ function mod:BuildSignals(G)
 				end
 
 				setmetatable(event, mt_ServerEvent)
+			end
+		end
+	end
+
+	if G.Config.MonitorAllSignals then
+		for module, identifers in Transmitters.Modules.provided do
+			for _, event in identifers do
+				__monitor(event)
+			end
+		end
+		for module, identifers in Broadcasters.Modules.provided do
+			for _, event in identifers do
+				__monitor(event)
+			end
+		end
+		for module, identifers in GameEvents.Modules.provided do
+			for _, event in identifers do
+				__monitor(event)
+			end
+		end
+		for module, identifers in Events.Modules.provided do
+			for _, event in identifers do
+				__monitor(event)
 			end
 		end
 	end
