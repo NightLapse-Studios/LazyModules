@@ -49,7 +49,7 @@ function mod.ServerSpawnPlayer(plr: Player, position, look_vector)
 		targetSpawnPosition = position + Vector3.new(0,6,0)
 	end
 
-	character.PrimaryPart.CFrame = CFrame.new(targetSpawnPosition, look_vector)
+	character.PrimaryPart:PivotTo(CFrame.new(targetSpawnPosition, look_vector))
 	character.PrimaryPart:SetNetworkOwner(plr)
 
 	stats:ChangeStat("IsDead", false, "set", false)

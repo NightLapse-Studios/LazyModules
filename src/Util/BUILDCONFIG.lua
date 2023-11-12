@@ -4,22 +4,9 @@ local IsStudio = RunService:IsStudio()
 
 local config = { }
 
-
---=============================================--
---=                                           =--
---=          Runtime configuration            =--
---=                                           =--
---=============================================--
--- Must point to the one main place, no matter what.
-config.PlaceId = 8256020164
-config.TestPlaceId = 13489727259
-config.MaxPlayers = 35
-config.GroupID = 5418470
-
-config.AnimationFadeTime = 0.1
-
 -- Set up ContextVar for StdLib
 -- This file can't rely on StdLib so functions it needs from StdLib are actually defined here and StdLib will load them
+-- I don't like having to do this here, but this file shouldn't need anything else from StdLib ever (hopefully)
 do
     -- Fun optimization to make the function never have to check values
     -- Instead, we give each path of the ContextVar function an equivalent function here, and set the exposed func to it
@@ -53,10 +40,6 @@ end
 
 local ContextVar = config.ContextVar
 
--- This won't work unless you are also doing device test in studio
--- However some things rely on this flag alone, so the game will be in an undefined-ish state if set true and not doing device emulation
-config.EmulateMobile = ContextVar(false, false, false, false)
-
 do
     local function return_mobile_value(_, mobile)
         return mobile 
@@ -76,6 +59,26 @@ do
 
     config.PlatformVar = __platform_var()
 end
+
+
+--=============================================--
+--=                                           =--
+--=          Runtime configuration            =--
+--=                                           =--
+--=============================================--
+-- Must point to the one main place, no matter what.
+config.PlaceId = 8256020164
+config.TestPlaceId = 13489727259
+config.MaxPlayers = 35
+config.GroupID = 5418470
+
+config.AnimationFadeTime = 0.1
+
+config.BaseWalkSpeed = ContextVar(12, 12, 12, 12)
+
+-- This won't work unless you are also doing device test in studio
+-- However some things rely on this flag alone, so the game will be in an undefined-ish state if set true and not doing device emulation
+config.EmulateMobile = ContextVar(false, false, false, false)
 
 
 

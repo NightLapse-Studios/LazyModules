@@ -19,10 +19,7 @@ do
 end
 
 function mod:__init(G)
-	local Convolution = G.Load("Convolution")
---[[ 	local Cvx = Convolution.new(Vector3.new(-20, 0, -40), Vector3.new(20, 10, 20), Vector3.new(2, 2, 2))
-	Cvx:PositionParts()
-	Cvx:Run() ]]
+
 end
 
 return mod

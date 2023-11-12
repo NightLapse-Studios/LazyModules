@@ -1,6 +1,6 @@
 local mod = { }
 
-function mod:__ui(G, I, P)
+--[[ function mod:__ui(G, I, P)
 	local Component
 	local UITest = I:Stateful("UITest", I
 		:Init(function(self)
@@ -28,6 +28,6 @@ function mod:__ui(G, I, P)
 	
 	local Roact = G.Load("Roact")
 	Roact.mount(Roact.createElement(UITest), game.Players.LocalPlayer.PlayerGui.BaseInterface_NoInset)
-end
+end ]]
 
 return mod
