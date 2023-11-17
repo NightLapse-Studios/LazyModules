@@ -41,7 +41,7 @@ end
 local CONFIGURATOR = { }
 local mt_CONFIGURATOR = { __index = CONFIGURATOR }
 
-local function make_strategy(strategy: Enums<META_CONTEXTS>, inner_func: (any)->nil)
+local function make_strategy(fn_identifier: string, strategy: Enums<META_CONTEXTS>, inner_func: (any)->any)
 	if strategy == META_CONTEXTS.BOTH then
 		return function(self, ...)
 			inner_func(self, ...)
@@ -66,8 +66,15 @@ local function make_strategy(strategy: Enums<META_CONTEXTS>, inner_func: (any)->
 		end
 	elseif strategy == META_CONTEXTS.AUTO then
 		return function(self, context: Enums<META_CONTEXTS>, ...)
-			assert(Enums.META_CONTEXTS[context] ~= nil)
-			assert(context ~= META_CONTEXTS.AUTO, "Makes no sense to passe META_CONTEXTS.AUTO to the auto-configurator func\n\tUse BOTH instead?")
+			if Enums.META_CONTEXTS[context] == nil then
+				warn("Auto-configurator option `" .. fn_identifier .. "` expected a META_CONTEXT enum value, got " .. tostring(context) .. " instead")
+				return self
+			end
+
+			if context == META_CONTEXTS.AUTO then
+				warn("Makes no sense to passe META_CONTEXTS.AUTO to the auto-configurator func\n\tUse BOTH instead?")
+				return self
+			end
 
 			if context == RUN_CONTEXT or context == META_CONTEXTS.BOTH then
 				inner_func(self, ...)
@@ -102,7 +109,7 @@ function CONFIGURATOR:SETTER(context: Enums<META_CONTEXTS>?, fn_identifier: stri
 	local f = function(_self, value)
 		_self[field_identifier] = value
 	end
-	local strategy = make_strategy(context, f)
+	local strategy = make_strategy(fn_identifier, context, f)
 	self[fn_identifier] = strategy
 
 	return self
@@ -118,9 +125,20 @@ function CONFIGURATOR:NAMED_LIST(context: Enums<META_CONTEXTS>?, fn_identifier: 
 	local f = function(_self, name, value)
 		_self[field_identifier][name] = value
 	end
-	local strategy = make_strategy(context, f)
+	local strategy = make_strategy(fn_identifier, context, f)
 	self[fn_identifier] = strategy
 
+	return self
+end
+
+function CONFIGURATOR:VALIDATOR(context: Enums<META_CONTEXTS>?, fn_validator: (any)->boolean)
+	context = context or META_CONTEXTS.BOTH
+
+	assert(typeof(fn_validator) == "function")
+
+	local strategy = make_strategy("VALIDATOR", context, fn_validator)
+	self.VALIDATE = strategy
+	
 	return self
 end
 
@@ -132,6 +150,14 @@ function CONFIGURATOR:FINISH()
 	setmetatable(self, mt_EMPTY)
 
 	self.FINISH = function(obj)
+		if self.VALIDATE then
+			local is_valid = self:VALIDATE()
+
+			if not is_valid then
+				error("Configurator failed validation")
+			end
+		end
+
 		setmetatable(obj, self.__final_mt)
 
 		return obj

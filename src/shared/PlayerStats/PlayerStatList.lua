@@ -146,6 +146,7 @@ end
 Stats.new_base( true, "IsDead", {Network = "All"})
 Stats.new_base( true, "CanRespawn")
 Stats.new_base( 60, "Ping", {Network = "All"})
+Stats.new_base( 0, "TargetSpread", {Network = "Me"})
 
 Stats.new_base( 0, "cur_torso_ang", {Network = "All"})
 Stats.new_base( 0, "cur_char_pitch", {Network = "All"})

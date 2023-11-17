@@ -40,7 +40,7 @@ function PlayerStats.new(plr): PlayerStats
 	local stats = {
 		DS3Versions = {
 			Latest = "v1",
-			["v1"] = PlayerStats.Deserialize_v1,
+			["v1"] = PlayerStats.Deserialize,
 		},
 
 		--This is a flag that lets us know when to update unlockables
@@ -71,6 +71,40 @@ function PlayerStats.new(plr): PlayerStats
 	return stats
 end
 
+
+--[[ Datastore stuff ]]
+function PlayerStats:Serialize(IsFinalSize)
+	local SavedStats = { }
+	for i,v in pairs(self.PermStats) do
+		local stat = StatList.ById[v.ID]
+		if stat == nil or stat.Name ~= i then
+			--The stat has been removed or changed IDs.
+			--Changing IDs causes lost data. Don't do it.
+			continue
+		end
+
+		SavedStats[tostring(v.ID)] = v.Value
+	end
+
+	return SavedStats
+end
+
+function PlayerStats:Deserialize(data, binding)
+	data = data or {}
+
+	for i,v in pairs(StatList.get_perms()) do
+		self.PermStats[i] = v:Copy(data[tostring(v.ID)])
+	end
+
+	for i,v in pairs(StatList.get_bases()) do
+		self[i] = v:Copy()
+	end
+
+	return true
+end
+
+
+
 function PlayerStats:Wipe(resetType)
 	if resetType == Enums.ResetType.EachRound then
 		self:StoreHistoryPoints()
@@ -85,18 +119,6 @@ function PlayerStats:Wipe(resetType)
 		if v.ResetType == resetType or v.ResetType == Enums.ResetType.Both then
 			self:ChangeStat(i, v.DefaultValue, "set", false)
 		end
-	end
-end
-
-function PlayerStats:LoadData(data)
-	data = data or {}
-
-	for i,v in pairs(StatList.get_bases()) do
-		self[i] = v:Copy()
-	end
-
-	for i,v in pairs(StatList.get_perms()) do
-		self.PermStats[i] = v:Copy(data[tostring(v.ID)])
 	end
 end
 
@@ -155,33 +177,6 @@ function PlayerStats:OnChange(statName: string, isPerm)
 	end
 
 	return Event
-end
-
-function PlayerStats:Serialize(IsFinalSize)
-	local SavedStats = { }
-	for i,v in pairs(self.PermStats) do
-		local stat = StatList.ById[v.ID]
-		if stat == nil or stat.Name ~= i then
-			--The stat has been removed or changed IDs.
-			--Changing IDs causes lost data. Don't do it.
-			continue
-		end
-
-		SavedStats[tostring(v.ID)] = v.Value
-	end
-
-	return SavedStats
-end
-
---[[ Datastore stuff ]]
-
-function PlayerStats:Deserialize_v1(tbl, binding)
-	--Note that `tbl` may be nil. That's fine.
-	for i,v in pairs(StatList.get_perms()) do
-		self.PermStats[i] = v:Copy(tbl[tostring(v.ID)])
-	end
-
-	return true
 end
 
 

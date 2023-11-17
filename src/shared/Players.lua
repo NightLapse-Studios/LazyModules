@@ -14,12 +14,13 @@ local Entity
 local Admin
 local SpawnHandler
 local Instances
+local Animation
 
 local JoinedGameGE
 local LeavedGameGE
 local AddRemotePlayerTransmitter
 
-local ERR_DATA_MODULE_INVALID = "Data module is missing method(s) or function(s)"
+local ERR_DATA_MODULE_INVALID = "Data module %s is missing method(s) or function(s)"
 local PlayerDataModules = { }
 local PlayerDataModulesOrder = { }
 
@@ -39,6 +40,7 @@ function mod:__init(G)
 	Admin = G.Load("Admin")
 	SpawnHandler = G.Load("SpawnHandler")
 	Instances = G.Load("Instances")
+	Animation = G.Load("Animation")
 	
 	if _G.Game.CONTEXT == "SERVER" then
 		CharacterFolder = Instance.new("Folder", workspace)
@@ -205,7 +207,9 @@ local function LoadClientData(plr_id, plr)
 	local data_bindings = { }
 
 	for i,v in PlayerDataModules do
-		local obj = v.new(plr)
+		local module = v[1]
+		local args = v[2]
+		local obj = module.new(plr, table.unpack(args))
 		char[i] = obj
 		data_bindings[i] = obj
 	end
@@ -214,17 +218,16 @@ local function LoadClientData(plr_id, plr)
 end
 
 -- Data modules will be serialized and deserialized in the order they are registered by this function
-function mod.RegisterPlayerDataModule(file)
+function mod.RegisterPlayerDataModule(file, ctor_args)
 	local Game = _G.Game
 	assert(Game.LOADING_CONTEXT < Game.Enums.LOAD_CONTEXTS.LOAD_INIT, "RegisterPlayerDataModule must be called before Game.Begin")
 
 	local name = file.Name
 	local mod = Game.PreLoad(file)
-	assert(typeof(mod.new) == "function", ERR_DATA_MODULE_INVALID)
-	assert(typeof(mod.LoadData) == "function", ERR_DATA_MODULE_INVALID)
-	assert(typeof(mod.Serialize) == "function", ERR_DATA_MODULE_INVALID)
+	assert(typeof(mod.new) == "function", string.format(ERR_DATA_MODULE_INVALID, name))
 
-	PlayerDataModules[name] = mod
+	ctor_args = ctor_args or { }
+	PlayerDataModules[name] = { mod, ctor_args }
 	table.insert(PlayerDataModulesOrder, name)
 end
 
@@ -248,7 +251,7 @@ local function AddRemotePlayer(plr_id, data)
 	for i,v in data do
 		local mod = Game.Load(i)
 		local obj = mod.new(plr)
-		obj:LoadData(v)
+		obj:Deserialize(v)
 		rPlr[i] = obj
 	end
 
@@ -257,16 +260,9 @@ local function AddRemotePlayer(plr_id, data)
 
 	local humanoid = plr.Character:WaitForChild("Humanoid")
 
---[[ 	humanoid.AnimationPlayed:Connect(function(track: AnimationTrack)
+	humanoid.AnimationPlayed:Connect(function(track: AnimationTrack)
 		rPlr.AnimationTracks[track.Animation.AnimationId] = track
-
-		local store = AnimationTrackConnects[track.Animation.AnimationId]
-		if store then
-			for i = #store, 1, -1 do
-				task.spawn(store[i], track, plr)
-			end
-		end
-	end) ]]
+	end)
 
 	for _,v in humanoid:GetPlayingAnimationTracks() do
 		rPlr.AnimationTracks[v.Animation.AnimationId] = v
@@ -403,6 +399,72 @@ function mod.Update()
 		end
 	end
 end
+
+
+--[[
+	Used when logic depends on an animation. For the local player, you will play the animation, but for
+		remote players, you will need to yield for their track.
+	
+	Only yields if the animation has not been played on the other player for a first time
+
+	There is no good fallback for if this times out, so using it in core loops such as system update loops can
+		cause the whole game to error
+]]
+function mod.YieldForRemoteAnimTrack(plr, id, timeout): AnimationTrack?
+	if Game.CONTEXT ~= "CLIENT" then
+		error()
+	end
+
+	timeout = timeout or 2.0
+
+	if plr:IsA("Model") then
+		local track = nil
+
+		local loader = Animation.GetAnimatorLoader(plr)
+
+		for _, v in loader:GetPlayingAnimationTracks() do
+			if v.Animation.AnimationId == id then
+				return v
+			end
+		end
+
+		local played = loader.AnimationPlayed:Connect(function(atrack)
+			if atrack.Animation.AnimationId == id then
+				track = atrack
+			end
+		end)
+
+		local start = tick()
+
+		while not track do
+			if tick() - start > timeout then
+				played:Disconnect()
+				return nil
+			end
+
+			task.wait()
+		end
+
+		played:Disconnect()
+		return track
+	end
+
+	local rPlr = Game[plr]
+	if not rPlr then return nil end
+
+	local start = tick()
+
+	while not rPlr.AnimationTracks[id] do
+		task.wait()
+		if tick() - start > timeout then
+			return nil
+		end
+	end
+
+	return rPlr.AnimationTracks[id]
+end
+
+
 
 return mod
 
