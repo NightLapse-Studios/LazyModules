@@ -131,17 +131,6 @@ function CONFIGURATOR:NAMED_LIST(context: Enums<META_CONTEXTS>?, fn_identifier: 
 	return self
 end
 
-function CONFIGURATOR:VALIDATOR(context: Enums<META_CONTEXTS>?, fn_validator: (any)->boolean)
-	context = context or META_CONTEXTS.BOTH
-
-	assert(typeof(fn_validator) == "function")
-
-	local strategy = make_strategy("VALIDATOR", context, fn_validator)
-	self.VALIDATE = strategy
-	
-	return self
-end
-
 function CONFIGURATOR:FINISH()
 	assert(self.__final_mt ~= -1, "Use the FINISHER function to configure what this configurator will transform into")
 
@@ -150,14 +139,6 @@ function CONFIGURATOR:FINISH()
 	setmetatable(self, mt_EMPTY)
 
 	self.FINISH = function(obj)
-		if self.VALIDATE then
-			local is_valid = self:VALIDATE()
-
-			if not is_valid then
-				error("Configurator failed validation")
-			end
-		end
-
 		setmetatable(obj, self.__final_mt)
 
 		return obj
