@@ -45,7 +45,7 @@ function Inventory:Serialize()
 		end
 
 		t.Slots[tostring(i)] = {
-			v.Id,
+			v.ID,
 			v.Stack
 		}
 	end
@@ -59,7 +59,7 @@ function Inventory:Deserialize(data)
 	for i,v in data.Slots do
 		local id = v[1]
 		local stack = v[2]
-		self:Set(Items.FromId[id], tonumber(i), stack)
+		self:SetSlot(Items.FromId[id], tonumber(i), stack)
 	end
 
 	return true
@@ -73,55 +73,67 @@ function Inventory:SetSize(size: number)
 	end
 end
 
-function Inventory:SetSlot(item, slot, stack)
-	self.Slots[slot] = item
-	item.Stack = stack
+function Inventory:SetSlot(item_type, slot, stack)
+	local remaining = stack
+	item_type = item_type:Instantiate()
+	self.Slots[slot] = item_type
+	item_type.Stack = math.min(item_type.StackSize, stack)
+
+	return remaining - item_type.Stack
 end
 
-function Inventory:Add(item): boolean
+-- returns the amount of items not able to be added
+function Inventory:Add(item_type, amount): boolean
+	amount = amount or item_type.Stack
+
 	local function try_add_new_item(): boolean
+		local remaining = amount
 		for i = 1, self.Size do
 			if self.Slots[i] == false then
-				self.Slots[i] = item
+				remaining = self:SetSlot(item_type, i, remaining)
 
-				return true
+				if remaining <= 0 then
+					break
+				end
 			end
 		end
 
-		return false
+		return remaining
 	end
 
 	local function try_add_to_stack(): boolean
+		local remaining = amount
 		for i = 1, self.Size do
 			local _item = self.Slots[i]
-			if _item and _item.Id == item.Id then
-				_item.Stack += 1
+			local can_add = _item.StackSize - _item.Stack
 
-				return true
+			if _item and _item.ID == item_type.ID and can_add > 0 then
+				_item.Stack += can_add
+				remaining -= can_add
 			end
 		end
 
-		return false
+		return remaining
 	end
 
-	if item.StackSize > 1 then
-		local did_add = try_add_to_stack()
-		if not did_add then
+	if item_type.StackSize > 1 then
+		local remaining = try_add_to_stack()
+		if remaining > 0 then
 			return try_add_new_item()
 		else
 			-- must be true at this point
-			return did_add
+			return remaining
 		end
 	else
 		return try_add_new_item()
 	end
 end
 
-function Inventory:RemoveItem(item)
+function Inventory:RemoveItem(item_type)
 	local function try_remove_item(): boolean
 		for i = 1, self.Size do
 			local _item = self.Slots[i]
-			if _item and _item.Id == item.Id then
+			if _item and _item.ID == item_type.ID then
 				self.Slots[i] = false
 
 				return true
@@ -134,7 +146,7 @@ function Inventory:RemoveItem(item)
 	local function try_remove_from_stack(): boolean
 		for i = 1, self.Size do
 			local _item = self.Slots[i]
-			if _item and _item.Id == item.Id then
+			if _item and _item.ID == item_type.ID then
 				_item.Stack -= 1
 
 				if _item.Stack == 0 then
@@ -148,16 +160,16 @@ function Inventory:RemoveItem(item)
 		return false
 	end
 
-	if item.StackSize > 1 then
+	if item_type.StackSize > 1 then
 		return try_remove_from_stack()
 	else
 		return try_remove_item()
 	end
 end
 
-function Inventory:RemoveCountFromSlot(item, slot, count)
+function Inventory:RemoveCountFromSlot(item_type, slot, count)
 	local _item = self.Slots[slot]
-	if _item and _item.Id == item.Id then
+	if _item and _item.ID == item_type.ID then
 		if _item.Stack < count then
 			-- Cannot remove more than exists in the stack
 			return false
