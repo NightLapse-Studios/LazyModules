@@ -1,4 +1,3 @@
-local Players = game:GetService("Players")
 local CollectionService = game:GetService("CollectionService")
 local PhysicsService = game:GetService("PhysicsService")
 
@@ -35,7 +34,7 @@ function Character:__init(G)
 
 	Entity.registerType("Character")
 		:DefaultMaxHealth(100)
-		:SpawnFunc(function(target_entity)
+		:OnSpawnFn(function(target_entity)
 			local plr = target_entity.SourcePlayer
 			local char = plr.Character
 
@@ -76,7 +75,7 @@ function Character:__init(G)
 			
 			target_entity.DamagedBy = {}
 		end)
-		:DamageFunc(function(target_entity, source_entity, amount)
+		:OnDamageFn(function(target_entity, source_entity, amount)
 			if source_entity and source_entity.SourcePlayer then
 				local plr_tbl = Game[source_entity.SourcePlayer]
 				if plr_tbl then
@@ -120,7 +119,7 @@ function Character:__init(G)
 				target_entity.Healing = false
 			end)
 		end)
-		:KillFunc(function(target_entity, source_entity)
+		:KillFn(function(target_entity, source_entity)
 			local killer = (source_entity or target_entity).SourcePlayer
 			local plr = target_entity.SourcePlayer
 
@@ -146,13 +145,13 @@ function Character:__init(G)
 				deadStats:ChangeStat("CanRespawn", true, "set", false)
 			end)
 		end)
-		:CanBeHurtFunc(function(target_entity)
+		:CanBeHurtFn(function(target_entity)
 			local player = target_entity.SourcePlayer
 			local char = Game[player]
 			local stats = char.PlayerStats
 			return not stats.IsDead.Value
 		end)
-		:DoesPartConnectFunc(function(target_entity, part)
+		:DoesPartConnectFn(function(target_entity, part)
 			local limb = part
 
 			local to = Instances.GetParentWhichHasParent(part, target_entity.Model.Armors)

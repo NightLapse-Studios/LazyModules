@@ -280,6 +280,12 @@ end
 local function RemoveRemotePlayer( plr )
 	local rPlr = Game[plr]
 
+	for i,v in rPlr do
+		if typeof(v) == "table" and v.Destroy then
+			v:Destroy()
+		end
+	end
+
 	Game[plr] = nil
 	Game[rPlr] = nil
 end

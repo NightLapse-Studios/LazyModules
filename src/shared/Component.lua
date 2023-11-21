@@ -1,13 +1,3 @@
-local module = {
-	Debug = false,
-	TimeScale = 1,
-	Presets = {
-		Generic = 1,
-		AoE = 2,
-		Unmanaged = 3
-	}
-}
-
 local RunService = game:GetService("RunService")
 local ReplicatedFirst = game.ReplicatedFirst
 
@@ -19,6 +9,65 @@ local RayCasting = _G.Game.PreLoad(ReplicatedFirst.Modules.RayCasting)
 local Config = _G.Game.PreLoad(ReplicatedFirst.Util.BUILDCONFIG)
 local SL = _G.Game.PreLoad(ReplicatedFirst.Util.SparseList)
 local CRC = _G.Game.PreLoad(ReplicatedFirst.Util.CRC32)
+
+local module = {
+	Debug = false,
+	TimeScale = 1,
+
+	Presets = {
+		Generic = 1,
+		AoE = 2,
+		Unmanaged = 3
+	},
+
+	Generics = {
+		MoveFn = function (cmpnt, dt)
+			local old_cf: CFrame = cmpnt.Model.PrimaryPart:GetPivot()
+
+			local rot = (cmpnt.RotVel * dt)
+			rot = cmpnt.AccumulatedRotation * CFrame.Angles(rot.X, rot.Y, rot.Z)
+			cmpnt.AccumulatedRotation = rot
+
+			local vel: Vector3 = cmpnt.Velocity * dt
+
+			local old_pos = old_cf.Position
+			local new_pos = old_pos + vel
+			local delta_pos = new_pos - old_pos
+
+			local new_cf = CFrame.new(new_pos, new_pos + (delta_pos.Unit)) * rot
+
+			cmpnt.Model:PivotTo(new_cf)
+
+			return old_cf, new_cf
+		end,
+
+		CollisionCheckFn = function(cmpnt, old_cf, new_cf)
+			local exclude = { }
+			if cmpnt.__Usage then
+				local addexclude = {cmpnt.__Usage.Ability:ResolveState("Exclude", cmpnt.__Usage.Owner, cmpnt.__Usage, cmpnt)}
+				exclude = { cmpnt.__Usage.Owner.Character, table.unpack(addexclude) }
+				for _,v in cmpnt.StickExcludes do
+					table.insert(exclude, v)
+				end
+			end
+
+			local to, from = old_cf.Position, new_cf.Position
+
+			local params = RayCasting.GetRaycastParamsBL("Barriers", exclude)
+			local result = workspace:Raycast(to, from - to, params)
+
+			return result
+		end,
+
+		IsFinishedFn = function(cmpnt)
+			return cmpnt.Model.PrimaryPart.Position.Y < -300
+		end,
+
+		CleanupFn = function(cmpnt)
+			cmpnt.Model:Destroy()
+		end
+	}
+}
 
 local ComponentHitTransmitter
 local ComponentFiredTransmitter
@@ -110,57 +159,6 @@ function Component:SetUsage(usage)
 	self.__Usage = usage
 
 	return self
-end
-
-local function generic_move_func(cmpnt, dt)
-	local old_cf: CFrame = cmpnt.Model.PrimaryPart:GetPivot()
-
-	local rot = (cmpnt.RotVel * dt)
-	rot = cmpnt.AccumulatedRotation * CFrame.Angles(rot.X, rot.Y, rot.Z)
-	cmpnt.AccumulatedRotation = rot
-
-	local vel: Vector3 = cmpnt.Velocity * dt
-
-	local old_pos = old_cf.Position
-	local new_pos = old_pos + vel
-	local delta_pos = new_pos - old_pos
-
-	local new_cf = CFrame.new(new_pos, new_pos + (delta_pos.Unit)) * rot
-
-	cmpnt.Model:PivotTo(new_cf)
-
-	return old_cf, new_cf
-end
-
-local empty_table = { }
-local function generic_collision_check(cmpnt, old_cf, new_cf)
-	local exclude = empty_table
-	if cmpnt.__Usage then
-		local addexclude = {cmpnt.__Usage.Ability:ResolveState("Exclude", cmpnt.__Usage.Owner, cmpnt.__Usage, cmpnt)}
-		exclude = { cmpnt.__Usage.Owner.Character, table.unpack(addexclude) }
-		for _,v in cmpnt.StickExcludes do
-			table.insert(exclude, v)
-		end
-	end
-
-	local to, from = old_cf.Position, new_cf.Position
-
-	local params = RayCasting.GetRaycastParamsBL("Bullets", exclude)
-	local result = workspace:Raycast(to, from - to, params)
-
-	return result
-end
-
-local function generic_is_finished(cmpnt)
-	return cmpnt.Model.PrimaryPart.Position.Y < -300
-end
-
-local function cleanup_server_proj(cmpnt)
-	if cmpnt.__Usage then
-		cmpnt.__Usage:DisownComponent(cmpnt.ID)
-	end
-
-	cmpnt.Model:Destroy()
 end
 
 local function apply_preset(cmpnt, preset)
@@ -400,7 +398,7 @@ function module:__init(G)
 					table.insert(exclude, v)
 				end
 
-				local params = RayCasting.GetRaycastParamsBL("Bullets", exclude)
+				local params = RayCasting.GetRaycastParamsBL("Barriers", exclude)
 				local result = workspace:Raycast(to, from - to, params)
 
 				return result

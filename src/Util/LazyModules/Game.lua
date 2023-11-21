@@ -20,7 +20,7 @@ LazyModules.CollectModules(Game)
 do
 	local Players = Game.PreLoad(game.ReplicatedFirst.Modules.Players)
 	Players.RegisterPlayerDataModule(game.ReplicatedFirst.Modules.PlayerStats)
-	Players.RegisterPlayerDataModule(game.ReplicatedFirst.Modules.Inventory, { 9 })
+	Players.RegisterPlayerDataModule(game.ReplicatedFirst.Modules.PlayerInventory)
 end
 
 if Game.CONTEXT == "CLIENT" then

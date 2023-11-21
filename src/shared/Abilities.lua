@@ -70,6 +70,8 @@ local Config = _G.Game.PreLoad(game.ReplicatedFirst.Util.BUILDCONFIG)
 local AbilityUsedTransmitter
 local AbilityUsedBroadcaster
 local AbilityExpiredBroadcaster
+local AbilityArmedTransmitter
+local AbilityDisarmedTransmitter
 local Usages
 
 local Players = game:GetService("Players")
@@ -155,6 +157,10 @@ function Usage:Cancel(broadcast: boolean?)
 
 	for i = #self.Allocated, 1, -1 do
 		self.Allocated[i]:Destroy()
+	end
+
+	for i,v in self.Components:get_obj_list() do
+		v:Destroy()
 	end
 
 	warn("CANCELED")
@@ -270,21 +276,25 @@ function mod.IsReady(self, plr)
 	return true
 end
 
-
 local mt_Ability = Meta.FUNCTIONAL_METATABLE()
 	:METHOD("Arm", function(self, ...)
 		if Game.CONTEXT == "SERVER" then
 			local plr = select(1, ...)
+			if not plr then
+				error("No player provided to Ability:Arm\n\tProbably called :Arm manually on the server (don't do that)")
+			end
+
 			if self.__Armed[plr] then return end
 
 			local ret = self:__ArmFn(...)
-
+			
 			self.__Armed[plr] = true
-
+			
 			return ret
 		else
 			if self.__Armed == true then return end
-
+			
+			AbilityArmedTransmitter:Transmit(self.Name)
 			local ret = self:__ArmFn(...)
 
 			self.__Armed = true
@@ -298,13 +308,14 @@ local mt_Ability = Meta.FUNCTIONAL_METATABLE()
 			if not self.__Armed[plr] then return end
 
 			local ret = self:__DisarmFn(...)
-
-			self.__Armed[plr] = false
-
+			
+			self.__Armed[plr] = nil
+			
 			return ret
 		else
 			if self.__Armed == false then return end
-
+			
+			AbilityDisarmedTransmitter:Transmit(self.Name)
 			local ret = self:__DisarmFn(...)
 
 			self.__Armed = false
@@ -312,7 +323,7 @@ local mt_Ability = Meta.FUNCTIONAL_METATABLE()
 			return ret
 		end
 	end)
-	:METHOD("CanArmFn", function(self, plr)
+	:METHOD("CanArm", function(self, plr)
 		if self.__CanArmFn then
 			return self:__CanArmFn(plr)
 		end
@@ -404,12 +415,6 @@ local mt_AbilityBuilder = Meta.CONFIGURATOR(mt_Ability)
 	:SETTER(META_CONTEXTS.BOTH, "GetComponentModelFn", "__GetComponentModelFn")
 	:NAMED_LIST(META_CONTEXTS.BOTH, "AddResolvableStateFn", "__ResolvableStates")
 	:SETTER(META_CONTEXTS.SERVER, "NoAutoReplication", "__NoAutoReplication")
-	:VALIDATOR(META_CONTEXTS.SERVER, function(configurator)
-		
-	end)
-	:VALIDATOR(META_CONTEXTS.CLIENT, function(configurator)
-
-	end)
 	:FINISH()
 
 function mod.new(name: string, category: string, opt_interface: table?)
@@ -487,7 +492,6 @@ local function ServerAbilityHandler(plr, name, client_use_id, seed, args)
 
 	local a = RegisteredAbilities[name]
 	if not a then
-		-- rejected
 		warn("Rejected 1")
 		AbilityUsedTransmitter:Transmit(plr, false, client_use_id)
 		return
@@ -498,9 +502,8 @@ local function ServerAbilityHandler(plr, name, client_use_id, seed, args)
 		return
 	end
 
-	if not a:__CanArmFn(plr) then
+	if not a.__Armed[plr] then
 		warn("Rejected 4")
-
 		AbilityUsedTransmitter:Transmit(plr, false, client_use_id)
 		return
 	end
@@ -511,7 +514,6 @@ local function ServerAbilityHandler(plr, name, client_use_id, seed, args)
 	end
 
 	if not should_accept then
-		-- rejected
 		warn("Rejected 5")
 		AbilityUsedTransmitter:Transmit(plr, false, client_use_id)
 		return
@@ -574,6 +576,32 @@ function mod:__build_signals(G, B)
 			local usage = Usages:get(plr)[client_use_id]
 			if not usage then return end
 			usage:Cancel(false)
+		end)
+
+	AbilityArmedTransmitter = B:NewTransmitter("AbilityArmedTransmitter")
+		:ClientConnection(function(did_arm: boolean, opt_name: string?)
+			if not did_arm then
+				local a = RegisteredAbilities[opt_name]
+				-- a:Disarm()
+			end
+		end)
+		:ServerConnection(function(plr, name)
+			local a = RegisteredAbilities[name]
+
+			if a:CanArm() then
+				a:Arm(plr)
+				AbilityArmedTransmitter:Transmit(plr, true)
+
+				return
+			end
+
+			AbilityArmedTransmitter:Transmit(plr, false, name)
+		end)
+
+	AbilityDisarmedTransmitter = B:NewTransmitter("AbilityDisarmedTransmitter")
+		:ServerConnection(function(plr, name)
+			local a = RegisteredAbilities[name]
+			a:Disarm(plr)
 		end)
 end
 

@@ -7,18 +7,22 @@
 
 local mod = { }
 
+local Ability
+
 local ComponentModel = Instance.new("Model")
 local Part = Instance.new("Part", ComponentModel)
 Part.Size = Vector3.new(1, 1, 1)
 Part.Anchored = true
 ComponentModel.PrimaryPart = Part
 
-function mod:__init(G)
+function mod:__tests(G, T)
 	local Abilities = G.Load("Abilities")
 	local Component = G.Load("Component")
 	local UserInput = G.Load("UserInput")
 	local Enums = G.Load("Enums")
 	local META_CONTEXTS = Enums.META_CONTEXTS
+	
+	local Handler
 
 	local ComponentType = Component.new()
 		:MoveFn(function(cmpnt, dt)
@@ -89,9 +93,6 @@ function mod:__init(G)
 		end)
 		:FINISH()
 
-	local Handler
-
-	local Ability
 	Ability = Abilities.new("TestAbility", "yep")
 		:SetCooldown(1.5)
 		:ArmFn(META_CONTEXTS.CLIENT, function(ability, arm_args)
@@ -108,7 +109,7 @@ function mod:__init(G)
 		end)
 		:DisarmFn(META_CONTEXTS.CLIENT, function(ability, arm_args)
 			-- print("DisarmFn")
-			Handler:Destroy()
+			Handler:Disconnect()
 			Handler = nil
 		end)
 		:DisarmFn(META_CONTEXTS.SERVER, function(ability, arm_args)
@@ -117,6 +118,8 @@ function mod:__init(G)
 		end)
 		:CanArmFn(function(ability, plr)
 			-- print("CanArmFn")
+			-- You can test out-of-sync abilities by making this return false
+			-- It will be usable on the client, but instantly canceled when the server rejects the usage
 			return true
 		end)
 		:ShouldAcceptFn(function(plr, ability, args)
@@ -139,7 +142,9 @@ function mod:__init(G)
 		:GetUseArgsFn(function(plr, usage, external_args: {any})
 			-- print("GetUseArgsFn")
 			local cam_look = workspace.CurrentCamera.CFrame.LookVector
-			local cf = CFrame.new(plr.Character:GetPivot().Position, Vector3.new(cam_look.X, 0, cam_look.Z))
+			local pos = plr.Character:GetPivot().Position
+			local dir = pos + Vector3.new(cam_look.X, 0, cam_look.Z)
+			local cf = CFrame.new(pos, dir)
 			return cf
 		end)
 		:UpdateFn(function(usage, dt)
@@ -159,9 +164,10 @@ function mod:__init(G)
 		:NoAutoReplication(false)
 		:FINISH()
 
---[[ 	if G.CONTEXT == "CLIENT" then
+	if G.CONTEXT == "CLIENT" then
+		-- Just use the ability to test it
 		Ability:Arm()
-	end ]]
+	end
 end
 
 return mod

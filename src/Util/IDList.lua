@@ -22,6 +22,14 @@ function mod:get(id_or_item)
 	return self.List:get(id_or_item)
 end
 
+function mod:get_id_list()
+	return self.List._b
+end
+
+function mod:get_obj_list()
+	return self.List._a
+end
+
 function mod.new()
 	local t = {
 		next_id = 0,

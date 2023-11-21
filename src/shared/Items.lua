@@ -6,9 +6,18 @@ mod.FromName = { }
 local Item = { }
 Item.__index = Item
 
+local Meta = _G.Game.Meta
+local META_CONTEXTS = _G.Game.Enums.META_CONTEXTS
+local ItemBuilder = Meta.CONFIGURATOR(Item)
+	:SETTER(META_CONTEXTS.BOTH, "SetStackSize", "StackSize")
+	:FINISHER(META_CONTEXTS.BOTH, function(obj)
+		table.freeze(obj)
+	end)
+	:FINISH()
+
 function Item:Instantiate()
 	if self.__IsInstanced then
-		warn("Instantiating an already instanced item, probably a bug")
+		error("Instantiating an already instanced item")
 		return self
 	end
 
@@ -20,7 +29,7 @@ function Item:Instantiate()
 	return item
 end
 
-local function new_item(name, id)
+local function NewItem(name, id)
 	local item = {
 		Name = name,
 		ID = id,
@@ -32,11 +41,13 @@ local function new_item(name, id)
 	mod.FromID[id] = item
 	mod.FromName[name] = item
 
-	table.freeze(item)
+	setmetatable(item, ItemBuilder)
 
 	return item
 end
 
-new_item("Grass seeds", 1)
+NewItem("Grass seeds", 1)
+	:SetStackSize(64)
+	:FINISH()
 
 return mod

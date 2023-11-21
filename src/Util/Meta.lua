@@ -41,6 +41,18 @@ end
 local CONFIGURATOR = { }
 local mt_CONFIGURATOR = { __index = CONFIGURATOR }
 
+local function strategize(strategy: Enums<META_CONTEXTS>, thing: any)
+	if strategy == META_CONTEXTS.BOTH then
+		return thing
+	elseif strategy == META_CONTEXTS.CLIENT and IsClient then
+		return thing
+	elseif strategy == META_CONTEXTS.SERVER and IsServer then
+		return thing
+	elseif strategy == META_CONTEXTS.AUTO then
+		error("META_CONTEXTS.AUTO describes accepted contexts, so cannot be used as a strategy")
+	end
+end
+
 local function make_strategy(fn_identifier: string, strategy: Enums<META_CONTEXTS>, inner_func: (any)->any)
 	if strategy == META_CONTEXTS.BOTH then
 		return function(self, ...)
@@ -131,6 +143,12 @@ function CONFIGURATOR:NAMED_LIST(context: Enums<META_CONTEXTS>?, fn_identifier: 
 	return self
 end
 
+function CONFIGURATOR:FINISHER(context: Enums<META_CONTEXTS>, fn_finisher)
+	self.__FINISHER = strategize(context, fn_finisher)
+
+	return self
+end
+
 function CONFIGURATOR:FINISH()
 	assert(self.__final_mt ~= -1, "Use the FINISHER function to configure what this configurator will transform into")
 
@@ -139,6 +157,10 @@ function CONFIGURATOR:FINISH()
 	setmetatable(self, mt_EMPTY)
 
 	self.FINISH = function(obj)
+		if self.__FINISHER then
+			self:__FINISHER(obj)
+		end
+
 		setmetatable(obj, self.__final_mt)
 
 		return obj

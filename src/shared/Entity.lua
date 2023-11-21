@@ -1,35 +1,35 @@
 --[[
-		:SpawnFunc(function(target_entity)
+		:SpawnFn(function(target_entity)
 
 		end)
-		:DamageFunc(function(target_entity, source_entity, amount)
+		:DamageFn(function(target_entity, source_entity, amount)
 
 		end)
-		:HealFunc(function(target_entity, source_entity, amount)
+		:HealFn(function(target_entity, source_entity, amount)
 
 		end)
-		:RepairFunc(function(target_entity, source_entity, amount)
+		:RepairFn(function(target_entity, source_entity, amount)
 
 		end)
-		:KillFunc(function(target_entity, source_entity)
+		:KillFn(function(target_entity, source_entity)
 
 		end)
-		:HitFunc(function(target_entity, proj, position, offset, hit_dir, instance)
+		:HitFn(function(target_entity, proj, position, offset, hit_dir, instance)
 
 		end)
-		:InExplosionFunc(function(target_entity, source_entity, position, percentDistance)
+		:InExplosionFn(function(target_entity, source_entity, position, percentDistance)
 
 		end)
-		:CheckForLimbKillFunc(function(target_entity, source_entity)
+		:CheckForLimbKillFn(function(target_entity, source_entity)
 
 		end)
-		:CanBeHurtFunc(function(target_entity)
+		:CanBeHurtFn(function(target_entity)
 
 		end)
-		:DoesPartConnectFunc(function(target_entity, part)
+		:DoesPartConnectFn(function(target_entity, part)
 
 		end)
-		:DestroyFunc(function(target_entity)
+		:DestroyFn(function(target_entity)
 
 		end)
 ]]
@@ -46,7 +46,7 @@ local ImpulseTransmitter
 local AddedCallbacks = {}
 local EntityTypes = {}
 local Entities = {}
-local EntitiesByID = {}
+local FromID = {}
 
 local lastId = 0
 
@@ -59,50 +59,53 @@ local NO_HEALTH_BARS = {
 	Tree = true,
 }
 
-local Entity = {}
+local mod = {}
 
 local mt_EntityBuilder = Meta.FUNCTIONAL_METATABLE()
-	:METHOD("SpawnFunc", function(self, func)
+	:METHOD("OnAddedFn", function(self, func)
+		if _G.Game.CONTEXT == "CLIENT" then
+			mod.Added(self.Name, func)
+		end
+
+		return self
+	end)
+	:METHOD("OnSpawnFn", function(self, func)
 		self.__Spawn = func
 		return self
 	end)
-    :METHOD("DamageFunc", function(self, func)
+    :METHOD("OnDamageFn", function(self, func)
 		self.__Damage = func
 		return self
 	end)
-	:METHOD("HealFunc", function(self, func)
+	:METHOD("OnHealFn", function(self, func)
 		self.__Heal = func
 		return self
 	end)
-	:METHOD("RepairFunc", function(self, func)
+	:METHOD("OnRepairFn", function(self, func)
 		self.__Repair = func
 		return self
 	end)
-	:METHOD("KillFunc", function(self, func)
+	:METHOD("KillFn", function(self, func)
 		self.__Kill = func
 		return self
 	end)
-	:METHOD("HitFunc", function(self, func)
+	:METHOD("CanInterractFn", function(self, func)
+		self.__CanInterract = func
+		return self
+	end)
+	:METHOD("OnComponentHitFn", function(self, func)
 		self.__Hit = func
 		return self
 	end)
-	:METHOD("InExplosionFunc", function(self, func)
-		self.__InExplosion = func
-		return self
-	end)
-	:METHOD("CheckForLimbKillFunc", function(self, func)
-		self.__CheckForLimbKill = func
-		return self
-	end)
-	:METHOD("CanBeHurtFunc", function(self, func)
+	:METHOD("CanBeHurtFn", function(self, func)
 		self.__CanBeHurt = func
 		return self
 	end)
-	:METHOD("DoesPartConnectFunc", function(self, func)
+	:METHOD("DoesPartConnectFn", function(self, func)
 		self.__DoesPartConnect = func
 		return self
 	end)
-	:METHOD("DestroyFunc", function(self, func)
+	:METHOD("OnDestroyFn", function(self, func)
 		self.__Destroy = func
 		return self
 	end)
@@ -112,10 +115,10 @@ local mt_EntityBuilder = Meta.FUNCTIONAL_METATABLE()
 	end)
     :FINISH()
 
-function Entity.registerType(name)
+function mod.registerType(name)
 	assert(EntityTypes[name] == nil, "Reused entity type name: " .. name)
     local entityType = {
-
+		Name = name
     }
 
     EntityTypes[name] = entityType
@@ -124,7 +127,8 @@ function Entity.registerType(name)
     return entityType
 end
 
-function Entity.new(model, sourcePlayer, entityType, ...)
+function mod.new(model, sourcePlayer, entityType, ...)
+	warn(entityType)
 	lastId += 1
 
 	model:SetAttribute("EntityID", lastId)
@@ -153,6 +157,8 @@ function Entity.new(model, sourcePlayer, entityType, ...)
 		Radius = 1,
 		Weight = 1,
 
+		Awaiting = false,
+
 		Events = {
 			Killed = {},
 		}
@@ -163,7 +169,7 @@ function Entity.new(model, sourcePlayer, entityType, ...)
 	})
 
 	Entities[model] = newEntity
-	EntitiesByID[newEntity.ID] = newEntity
+	FromID[newEntity.ID] = newEntity
 
 	if newEntity.__Spawn then
 		newEntity:__Spawn(...)
@@ -172,11 +178,11 @@ function Entity.new(model, sourcePlayer, entityType, ...)
 	return newEntity
 end
 
-function Entity.GetByID(id)
-	return EntitiesByID[id]
+function mod.GetByID(id)
+	return FromID[id]
 end
 
-function Entity.PoolPlayer(sourcePlayer, entityType, subType)
+function mod.PoolPlayer(sourcePlayer, entityType, subType)
 	local ret = {}
 
 	for model, entity in pairs(Entities) do
@@ -202,11 +208,11 @@ local function fireEvents(name, target_entity, ...)
 	end
 end
 
-function Entity.Distance(entity, other_entity)
+function mod.Distance(entity, other_entity)
 	return (entity.Model.PrimaryPart.Position - other_entity.Model.PrimaryPart.Position).Magnitude
 end
 
-function Entity.Impulse(target_entity, direction, speed)
+function mod.Impulse(target_entity, direction, speed)
 	local part = target_entity.Model.PrimaryPart
 
 	local impulse = part.AssemblyMass * direction * speed
@@ -225,7 +231,7 @@ function Entity.Impulse(target_entity, direction, speed)
 	end
 end
 
-function Entity.ImpulseSimple(target_entity, impulse)
+function mod.ImpulseSimple(target_entity, impulse)
 	local part = target_entity.Model.PrimaryPart
 
 	local owner = part:GetNetworkOwner()
@@ -236,22 +242,17 @@ function Entity.ImpulseSimple(target_entity, impulse)
 	end
 end
 
-function Entity.ClampHeal(maxHealth, health, amount)
+function mod.ClampHeal(maxHealth, health, amount)
 	return math.ceil(math.min(maxHealth - health, amount))
 end
 
-function Entity.IsMaxHealth(entity)
+function mod.IsMaxHealth(entity)
 	return entity.Model:GetAttribute("Health") >= entity.Model:GetAttribute("MaxHealth")
 end
 
-function Entity.Damage(target_entity, source_entity, amount)
+function mod.Damage(target_entity, source_entity, amount)
 	if target_entity.__Damage then
-		if Entity.CanEntitysInteract(target_entity, source_entity) then
-
-			if CollectionService:HasTag(target_entity.Model, "Cloaked") then
-				CollectionService:RemoveTag(target_entity.Model, "Cloaked")
-			end
-
+		if mod.CanEntitysInteract(target_entity, source_entity) then
 			local health = target_entity.Model:GetAttribute("Health")
 			local newHealth
 			
@@ -272,7 +273,7 @@ function Entity.Damage(target_entity, source_entity, amount)
 
 			local killRet
 			if isKill then
-				killRet = Entity.Kill(target_entity, source_entity)
+				killRet = mod.Kill(target_entity, source_entity)
 			end
 
 			return amount, killRet
@@ -280,13 +281,13 @@ function Entity.Damage(target_entity, source_entity, amount)
 	end
 end
 
-function Entity.Heal(target_entity, source_entity, amount)
+function mod.Heal(target_entity, source_entity, amount)
 	if target_entity.__Heal then
-		if Entity.CanEntitysInteract(target_entity, source_entity) then
+		if mod.CanEntitysInteract(target_entity, source_entity) then
 			local maxHealth = target_entity.Model:GetAttribute("MaxHealth")
 			local health = target_entity.Model:GetAttribute("Health")
 
-			amount = Entity.ClampHeal(maxHealth, health, amount)
+			amount = mod.ClampHeal(maxHealth, health, amount)
 
 			target_entity.Model:SetAttribute("Health", health + amount)
 
@@ -298,12 +299,12 @@ function Entity.Heal(target_entity, source_entity, amount)
 end
 
 -- this function is the same as heal, but the callers are different
-function Entity.Repair(target_entity, source_entity, amount)
+function mod.Repair(target_entity, source_entity, amount)
 	if target_entity.__Repair then
 		local maxHealth = target_entity.Model:GetAttribute("MaxHealth")
 		local health = target_entity.Model:GetAttribute("Health")
 
-		amount = Entity.ClampHeal(maxHealth, health, amount)
+		amount = mod.ClampHeal(maxHealth, health, amount)
 
 		target_entity.Model:SetAttribute("Health", health + amount)
 
@@ -313,7 +314,7 @@ function Entity.Repair(target_entity, source_entity, amount)
 	end
 end
 
-function Entity.Kill(target_entity, source_entity)
+function mod.Kill(target_entity, source_entity)
 	fireEvents("Killed", target_entity)
 
 	if target_entity.__Kill then
@@ -321,48 +322,30 @@ function Entity.Kill(target_entity, source_entity)
 	end
 end
 
-function Entity.KilledEvent(target_entity)
+function mod.KilledEvent(target_entity)
 	local event = Instance.new("BindableEvent")
 	table.insert(target_entity.Events.Killed, event)
 
 	return event.Event
 end
 
-function Entity.Hit(target_entity, source_entity, proj, position, offset, hit_dir, instance)
+-- TODO: Connect this back up to components on the server
+function mod.Hit(target_entity, source_entity, proj, position, offset, hit_dir, instance)
 	if target_entity.__Hit then
-		if Entity.CanEntitysInteract(target_entity, source_entity) then
+		if mod.CanEntitysInteract(target_entity, source_entity) then
 			target_entity:__Hit(source_entity, proj, position, offset, hit_dir, instance)
 		end
 	end
 end
 
-
-function Entity.InExplosion(target_entity, source_entity, position, percentDistance)
-	if target_entity.__InExplosion then
-		if Entity.CanEntitysInteract(target_entity, source_entity) then
-			target_entity:__InExplosion(source_entity, position, percentDistance)
-		end
-	end
-end
-
-function Entity.CheckForLimbKill(target_entity, source_entity)
-	if target_entity.__CheckForLimbKill then
-		local ret = target_entity:__CheckForLimbKill(source_entity)
-		if ret then
-			return true, ret
-		end
-		return false
-	end
-end
-
-function Entity.DoesPartConnect(target_entity, part)
+function mod.DoesPartConnect(target_entity, part)
 	if target_entity.__DoesPartConnect then
 		return target_entity:__DoesPartConnect(part)
 	end
 	return true
 end
 
-function Entity.CanBeHurt(target_entity)
+function mod.CanBeHurt(target_entity)
 	if target_entity.Model:FindFirstChildWhichIsA("ForceField") then
 		return false
 	end
@@ -375,12 +358,14 @@ function Entity.CanBeHurt(target_entity)
 		if success then
 			return result
 		end
+
 		return false
 	end
-	return true
+
+	return false
 end
 
-function Entity.Destroy(target_entity)
+function mod.Destroy(target_entity)
 	if target_entity.Destroyed == true then
 		warn("Multi-delete of an entity\n", debug.traceback())
 		return
@@ -388,7 +373,7 @@ function Entity.Destroy(target_entity)
 
 	target_entity.Destroyed = true
 	Entities[target_entity.Model] = nil
-	EntitiesByID[target_entity.ID] = nil
+	FromID[target_entity.ID] = nil
 	
 	CollectionService:RemoveTag(target_entity.Model, "Entity")
 	CollectionService:RemoveTag(target_entity.Model, target_entity.Type)
@@ -408,7 +393,7 @@ function Entity.Destroy(target_entity)
 	end
 end
 
-function Entity.GetAll()
+function mod.GetAll()
 	--[[ for i,v in Entities do
         if v.Model.PrimaryPart == nil then
             warn(v.Model.Name, v.Model.Parent)
@@ -418,11 +403,11 @@ function Entity.GetAll()
 	return Entities
 end
 
-function Entity.GetFromPlayer(plr)
+function mod.GetFromPlayer(plr)
 	return Entities[plr.Character]
 end
 
-function Entity.GetFromPart(part, optType)
+function mod.GetFromPart(part, optType)
 	-- if optType is passed, an entity will only be returned if the part belongs to an entity of that type.
 	local model
 
@@ -439,33 +424,29 @@ function Entity.GetFromPart(part, optType)
 
 	if model then
 		local entity = Entities[model]
-		if Entity.DoesPartConnect(entity, part) then
+		if mod.DoesPartConnect(entity, part) then
 			return entity
 		end
 	end
 end
 
-function Entity.CanEntitysInteract(target_entity, source_entity)
-	if source_entity then
-		local source_team = source_entity.Team
-
-		if not source_team.CanHurt then
+function mod.CanEntitysInteract(target_entity, source_entity)
+	if target_entity.__CanInterract then
+		if not target_entity:__CanInterract(source_entity) then
 			return false
 		end
 	end
 
-	if not Game.GameState.CanHurt then
-		return false
-	end
-
-	if not Entity.CanBeHurt(target_entity) then
-		return false
+	if source_entity.__CanInterract then
+		if not source_entity:__CanInterract(source_entity) then
+			return false
+		end
 	end
 
 	return true
 end
 
-function Entity.MakeInvincible(char, t)
+function mod.MakeInvincible(char, t)
 	local ff = char:FindFirstChildWhichIsA("ForceField")
 	local ffh = char:FindFirstChild("InvincibleHighlight")
 
@@ -498,15 +479,15 @@ function Entity.MakeInvincible(char, t)
 	Debris:AddItem(newffh, t)
 end
 
-function Entity.RemoveAll()
+function mod.RemoveAll()
 	for model, entity in pairs(Entities) do
 		if entity.Type ~= "Character" then
-			Entity.Destroy(entity)
+			mod.Destroy(entity)
 		end
 	end
 end
 
-function Entity.Added(tag, callback)
+function mod.Added(tag, callback)
 	if Game.CONTEXT ~= "CLIENT" then
 		return
 	end
@@ -523,12 +504,12 @@ function Entity.Added(tag, callback)
 	end
 end
 
-function Entity:__init(G)
+function mod:__init(G)
 	Game = G
 	Instances = G.Load("Instances")
 end
 
-function Entity:__run(G)
+function mod:__run(G)
 	if G.CONTEXT ~= "CLIENT" then
 		return
 	end
@@ -538,32 +519,17 @@ function Entity:__run(G)
 		-- a little sloppy, but just so we know on the client types worth itterating over, lazily.
 		EntityTypes[ty] = true
 
-		local healthBar
-		if (not NO_HEALTH_BARS[ty]) then-- overall types
-
-			-- subtypes
-			local noBar = false
-			for tag, _ in NO_HEALTH_BARS do
-				if CollectionService:HasTag(model, tag) then
-					noBar = true
-					break
-				end
-			end
-
-			if not noBar then
-				healthBar = HealthBars.new(model)
-			end
-		end
-
 		local t = {
 			ID = model:GetAttribute("EntityID"),
 			SourcePlayer = model:GetAttribute("SourcePlayer"),
 			Model = model,
 
 			Cleanups = {},
-			HealthBar = healthBar,
 		}
-		Entities[model] = setmetatable(t, mt_Entity)
+
+		setmetatable(t, mt_EntityBuilder)
+		Entities[model] = t
+		FromID[t.ID] = t
 
 		for _, obj in pairs(AddedCallbacks) do
 			if CollectionService:HasTag(model, obj.Tag) then
@@ -572,7 +538,7 @@ function Entity:__run(G)
 		end
 	end
 
-	--CollectionService:GetInstanceAddedSignal("Entity"):Connect(entity_model_added)
+	CollectionService:GetInstanceAddedSignal("Entity"):Connect(entity_model_added)
 	CollectionService:GetAttributeChangedSignal("EntityType"):Connect(entity_model_added)
 
 	for _, model in pairs(CollectionService:GetTagged("Entity")) do
@@ -597,12 +563,12 @@ function Entity:__run(G)
 	end)
 end
 
-function Entity:__build_signals(G, B)
+function mod:__build_signals(G, B)
 	ImpulseTransmitter = B:NewTransmitter("ImpulseTransmitter")
 		:ClientConnection(function(part, impulse)
 			part:ApplyImpulse(impulse)
 		end)
 end
 
-return Entity
+return mod
 
