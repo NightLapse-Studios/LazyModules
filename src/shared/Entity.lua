@@ -128,7 +128,6 @@ function mod.registerType(name)
 end
 
 function mod.new(model, sourcePlayer, entityType, ...)
-	warn(entityType)
 	lastId += 1
 
 	model:SetAttribute("EntityID", lastId)

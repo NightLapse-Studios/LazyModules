@@ -48,7 +48,7 @@ end
 
 function mod.PickUp(plr, entity_id)
 	local ground_entity = Entity.GetByID(entity_id)
-	print("YEPPERS")
+
 	if Game.CONTEXT == "CLIENT" then
 		if ground_entity.Awaiting then
 			return
