@@ -419,7 +419,7 @@ end
 function mod:__init(G)
 	Game = G
 	local Stack = G.Load("Stack")
-	Config = G.Load("BUILDCONFIG")
+	Config = G.Load("Config")
 	GestureDetector = G.Load("GestureDetector")
 
 	for i,v in Enum.KeyCode:GetEnumItems() do

@@ -1,3 +1,0 @@
---[[
-	File intentionally left blank
-]]

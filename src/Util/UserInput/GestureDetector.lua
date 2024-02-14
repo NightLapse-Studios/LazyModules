@@ -321,9 +321,9 @@ function mod:__ui(G, i, p)
 
 			local f = I:Frame(P()
 				:Size(0, 5, 0, 5)
-				:BackgroundColor3_Raw(sig.Color)
+				:BackgroundColor3(sig.Color)
 				:AnchorPoint(0.5, 0.5)
-				:Position_Raw(binding:map(function(v)
+				:Position(binding:map(function(v)
 					return UDim2.new(i / SIG_SAMPLE_LEN, 0, 0.5 + v, 0)
 				end))
 			)
@@ -350,12 +350,12 @@ function mod:__ui(G, i, p)
 
 	local function vis_render(self)
 		local group_containers = {
-			I:StdElement("VerticalLayout", P()
+			I:Element("VerticalLayout", P()
 				:Padding(0, 8)
 			)
 		}
 		for i, v in SignalTree do
-			local c = I:StdElement("VisibleContainerFrame", P()
+			local c = I:Element("VisibleContainerFrame", P()
 				:Size(1, 0, 1 / #SignalTree, -8)
 				:LayoutOrder(i)
 			)
@@ -372,7 +372,7 @@ function mod:__ui(G, i, p)
 			table.insert(group_containers, c)
 		end
 		
-		local container = I:StdElement("VisibleContainerFrame", P()
+		local container = I:Element("VisibleContainerFrame", P()
 			:Size(0.42, 0, 0.6, 0)
 			:AnchorPoint(1, 1)
 			:Position(1, -5, 0.9, 0)

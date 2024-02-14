@@ -245,11 +245,11 @@ local function ContinuousTouchDetector(name, props, bind_callback, unbind_callba
 		end
 	end
 
-	return I:StdElement("ContainerFrame", D(A(), I
-		:Size_Raw(props.Size or UDim2.new(1, 0, 1, 0))
-		:AnchorPoint_Raw(props.AnchorPoint or Vector2.new(0.5, 0.5))
-		:Position_Raw(props.Position)
-		:Active_Raw(props.Active or true)
+	return I:Element("ContainerFrame", D(A(), I
+		:Size(props.Size or UDim2.new(1, 0, 1, 0))
+		:AnchorPoint(props.AnchorPoint or Vector2.new(0.5, 0.5))
+		:Position(props.Position)
+		:Active(props.Active or true)
 		:BackgroundTransparency(1)
 		:InputBegan(function(frame, input: InputObject)
 			if input.UserInputState ~= Enum.UserInputState.Begin then
@@ -303,10 +303,10 @@ local function ChangeTouchDetector(name, props, bind_callback, unbind_callback, 
 		end
 	end
 
-	return I:StdElement("ContainerFrame", D(A(), I
-		:Size_Raw(props.Size or UDim2.new(1, 0, 1, 0))
-		:AnchorPoint_Raw(props.AnchorPoint or Vector2.new(0.5, 0.5))
-		:Position_Raw(props.Position)
+	return I:Element("ContainerFrame", D(A(), I
+		:Size(props.Size or UDim2.new(1, 0, 1, 0))
+		:AnchorPoint(props.AnchorPoint or Vector2.new(0.5, 0.5))
+		:Position(props.Position)
 		:Active(true)
 		:BackgroundTransparency(1)
 		:Ref(function(rbx) ref = rbx end)
@@ -373,19 +373,19 @@ function mod:__ui(G, i,a,d)
 				:DominantAxis(Enum.DominantAxis.Height)
 
 		if state.DPadEnabled then
-			local modal = I:StdElement("ContainerFrame", D(A(), I
+			local modal = I:Element("ContainerFrame", D(A(), I
 				:Size(0, 0, 0.08, 0)
 				:AnchorPoint(0.5, 0.5)
 				:Active(false)
 				:ClipsDescendants(false)
 				:BackgroundTransparency(1)
-				:Position_Raw(modal_pos)
+				:Position(modal_pos)
 
 				:Children(
 					square_aspect_ratio,
 
 					I:Frame()
-						:BackgroundColor3_Raw(Color3.new(44.7 / 255, 44.3 / 255, 45.1 / 255))
+						:BackgroundColor3(Color3.new(44.7 / 255, 44.3 / 255, 45.1 / 255))
 						:AnchorPoint(0.5, 0.5)
 						:Position(0.5, 0, 0.5, 0)
 						:Size(0.7, 0, 0.7, 0)
@@ -394,11 +394,11 @@ function mod:__ui(G, i,a,d)
 
 					I:ImageButton()
 						:AutoButtonColor(false)
-						:BackgroundColor3_Raw(Color3.new(63.9 / 255, 63.5 / 255, 64.7 / 255))
+						:BackgroundColor3(Color3.new(63.9 / 255, 63.5 / 255, 64.7 / 255))
 						:AnchorPoint(0, 0)
 						:RoundCorners(1, 0)
 						:Size(1, -2, 1, -2)
-						:Position_Raw(inner_pos:map(function(pos: UDim2)
+						:Position(inner_pos:map(function(pos: UDim2)
 							local dir = Vector2.new(pos.X.Offset, pos.Y.Offset)
 							if dir.Magnitude > 42 then
 								dir = dir.Unit
@@ -500,7 +500,7 @@ function mod:__ui(G, i,a,d)
 				:Rotation(270)
 				:Size(gesture_button_size, 0, gesture_button_size, 0)
 				:AnchorPoint(1, 0.5)
-				:Position_Raw(gesture_button_center + UDim2.new(-.1, 0, 0, 0))
+				:Position(gesture_button_center + UDim2.new(-.1, 0, 0, 0))
 				:Children(square_aspect_ratio)
 				:TouchTap(function() push_gesture(Enums.InputGestures.Left) end)
 
@@ -513,7 +513,7 @@ function mod:__ui(G, i,a,d)
 				:Rotation(90)
 				:Size(gesture_button_size, 0, gesture_button_size, 0)
 				:AnchorPoint(-1, 0.5)
-				:Position_Raw(gesture_button_center + UDim2.new(.1, 0, 0, 0))
+				:Position(gesture_button_center + UDim2.new(.1, 0, 0, 0))
 				:Children(square_aspect_ratio)
 				:TouchTap(function() push_gesture(Enums.InputGestures.Right) end)
 
@@ -526,7 +526,7 @@ function mod:__ui(G, i,a,d)
 				:Rotation(0)
 				:Size(gesture_button_size, 0, gesture_button_size, 0)
 				:AnchorPoint(0.5, 0)
-				:Position_Raw(gesture_button_center)-- + UDim2.new(0, 0, -.1, 0))
+				:Position(gesture_button_center)-- + UDim2.new(0, 0, -.1, 0))
 				:Children(square_aspect_ratio)
 				:TouchTap(function() push_gesture(Enums.InputGestures.Up) end)
 
@@ -539,7 +539,7 @@ function mod:__ui(G, i,a,d)
 				:Rotation(180)
 				:Size(gesture_button_size, 0, gesture_button_size, 0)
 				:AnchorPoint(0.5, 0)
-				:Position_Raw(gesture_button_center)-- + UDim2.new(0, 0, .1, 0))
+				:Position(gesture_button_center)-- + UDim2.new(0, 0, .1, 0))
 				:Children(square_aspect_ratio)
 				:TouchTap(function() push_gesture(Enums.InputGestures.Down) end)
 
@@ -565,7 +565,7 @@ function mod:__ui(G, i,a,d)
 			end)
 
 		if #gesture_buttons > 0 then
-			local gesture_button_container = I:StdElement("ContainerFrame", D(A(), I
+			local gesture_button_container = I:Element("ContainerFrame", D(A(), I
 				:Size(1/3, 0, 1/2, 0)
 				:BackgroundTransparency(1)
 				:JustifyRight(0, 0)
@@ -585,7 +585,7 @@ function mod:__ui(G, i,a,d)
 
 		table.insert(enabled_elements, gesture_container)
 
-		local container = I:StdElement("ContainerFrame", D(A(), I
+		local container = I:Element("ContainerFrame", D(A(), I
 			:Size(1, 0, 1, 0)
 			:BackgroundTransparency(1)
 			:Children(I:Fragment(enabled_elements))
@@ -629,7 +629,7 @@ function mod:__ui(G, i,a,d)
 			local y = 0.5 + dist * math.sin(angle)
 			local p = Vector2.new(x, y)
 
-			local b = I:StdElement("TextButton", D(A(), I
+			local b = I:Element("TextButton", D(A(), I
 				:Size(0.1, 0, 0.1, 0)
 				:Text(cfg.Label)
 				:AnchorPoint(0.5, 0.5)
@@ -674,7 +674,7 @@ function mod:__ui(G, i,a,d)
 			return false
 		end
 
-		local tree = I:StdElement("ContainerFrame", D(A(), I
+		local tree = I:Element("ContainerFrame", D(A(), I
 			:Size(0.5, 0, 1, 0)
 			:AnchorPoint(0, 0.5)
 			:Position(0, 0, 0.5, 0)

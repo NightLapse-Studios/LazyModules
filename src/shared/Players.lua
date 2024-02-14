@@ -31,7 +31,7 @@ local CharacterFolder
 
 function mod:__init(G)
 	Game = G
-	Config = G.Load("BUILDCONFIG")
+	Config = G.Load("Config")
 	AssociativeList = G.Load("AssociativeList")
 	NameAssociations = AssociativeList.new()
 	IDAssociations = AssociativeList.new()

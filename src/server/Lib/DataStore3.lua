@@ -64,7 +64,7 @@ About Versions:
 ]]
 
 local Globals
-local config
+local Config
 local PSA
 local BindingsList
 local Enums = _G.Game.Enums
@@ -81,10 +81,10 @@ local Autosave_Interval = 360.0
 local IsStudio = RunService:IsStudio()
 
 function DS3:__init(G)
-	config = G.Load("BUILDCONFIG")
+	Config = G.Load("Config")
 	PSA = G.Load("SparseList")
 	Globals = G
-	SaveInStudio = config.SaveDatastoresInStudio
+	SaveInStudio = Config.SaveDatastoresInStudio
 	BindingsList = PSA.new()
 end
 
@@ -315,7 +315,7 @@ local function _SaveAsync(self: DS3Binding, callback: (boolean) -> nil)
 	end
 
 	-- Config checks
-	if game.PlaceId ~= config.PlaceId or (IsStudio and not SaveInStudio) then
+	if game.PlaceId ~= Config.PlaceId or (IsStudio and not SaveInStudio) then
 		-- This is here so that if you're doing datastore work, or datastore work needs to be done
 		-- we won't overwrite our data instantly
 		warn("Skipping DS3 save because this is in a test environment")
@@ -352,7 +352,7 @@ local function _getIndividualBinding(self, key, DS3Obj, data)
 	--For uninitialized saves, sub_store can be nil. It's still important to process because the deserialize func is a good initializer
 	--  To make things easier, an empty table is passed instead of nil
 	local sub_store = data[key] or { }
-	if config.WipeStoresOnStart then
+	if Config.WipeStoresOnStart then
 		sub_store = { }
 	end
 

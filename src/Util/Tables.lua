@@ -200,56 +200,58 @@ function Table.Clear(Tbl)
 end
 Table.Clear2 = table.clear
 
-function Table.ExtremeTableValue(Tbl, Func, Max) -- Max is Optional
-
-	--[[
-	BiggestRect, idx = Tables.ExtremeTableValue(Rectangles, function(a, b, retTable)
-		local comp = math.max(b.Width, b.Height)
-		retTable[1] = comp
-		return comp > a
-	end)
-
-	// a is already computed if its not nil, we still send comp, so we always just compute b. 
-	// It makes more since if comp comes before "a" in the comparison(this func gets rect with biggest wall)
-
-	]]
-
-	local failed = false
-	local Computed, ComputedI
-	local run = 0
-	local RetValues = {}
-	local Extra = {}
-	local first = true
-	local c,a
-	for i,b in pairs(Tbl)do
-		local suc, check = xpcall(Func, function(a) return a end, Computed,b, RetValues, ComputedI,i)
-		if (suc and check)or not suc then
-			for o,v in pairs(RetValues)do
-				if o == 1 then
-					Computed = v
-				elseif o == 2 then
-					ComputedI = v
-				else
-					Extra[o] = v
-				end
-			end
-			a = b
-			c = i
-		end
-		if not suc then
-			if failed == true then
-				error(check)
-			end
-			failed = true
-		end
-		if Max then
-			run += 1
-			if run >= Max then
-				break
-			end
+function Table.Max(Tbl, compute)
+	local values = Tbl
+	
+	if compute then
+		for i, v in values do
+			local value = compute(i, v)
+			values[i] = value
 		end
 	end
-	return a, c, Extra
+	
+	local maxIndex, maxV
+	local maxValue
+	
+	for i, v in Tbl do
+		local value = values[i]
+		
+		if (maxValue == nil) or value > maxValue then
+			maxValue = value
+			
+			maxIndex = i
+			maxV = v
+		end
+	end
+	
+	return maxV, maxValue, maxIndex
+end
+
+function Table.Min(Tbl, compute)
+	local values = Tbl
+	
+	if compute then
+		for i, v in values do
+			local value = compute(i, v)
+			values[i] = value
+		end
+	end
+	
+	local minIndex, minV
+	local minValue
+	
+	for i, v in Tbl do
+		local value = values[i]
+		
+		if (minValue == nil) or value < minValue then
+			minValue = value
+			
+			minIndex = i
+			minV = v
+		end
+	end
+	
+	return minV, minValue, minIndex
 end
 
 return Table

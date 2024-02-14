@@ -1,113 +1,93 @@
-local CollectionService = game:GetService("CollectionService")
+local Debris = game:GetService("Debris")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local debugFolder = Instance.new("Folder", workspace)
+debugFolder.Name = RunService:IsClient() and "ClientDebug" or "ServerDebug"
+
 local mod = { }
 
-local safe_require = require(game.ReplicatedFirst.Util.SafeRequire).require
-for i,v in script:GetChildren() do
-	mod[v.Name] = safe_require(v)
-end
+local spots = {}
+local spotID = 0
 
-mod.LogBuf = mod.DebugBuf.Log
-
-function mod.MarkSpotDbg(pos)
+function mod.MarkSpotDbg(pos, color, size, extra_data, singular_name, __t)
 	local p = Instance.new("Part")
-	p.Color = Color3.new(1,1,1)
+	p.Color = color or Color3.new(1,1,1)
 	p.Material = Enum.Material.Neon
-	p.Size = Vector3.new(1,10,1)
-	p.Position = pos
-	p.Name = "DDDDDDD"
-	p.Anchored = true
-	p.CanCollide = false
-	p.CanQuery = false
-	p.Parent = workspace
-
-	return p
-end
-local function __TempMarkSpotDbg(pos, wait, size, color, part)
-	task.wait(wait)
-	part:Destroy()
-end
-function mod.TempMarkSpotDbg(pos, wait, color, size, opt_part)
-	color = color or Color3.new(1, 0, 0)
-
-	local p = opt_part or Instance.new("Part")
-	p.Color = color
-	p.Material = Enum.Material.Neon
-	p.Name = "DDDDDDD"
-	p.Anchored = true
-	p.CanCollide = false
-	p.CanQuery = false
-	p.Parent = workspace
-
-	if size then
-		p.Size = size
-	end
-
+	p.Transparency = 0.7
+	
+	p.Size = size or Vector3.new(1,10,1)
+	
 	if typeof(pos) == "CFrame" then
 		p.CFrame = pos
 	elseif pos then
 		p.Position = pos
 	end
+	
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	
+	p.Parent = debugFolder
+	
+	spotID += 1
+	singular_name = singular_name or spotID
+	
+	if spots[singular_name] then
+		spots[singular_name]:Destroy()
+	end
+	
+	spots[singular_name] = p
+	
+	if extra_data then
+		mod.DebugHighlight(p, color, extra_data, __t)
+	end
+	
+	return p
+end
 
-	coroutine.resume(coroutine.create(__TempMarkSpotDbg), pos, wait, size, color, p)
+function mod.TempMarkSpotDbg(pos, t, size, color, extra_data, singular_name)
+	local p = mod.MarkSpotDbg(pos, size, color, extra_data, singular_name, t)
+
+	Debris:AddItem(p, t)
 
 	return p
 end
 
-function mod.DebugModelAxis(model: Model|BasePart, wait, dist)
-	local cf: CFrame
-	if model:IsA("Model") then
-		cf = model.PrimaryPart:GetPivot()
-	elseif model:IsA("BasePart") then
-		cf = model.CFrame
-	end
-
-	local x, y, z = Vector3.new(dist, 0, 0), Vector3.new(0, dist, 0), Vector3.new(0, 0, dist)
+function mod.DebugCFAxis(cf, wait, dist)
+	-- RightVector (+X), UpVector (+Y), LookVector (-Z)
+	
+	local x, y, z = Vector3.new(dist, 0, 0), Vector3.new(0, dist, 0), Vector3.new(0, 0, -dist)
 	x = mod.TempMarkSpotDbg(cf * CFrame.new(x), wait, Color3.new(1, 0, 0), Vector3.new(0.5, 0.5, 0.5))
 	y = mod.TempMarkSpotDbg(cf * CFrame.new(y), wait, Color3.new(0, 1, 0), Vector3.new(0.5, 0.5, 0.5))
 	z = mod.TempMarkSpotDbg(cf * CFrame.new(z), wait, Color3.new(0, 0, 1), Vector3.new(0.5, 0.5, 0.5))
-
-	mod.DebugHighlight(x, Color3.new(1, 0, 0))
-	mod.DebugHighlight(y, Color3.new(0, 1, 0))
-	mod.DebugHighlight(z, Color3.new(0, 0, 1))
 end
 
-function mod.DebugGlobalAxis(model: Model, wait, dist)
-	local cf: CFrame
-	if model:IsA("Model") then
-		cf = model.PrimaryPart:GetPivot()
-	elseif model:IsA("BasePart") then
-		cf = model.CFrame
-	end
+function mod.DebugModelAxis(model: Model|BasePart, wait, dist)
+	local cf = model:GetPivot()
+	mod.DebugCFAxis(cf, wait, dist)
+end
+
+function mod.DebugGlobalAxis(model: Model|BasePart, wait, dist)
+	local cf = model:GetPivot()
 
 	-- Erase the angles
 	cf = CFrame.new(cf.Position)
 
-	local x, y, z = Vector3.new(dist, 0, 0), Vector3.new(0, dist, 0), Vector3.new(0, 0, dist)
-	mod.TempMarkSpotDbg(cf * CFrame.new(x), wait, Color3.new(1, 0, 0), Vector3.new(0.5, 0.5, 0.5))
-	mod.TempMarkSpotDbg(cf * CFrame.new(y), wait, Color3.new(0, 1, 0), Vector3.new(0.5, 0.5, 0.5))
-	mod.TempMarkSpotDbg(cf * CFrame.new(z), wait, Color3.new(0, 0, 1), Vector3.new(0.5, 0.5, 0.5))
+	mod.DebugCFAxis(cf, wait, dist)
 end
 
-local ArrowModel = game.ReplicatedStorage.RectangularArrow
-function mod.VisualizeCFrame(cf: CFrame, dur, opt_mag, opt_color, opt_planar_size: Vector2?)
-	opt_color = opt_color or Color3.new(0.560784, 0.066666, 0.066666)
-	opt_planar_size = opt_planar_size or Vector2.new(1, 1)
-	local mag = opt_mag or ArrowModel.PrimaryPart.Size.Z
-	local size = Vector3.new(opt_planar_size.X, opt_planar_size.Y, mag)
-
-	local origin = cf.Position
-	local dest = origin + (cf.LookVector * mag)
-	local vis_spot = (origin + dest) / 2
-
-	local m = ArrowModel:Clone()
-	m.Parent = workspace
-	m:PivotTo(CFrame.new(vis_spot, dest))
-	m.PrimaryPart.Size = size
-	mod.TempMarkSpotDbg(nil, dur, opt_color, nil, m.PrimaryPart)
-	return m
+function mod.VisualizeLine(pos1, pos2, color, thickness, extra_data, singular_name)	
+	local length = (pos1 - pos2).Magnitude
+	local cf = CFrame.new(pos1, pos1 + pos2) * CFrame.new(0, 0, -math.abs(length / 2))
+	local size = Vector3.new(thickness, thickness, length)
+	
+	return mod.MarkSpotDbg(cf, color, size, extra_data, singular_name)
 end
 
 function mod.VisualizePlane(p1, p2, p3, opt_p)
+	-- Constructs a plane from 3 points and optionaly visualizes opt_p distance to the plane
+	
 	local v1 = p2 - p1
     local v2 = p3 - p1
     local normal = v1:Cross(v2).Unit
@@ -119,6 +99,8 @@ function mod.VisualizePlane(p1, p2, p3, opt_p)
 		p.Material = Enum.Material.Neon
 		p.Anchored = true
 		p.CanCollide = false
+		p.CanQuery = false
+		
 		p.Parent = folder
 		return p
 	end
@@ -163,30 +145,124 @@ function mod.VisualizePlane(p1, p2, p3, opt_p)
 		p.CFrame = CFrame.new((nearest + opt_p) / 2, opt_p)
 	end
 	
-	CollectionService:AddTag(folder, "Invisibles")
-	folder.Parent = workspace
+	folder.Parent = debugFolder
     return folder
 end
 
-function mod.DebugHighlight(model, color, t, occlude)
-	color = color or Color3.new(1, 0, 0)
-	local hl = Instance.new("Highlight", model)
-
+function mod.DebugHighlight(model: Model|BasePart, color, extra_data, t)
+	color = color or Color3.new(1,1,1)
+	
+	local hl = model:FindFirstChild("DebugHighlight") or Instance.new("Highlight", model)
+	
 	hl.Adornee = model
 	hl.OutlineColor = color
 	hl.FillColor = color
 	hl.OutlineTransparency = 0.5
-	if occlude then
-		hl.DepthMode = Enum.HighlightDepthMode.Occluded
-	else
-		hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-	end
+	hl.FillTransparency = 0.5
+	hl.Name = "DebugHighlight"
+	hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	
 	if t then
-		game:GetService("Debris"):AddItem(hl, t)
+		Debris:AddItem(hl, t)
 	end
+	
+	if extra_data then
+		mod.DebugLabel(model, extra_data, t)
+	end
+	
+	return hl
 end
 
+function mod.DebugLabel(model: Model|BasePart, extra_data, t)
+	local ref = model:FindFirstChild("DebugLabel") or Instance.new("ObjectValue", model)
+	
+	local parent = RunService:IsServer() and model or Players.LocalPlayer.PlayerGui
+	
+	local bgui: BillboardGui = ref.Value or Instance.new("BillboardGui", parent)
+	ref.Value = bgui
+	
+	bgui.Adornee = model
+	bgui.Name = "DebugLabel"
+	bgui.AlwaysOnTop = true
+	bgui.SizeOffset = Vector2.new(0, 1)
+	bgui.ExtentsOffsetWorldSpace = Vector3.new(0, 1, 0)
+	bgui.Size = UDim2.new(0, 200, 0, 100)
+	bgui.ResetOnSpawn = false
+	
+	bgui:ClearAllChildren()
+
+	local uIPadding = Instance.new("UIPadding")
+	uIPadding.PaddingBottom = UDim.new(0, 4)
+	uIPadding.PaddingLeft = UDim.new(0, 4)
+	uIPadding.PaddingRight = UDim.new(0, 4)
+	uIPadding.PaddingTop = UDim.new(0, 4)
+	uIPadding.Parent = bgui
+
+	local frame = Instance.new("Frame")
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.BackgroundColor3 = Color3.fromRGB(31, 31, 31)
+	frame.BorderSizePixel = 0
+	frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+	frame.Size = UDim2.new(1, -4, 1, -4)
+
+	local uIStroke = Instance.new("UIStroke")
+	uIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	uIStroke.Color = Color3.fromRGB(255, 225, 0)
+	uIStroke.LineJoinMode = Enum.LineJoinMode.Miter
+	uIStroke.Thickness = 2
+	uIStroke.Parent = frame
+
+	local scrollingFrame = Instance.new("ScrollingFrame")
+	scrollingFrame.AutomaticCanvasSize = Enum.AutomaticSize.XY
+	scrollingFrame.BottomImage = ""
+	scrollingFrame.TopImage = ""
+	scrollingFrame.CanvasSize = UDim2.new()
+	scrollingFrame.ScrollBarImageColor3 = Color3.fromRGB(255, 0, 0)
+	scrollingFrame.ScrollBarThickness = 3
+	scrollingFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+	scrollingFrame.BackgroundTransparency = 1
+	scrollingFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+	scrollingFrame.Size = UDim2.new(1, 0, 1, 0)
+
+	local textLabel = Instance.new("TextLabel")
+	textLabel.Font = Enum.Font.RobotoMono
+	textLabel.RichText = true
+	textLabel.Text = tostring(extra_data)
+	textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	textLabel.TextSize = 13
+	textLabel.TextWrapped = true
+	textLabel.TextXAlignment = Enum.TextXAlignment.Left
+	textLabel.TextYAlignment = Enum.TextYAlignment.Top
+	textLabel.AutomaticSize = Enum.AutomaticSize.Y
+	textLabel.BackgroundTransparency = 1
+	textLabel.Size = UDim2.new(1, -4, 0, 0)
+	textLabel.Parent = scrollingFrame
+
+	scrollingFrame.Parent = frame
+
+	local uIPadding1 = Instance.new("UIPadding")
+	uIPadding1.PaddingBottom = UDim.new(0, 5)
+	uIPadding1.PaddingLeft = UDim.new(0, 5)
+	uIPadding1.PaddingRight = UDim.new(0, 5)
+	uIPadding1.PaddingTop = UDim.new(0, 5)
+	uIPadding1.Parent = frame
+
+	frame.Parent = bgui
+	
+	if t then
+		Debris:AddItem(bgui, t)
+	end
+	
+	if RunService:IsClient() then
+		ref.Destroying:Once(function()
+			if bgui.Parent then
+				bgui:Destroy()
+			end
+		end)
+	end
+	
+	return bgui
+end
 
 local function cycle(self, dur, funcs)
 	local len = #funcs
@@ -225,42 +301,18 @@ function mod.FunctionCycler(dur: number, ...)
 	return cycler
 end
 
-
--- Quick and dirty way to send a message to our discord bot
-local DebugDiscordMsgRemote
-
-local Secrets
-function mod.DebugDiscordMsg(msg: string)
-	assert(msg)
-
-	if _G.Game.CONTEXT == "CLIENT" then
-		DebugDiscordMsgRemote:FireServer(msg)
-	elseif _G.Game.CONTEXT == "SERVER" then
-		Secrets.SendDiscordMsg(msg)
-	end
-end
-
-if game:GetService("RunService"):IsServer() then
-	-- TODO: again, secrets thing
-	-- Secrets = require(game.ServerScriptService.Secrets)
-	DebugDiscordMsgRemote = Instance.new("RemoteEvent", game.ReplicatedStorage)
-	DebugDiscordMsgRemote.Name = "DebugDiscordMsgRemote"
-	DebugDiscordMsgRemote.OnServerEvent:Connect(function(plr, msg) mod.DebugDiscordMsg(msg) end)
-elseif game:GetService("RunService"):IsClient() then
-	DebugDiscordMsgRemote = game.ReplicatedStorage:WaitForChild("DebugDiscordMsgRemote")
-end
-
 -- Make listed functions available for export
 local APIUtils = require(game.ReplicatedFirst.Util.APIUtils)
 APIUtils.EXPORT_LIST(mod)
 	:ADD("MarkSpotDbg")
 	:ADD("TempMarkSpotDbg")
+	:ADD("DebugCFAxis")
 	:ADD("DebugModelAxis")
 	:ADD("DebugGlobalAxis")
-	:ADD("VisualizeCFrame")
-	:ADD("DebugHighlight")
-	:ADD("FunctionCycler")
-	:ADD("DebugDiscordMsg")
+	:ADD("VisualizeLine")
 	:ADD("VisualizePlane")
+	:ADD("DebugHighlight")
+	:ADD("DebugLabel")
+	:ADD("FunctionCycler")
 
 return mod

@@ -6,30 +6,14 @@
 --
 -- _G.Game is not available to module-scope code unless __init caches it in an upvalue
 
-local Component
-
 local mod = { }
 
--- Move Screen GUIs from ReplicatedStorage to PlayerGUI
-do
-	local PlayerGUI = game.Players.LocalPlayer.PlayerGui
-	local GUIDir = game.ReplicatedStorage.GUIs
-
-	for i,v in GUIDir:GetChildren() do
-		v.Parent = PlayerGUI
-	end
-end
-
-local function OnTick(dt)
-	Component.Update(dt)
-end
-
 function mod:__init(G)
-	Component = G.Load("Component")
+	
 end
 
 function mod:__finalize(G)
-	game:GetService("RunService").Stepped:Connect(OnTick)
+	
 end
 
 return mod

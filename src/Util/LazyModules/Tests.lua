@@ -6,7 +6,7 @@ local mod = {
 	Nouns = { },
 }
 
-local Config = require(game.ReplicatedFirst.Util.BUILDCONFIG)
+local Config = require(game.ReplicatedFirst.Util.Config)
 
 local USAGE_EXAMPLE = [[
 	function mod:__tests(G, T)
