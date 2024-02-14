@@ -123,7 +123,6 @@ end
 	Perhaps the craziest thing we did was make a wrapper and expansion for Roact. Check [DebugMenu.lua](src/Util/Debug/DebugMenu.lua) for a practical stateful UI example, and [UI.lua](src/Util/LazyModules/UI.lua) for most implementation.
 
 	UI has its own build step which runs just before `__run` (`__ui` is second to last). UI has its own step because it is nice ergonomically and, in theory, would encourage deep UI integration with systems.
-
 ```lua
 -- I for IFrame or UI
 -- P for Props
