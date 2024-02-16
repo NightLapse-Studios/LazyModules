@@ -20,8 +20,7 @@
 
 local TextBox = {}
 
-function TextBox:__ui(G, I, P)
-	local Roact = G.Load("Roact")
+function TextBox:__ui(G, I, P, Roact)
 	local ExpressionParser = G.Load("ExpressionParser")
 	local Math = G.Load("Math")
 	
@@ -31,7 +30,7 @@ function TextBox:__ui(G, I, P)
 	
 	local function render(self)
 		local props = self.props
-	
+		
 		local oldLost = props[Roact.Event.FocusLost]
 		local ref = props[Roact.Ref]
 	
@@ -42,14 +41,19 @@ function TextBox:__ui(G, I, P)
 			:TextScaled(false)
 			:Font("Roboto")
 			:Ref(ref)
-			:Text(self.LastText)
+			:Text(self.LastText:map(function(v)
+				if props.Increment then
+					return Math.Round(v, props.Increment)
+				end
+				return v
+			end))
 			:Size(1, 0, 1, 0)
 			:TextTruncate(Enum.TextTruncate.None)
 			:ClearTextOnFocus(false)
 			:TextWrapped(false)
 			:TextEditable(true)
 			:TextColor3(1,1,1)
-			:BackgroundColor3(0.05,0.05,0.05)
+			:BackgroundColor3(0.16,0.16,0.16)
 			
 			:FocusLost(function(rbx, enterPressed)
 				if props.IsNumber then
@@ -82,7 +86,9 @@ function TextBox:__ui(G, I, P)
 	
 						-- Callbacks
 						if passedCustom then
-							self.LastText.update(num)
+							if not self.props.DontUpdateBinding then
+								self.LastText.update(num)
+							end
 							props.Callback(num)
 	
 							if oldLost then
@@ -116,7 +122,9 @@ function TextBox:__ui(G, I, P)
 	
 							-- callbacks
 							if passedCustom then
-								self.LastText.update(text)
+								if not self.props.DontUpdateBinding then
+									self.LastText.update(text)
+								end
 								props.Callback(text)
 	
 								if oldLost then
@@ -130,7 +138,9 @@ function TextBox:__ui(G, I, P)
 				end
 	
 				-- reset text if not returned
-				self.LastText.update(self.LastText:getValue())
+				if not self.props.DontUpdateBinding then
+					self.LastText.update(self.LastText:getValue())
+				end
 	
 				if oldLost then
 					oldLost(rbx, enterPressed)

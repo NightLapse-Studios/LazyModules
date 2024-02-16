@@ -1,3 +1,4 @@
+local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -5,7 +6,7 @@ local DraggableWindow = {}
 
 local grab = nil
 
-function DraggableWindow:__ui(G, I, P)
+function DraggableWindow:__ui(G, I, P, Roact)
 	I:Stateful(P()
 		:Name("DebugDraggableWindow")
 		:Init(function(self)
@@ -27,6 +28,8 @@ function DraggableWindow:__ui(G, I, P)
 					:AnchorPoint(0, 1)
 					:Position(0,0,0,-1)
 					:BackgroundColor3(0,0,0)
+					:BorderSizePixel(1)
+					:BorderColor3(0,0,0)
 					:TextColor3(1,1,1)
 					:TextXAlignment("Left")
 					:TextYAlignment("Center")
@@ -44,11 +47,17 @@ function DraggableWindow:__ui(G, I, P)
 					I:ImageButton(P()
 						:JustifyRight(0, 5)
 						:BackgroundColor3(1,0,0)
-						:Size(0, 20, 0, 20)
+						:Size(0, 15, 0, 15)
+						:BorderSizePixel(1)
+						:BorderColor3(0,0,0)
 						
 						:Activated(function()
 							self.props.CloseCallback()
 						end)
+					),
+					
+					I:UIPadding(P()
+						:PaddingLeft(0, 5)
 					)
 				),
 				
@@ -67,8 +76,8 @@ function DraggableWindow:__ui(G, I, P)
 			if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
 				grab = nil
 			else
-				local pos = UserInputService:GetMouseLocation() + grab.Offset
-				grab.Binding.update(UDim2.new(0, pos.X, 0, pos.Y))
+				local pos = UserInputService:GetMouseLocation() + grab.Offset + GuiService:GetGuiInset()
+				grab.Binding.update(UDim2.new(0, pos.X, 0, pos.Y + 26))-- +26 is the height of the top grab bar + 1
 			end
 		end
 	end)

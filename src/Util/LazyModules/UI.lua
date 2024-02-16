@@ -61,6 +61,7 @@
 ]]
 
 local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
 
 local IsServer = RunService:IsServer()
 local CONTEXT = IsServer and "SERVER" or "CLIENT"
@@ -71,14 +72,19 @@ local I = {
 }
 
 setmetatable(I, {
-	__index = function(_, index)
-		local total = 0
-		repeat total += task.wait() until (rawget(I, index) or total > 1)
-		return rawget(I, index)
+	__index = function(t, index)
+		return function(...)
+			local total = 0
+			repeat total += task.wait() until (rawget(t, index) or total > 1)
+			
+			if not rawget(t, index) then
+				error(index .. " is not registered")
+			end
+			
+			return rawget(t, index)(...)
+		end
 	end
 })
-
-local Style
 
 local Roact = require(game.ReplicatedFirst.Util.Roact)
 local ClassicSignal = require(game.ReplicatedFirst.Util.ClassicSignal)
@@ -504,10 +510,17 @@ local Classes = {
 local PropSet = { }
 
 setmetatable(PropSet, {
-	__index = function(_, index)
-		local total = 0
-		repeat total += task.wait() until (rawget(PropSet, index) or total > 1)
-		return rawget(PropSet, index)
+	__index = function(t, index)
+		return function(...)
+			local total = 0
+			repeat total += task.wait() until (rawget(t, index) or total > 1)
+			
+			if not rawget(t, index) then
+				error(index .. " is not registered")
+			end
+			
+			return rawget(t, index)(...)
+		end
 	end
 })
 
@@ -794,14 +807,14 @@ local function getMaxSize(rbx: TextLabel, constantText)
 	end
 end
 
-function I:ScaledTextSize(groupName, constantText)
+function PropSet:ScaledTextSize(groupName, constantText)
 	if type(constantText) == "number" then
 		constantText = string.rep(" ", constantText)
 	end
 	
 	local group = scaledTextGroups[groupName]
 	if not group then
-		local binding, updBinding = Roact.createBinding(0)
+		local binding = I:Binding(0)
 		
 		scaledTextGroups[groupName] = {
 			Binding = binding,
@@ -813,15 +826,17 @@ function I:ScaledTextSize(groupName, constantText)
 		group = scaledTextGroups[groupName]
 	end
 	
-	local ref = Roact.createRef()
-	self.Current[Roact.Ref] = ref
+	local ref = I:CreateRef()
+	self:Ref(ref)
 	
 	table.insert(group.Refs, ref)
 	
-	return group.Binding
+	self:TextSize(group.Binding)
+	
+	return self
 end
 
-function I:__run(G)
+if not IsServer then
 	RunService.Stepped:Connect(function()
 		for name, group in pairs(scaledTextGroups) do
 			local refs = group.Refs
@@ -854,7 +869,6 @@ function I:__run(G)
 		end
 	end)
 end
-
 
 function PropSet:Attribute(name, value)
 	self.props[Roact.Attribute[name]] = value
@@ -1083,54 +1097,52 @@ function I:IsScrollBarAtEnd(barRBX, damp)
 end
 
 
-function I:__init(G)
-	local roactType = Roact.Type
-	
-	-- create :[propName]() functions
-	for class, properties in pairs(Classes) do
-		for prop_name, _type in properties do
-			local ctor = TypeBindings[_type]
+local roactType = Roact.Type
 
-			if type(ctor) == "function" then
-				PropSet[prop_name] = function(_self, binding, ...)
-					if roactType.of(binding) == roactType.Binding then
-						_self.props[prop_name] = binding
-					else
-						local value = ctor(binding, ...)
-						_self.props[prop_name] = value
-					end
-					
-					return _self
-				end
-			elseif ctor == "Event" then
-				local event_key = Roact.Event[prop_name]
-				PropSet[prop_name] = function(_self, value)
-					_self.props[event_key] = value
-					return _self
-				end
-			elseif ctor == "Change" then
-				local event_key = Roact.Change[prop_name]
-				PropSet[prop_name] = function(_self, value)
-					_self.props[event_key] = value
-					return _self
-				end
-			else
-				PropSet[prop_name] = function(_self, value)
+-- create :[propName]() functions
+for class, properties in pairs(Classes) do
+	for prop_name, _type in properties do
+		local ctor = TypeBindings[_type]
+
+		if type(ctor) == "function" then
+			PropSet[prop_name] = function(_self, binding, ...)
+				if roactType.of(binding) == roactType.Binding then
+					_self.props[prop_name] = binding
+				else
+					local value = ctor(binding, ...)
 					_self.props[prop_name] = value
-					return _self
 				end
+				
+				return _self
+			end
+		elseif ctor == "Event" then
+			local event_key = Roact.Event[prop_name]
+			PropSet[prop_name] = function(_self, value)
+				_self.props[event_key] = value
+				return _self
+			end
+		elseif ctor == "Change" then
+			local event_key = Roact.Change[prop_name]
+			PropSet[prop_name] = function(_self, value)
+				_self.props[event_key] = value
+				return _self
+			end
+		else
+			PropSet[prop_name] = function(_self, value)
+				_self.props[prop_name] = value
+				return _self
 			end
 		end
+	end
 
-		I[class] = function(_self, prop_set: table)
-			local props = prop_set.props
-			local element = Roact.createElement(class, props)
-			
-			return element
-		end
+	I[class] = function(_self, prop_set: table)
+		local props = prop_set.props
+		local element = Roact.createElement(class, props)
+		
+		return element
 	end
 end
 
-setmetatable(Roact.elementModule, {__index = I})
+setmetatable(Roact.elementModule, {__index = PropSet})
 
 return I

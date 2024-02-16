@@ -15,4 +15,8 @@ function PlayerClass.new(plr)
 	return self
 end
 
+function PlayerClass:Destroy()
+	
+end
+
 return PlayerClass

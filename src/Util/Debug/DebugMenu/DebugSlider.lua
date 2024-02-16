@@ -26,7 +26,7 @@ function Slider:__init(G)
 	end
 end
 
-function Slider:__ui(G, I, P)
+function Slider:__ui(G, I, P, Roact)
 	local function init_Slider(self)
 		self.Ref = I:CreateRef()
 	end
@@ -44,8 +44,9 @@ function Slider:__ui(G, I, P)
 		):Children(
 			I:ImageButton(P()
 				:Size(0.7, 0, 0.5, 0)
-				:BorderSizePixel(0)
-				:BackgroundColor3(self.props.BackgroundColor3 or Color3.new(0.06, 0.06, 0.06))
+				:BorderSizePixel(1)
+				:BorderColor3(0,0,0)
+				:BackgroundColor3(self.props.BackgroundColor3 or Color3.new(0.16, 0.16, 0.16))
 				:JustifyLeft(0,0)
 				:Ref(self.Ref)
 				:MouseButton1Down(function()
@@ -54,7 +55,7 @@ function Slider:__ui(G, I, P)
 			):Children(
 				I:ImageButton(P()
 					:Size(1, 0, 2, 0)
-					:AspectRatioProp(0.5)
+					:AspectRatioProp(0.3)
 					:BorderSizePixel(0)
 					:BackgroundColor3(0, 1, 0)
 					:AnchorPoint(0.5, 0.5)
@@ -70,7 +71,7 @@ function Slider:__ui(G, I, P)
 			),
 			
 			I:Frame(P()
-				:Position(1, 0, 0.5, 0)
+				:Position(1, 5, 0.5, 0)
 				:AnchorPoint(1, 0.5)
 				:Size(0.28, 0, 1, 0)
 				:Invisible()
@@ -80,6 +81,8 @@ function Slider:__ui(G, I, P)
 					:Prop("Increment", increment)
 					:Prop("Min", min)
 					:Prop("Max", max)
+					:Prop("TextBinding", binding)
+					:Prop("DontUpdateBinding", self.props.DontUpdateBinding)
 					:Prop("Callback", function(value)
 						callback(value, true)
 					end)
@@ -106,7 +109,7 @@ function Slider:__run(G)
 		if self then
 			local gui = self.Ref:getValue()
 			if gui then
-				local x = UserInput:GetMousePos().X
+				local x = UserInputService:GetMouseLocation().X
 
 				local minGui = gui.AbsolutePosition.X
 				local maxGui = minGui + gui.AbsoluteSize.X
@@ -114,6 +117,9 @@ function Slider:__run(G)
 				local newValue = Math.Map(x, minGui, maxGui, self.props.Min, self.props.Max)
 
 				local finalValue = constrainValue(newValue, self.props.Min, self.props.Max, self.props.Increment)
+				if not self.props.DontUpdateBinding then
+					self.props.UseThisBinding.update(finalValue)
+				end
 				self.props.Callback(finalValue, is_from_mouse_release)
 			end
 		end

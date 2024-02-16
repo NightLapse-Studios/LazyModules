@@ -1,22 +1,16 @@
 local Graph = {}
 
-function Graph:__ui(G, I, P)
+function Graph:__ui(G, I, P, Roact)
 	I:Stateful(P()
 		:Name("DebugGraph")
 		:Init(function(self)
-			--[[
-				Points
-				CreatePoint
-				IsScreen
-			]]
-			
-			self.Points:subscribe(function(hexHash)
+			self.props.Points:subscribe(function(hexHash)
 				self:setState({})
 			end)
 		end)
 		:Render(function(self)
 			local createPoint = self.props.CreatePoint
-			local hexHash = self.Points:getValue()
+			local hexHash = self.props.Points:getValue()
 			
 			local renderPoints = {}
 			local renderLines = {}
@@ -40,6 +34,7 @@ function Graph:__ui(G, I, P)
 								
 								table.insert(renderLines, I:Frame(P()
 									:BackgroundColor3(color)
+									:BorderSizePixel(0)
 									:Line(pos, lastPos, 1)
 								))
 							end
@@ -98,6 +93,7 @@ function Graph:__ui(G, I, P)
 							
 							table.insert(renderLines, I:Frame(P()
 								:BackgroundColor3(color)
+								:BorderSizePixel(0)
 								:Line(pos, lastPos, 1)
 							))
 						end

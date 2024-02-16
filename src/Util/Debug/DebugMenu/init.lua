@@ -27,8 +27,10 @@ local function getMenu(menu_name, isPlot)
 		end
 	end
 	
-	return arr[menu_name]
+	return arr[menu_name], menu_name
 end
+
+local MaxPointsHash = {}
 
 -- menu_name can be "Screen" to plot directly to the screen (on a ScreenGui with IgnoreInset) instead of the plot.
 -- plots are grouped by their color
@@ -44,7 +46,7 @@ function mod.Plot(opt_x, y, color: Color3, connect, opt_menu_name)
 		return
 	end
 	
-	local menu = getMenu(opt_menu_name, true)
+	local menu, name = getMenu(opt_menu_name, true)
 	local points = menu:getValue()
 	
 	local hex = color:ToHex()
@@ -59,7 +61,15 @@ function mod.Plot(opt_x, y, color: Color3, connect, opt_menu_name)
 	
 	table.insert(points[hex], newPoint)
 	
+	if MaxPointsHash[name] and #points[hex] > MaxPointsHash[name] then
+		table.remove(points[hex], 1)
+	end
+	
 	menu.update(points)
+end
+
+function mod.SetPlotMaxPoints(menu_name, maxPoints)
+	MaxPointsHash[menu_name] = maxPoints
 end
 
 local ServerCallbacks = {
@@ -193,7 +203,7 @@ function mod:__ui(G, I, P)
 	local UserInput = G.Load("UserInput")
 	
 	local function init(self)
-		self.ColorPickingPosition = I:Binding(UDim2.new())
+		self.ColorPickingPosition = I:Binding(UDim2.new(0, 50, 0, 50))
 		self.ColorPicking = I:Binding(false)
 		self.ColorPickingColor = I:Binding(Color3.new())
 		
@@ -204,7 +214,7 @@ function mod:__ui(G, I, P)
 			end
 		end)
 		
-		self.Position = I:Binding(UDim2.new())
+		self.Position = I:Binding(UDim2.new(0, 50, 0, 50))
 		self.Enabled = false
 		
 		UserInput:Handler(Enum.KeyCode.B, function()
@@ -226,23 +236,24 @@ function mod:__ui(G, I, P)
 		local function createStrip(list, title, element)
 			table.insert(list, I:Frame(P()
 				:LayoutOrder(#list)
-				:Size(0.94, 0, 0, 55)
+				:Size(0.94, 0, 0, 25)
 				:Invisible()
 			):Children(
 				I:TextLabel(P()
 					:JustifyLeft(0,0)
 					:Font("Roboto")
 					:Text(title)
-					:TextSize(I:ScaledTextSize("DebugColorPickerSliderTitle"))
+					:ScaledTextSize("DebugColorPickerSliderTitle")
 					:TextColor3(1,1,1)
 					:Size(0.45, 0, 1, 0)
 					:TextXAlignment("Left")
 					:TextYAlignment("Center")
+					:Invisible()
 				),
 				
 				I:Frame(P()
 					:JustifyRight(0,0)
-					:Size(0.45, 0, 1, 0)
+					:Size(0.45, 0, 0.8, 0)
 					:Invisible()
 				):Children(
 					element
@@ -252,7 +263,7 @@ function mod:__ui(G, I, P)
 		
 		for menu_name, elements in menus do
 			table.sort(elements, function(a, b)
-				return a < b
+				return a.Name < b.Name
 			end)
 			
 			local strips = {}
@@ -270,10 +281,11 @@ function mod:__ui(G, I, P)
 				elseif ty == "Button" then
 					createStrip(strips, props.Name, I:TextButton(P()
 						:Text("")
-						:Size(0.5, 0, 0.9, 0)
+						:Size(0.5, 0, 0.8, 0)
 						:AutoButtonColor(true)
-						:BackgroundColor3(0.3, 0.3, 0.3)
-						:BorderSizePixel(0)
+						:BackgroundColor3(0.16, 0.16, 0.16)
+						:BorderSizePixel(1)
+						:BorderColor3(0,0,0)
 						:JustifyRight(0,0)
 						:Activated(props.Callback)
 					))
@@ -285,7 +297,7 @@ function mod:__ui(G, I, P)
 				elseif ty == "Color" then
 					createStrip(strips, props.Name, I:TextButton(P()
 						:Text("")
-						:Size(0.3, 0, 0.9, 0)
+						:Size(0.3, 0, 0.8, 0)
 						:AutoButtonColor(true)
 						:JustifyRight(0,0)
 						:BackgroundColor3(props.Binding)
@@ -318,9 +330,10 @@ function mod:__ui(G, I, P)
 					:LayoutOrder(-1)
 					:Text(menu_name)
 					:Font("Roboto")
-					:TextSize(I:ScaledTextSize("DebugMenuNameTitles"))
+					:ScaledTextSize("DebugMenuNameTitles")
 					:TextColor3(1, 1, 1)
 					:Invisible()
+					:Size(1, 0, 0, 25)
 				),
 				
 				I:UIListLayout(P()
@@ -341,6 +354,7 @@ function mod:__ui(G, I, P)
 				:Size(0, 3, 0, 3)
 				:BackgroundColor3(color)
 				:AnchorPoint(0.5, 0.5)
+				:BorderSizePixel(0)
 			)
 		end
 		
@@ -376,7 +390,7 @@ function mod:__ui(G, I, P)
 			:IgnoreGuiInset(true)
 		):Children(
 			I:DebugDraggableWindow(P()
-				:Size(0, 400, 0, 300)
+				:Size(0, 500, 0, 300)
 				:Prop("PositionBinding", self.Position)
 				:Prop("Title", "Debug Menu")
 				:Prop("CloseCallback", function()
@@ -425,7 +439,7 @@ function mod:__ui(G, I, P)
 			),
 			
 			I:DebugDraggableWindow(P()
-				:Size(0, 100, 0, 200)
+				:Size(0, 150, 0, 300)
 				:Visible(self.ColorPicking:map(function(v)
 					return v and true or false
 				end))
@@ -435,6 +449,7 @@ function mod:__ui(G, I, P)
 					if props then
 						title ..= " | " .. props.Name
 					end
+					return title
 				end))
 				:Prop("CloseCallback", function()
 					self.ColorPicking.update(false)

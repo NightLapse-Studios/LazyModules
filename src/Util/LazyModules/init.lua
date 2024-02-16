@@ -79,6 +79,7 @@ local LOAD_CONTEXTS = require(game.ReplicatedFirst.Util.Enums).LOAD_CONTEXTS
 local CONTEXT = mod.CONTEXT
 local SOURCE_NAME = debug.info(function() return end, "s")
 
+local Roact = require(game.ReplicatedFirst.Util.Roact)
 local Config = require(game.ReplicatedFirst.Util.Config)
 local AsyncList = require(game.ReplicatedFirst.Util.AsyncList)
 
@@ -273,7 +274,7 @@ local function ui_wrapper(module, name)
 		print(" -- > UI INIT: " .. name)
 	end
 
-	module:__ui(Game, UI, UI.P)
+	module:__ui(Game, UI, UI.P, Roact)
 	reset_context(prior_context)
 end
 

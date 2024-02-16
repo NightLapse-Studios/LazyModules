@@ -13,8 +13,8 @@ local spotID = 0
 function mod.MarkSpotDbg(pos, color, size, extra_data, singular_name, __t)
 	local p = Instance.new("Part")
 	p.Color = color or Color3.new(1,1,1)
-	p.Material = Enum.Material.Neon
-	p.Transparency = 0.7
+	p.Material = Enum.Material.SmoothPlastic
+	p.Transparency = 0
 	
 	p.Size = size or Vector3.new(1,10,1)
 	
@@ -27,6 +27,7 @@ function mod.MarkSpotDbg(pos, color, size, extra_data, singular_name, __t)
 	p.Anchored = true
 	p.CanCollide = false
 	p.CanQuery = false
+	p.CastShadow = false
 	
 	p.Parent = debugFolder
 	
@@ -100,6 +101,7 @@ function mod.VisualizePlane(p1, p2, p3, opt_p)
 		p.Anchored = true
 		p.CanCollide = false
 		p.CanQuery = false
+		p.CastShadow = false
 		
 		p.Parent = folder
 		return p
@@ -158,7 +160,7 @@ function mod.DebugHighlight(model: Model|BasePart, color, extra_data, t)
 	hl.OutlineColor = color
 	hl.FillColor = color
 	hl.OutlineTransparency = 0.5
-	hl.FillTransparency = 0.5
+	hl.FillTransparency = 0.6
 	hl.Name = "DebugHighlight"
 	hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 	
@@ -167,13 +169,13 @@ function mod.DebugHighlight(model: Model|BasePart, color, extra_data, t)
 	end
 	
 	if extra_data then
-		mod.DebugLabel(model, extra_data, t)
+		mod.DebugLabel(model, color, extra_data, t)
 	end
 	
 	return hl
 end
 
-function mod.DebugLabel(model: Model|BasePart, extra_data, t)
+function mod.DebugLabel(model: Model|BasePart, color, extra_data, t)
 	local ref = model:FindFirstChild("DebugLabel") or Instance.new("ObjectValue", model)
 	
 	local parent = RunService:IsServer() and model or Players.LocalPlayer.PlayerGui
@@ -207,7 +209,7 @@ function mod.DebugLabel(model: Model|BasePart, extra_data, t)
 
 	local uIStroke = Instance.new("UIStroke")
 	uIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	uIStroke.Color = Color3.fromRGB(255, 225, 0)
+	uIStroke.Color = color or Color3.fromRGB(255, 225, 0)
 	uIStroke.LineJoinMode = Enum.LineJoinMode.Miter
 	uIStroke.Thickness = 2
 	uIStroke.Parent = frame

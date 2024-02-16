@@ -1,3 +1,4 @@
+local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ColorPicker = {}
@@ -5,10 +6,17 @@ local ColorPicker = {}
 local ColorWheel = "rbxassetid://7151805781"
 local CircleRing = "rbxassetid://7151851820"
 
+local Math
+
 local grabbed = nil
 
-function ColorPicker:__ui(G, I, P)
-	local Math = G.Load("Math")
+local function constrainValue(v, min, max, inc)
+	local n = Math.Round(v, inc)
+	return math.clamp(n, min, max)
+end
+
+function ColorPicker:__ui(G, I, P, Roact)
+	Math = G.Load("Math")
 	local Vectors = G.Load("Vectors")
 	
 	local function init(self)
@@ -18,13 +26,8 @@ function ColorPicker:__ui(G, I, P)
 			self.props.Color.update(color)
 			self.props.Callback(color)
 		end
-	end
-	
-	local function render(self)
-		local color = self.props.Color
-		local updateColor = self.UpdateColor
 		
-		local colorComponents = color:map(function(v: Color3)
+		self.ColorComponents = self.props.Color:map(function(v: Color3)
 			-- n is for normalized
 			
 			local nh, ns, nv = v:ToHSV()
@@ -37,26 +40,33 @@ function ColorPicker:__ui(G, I, P)
 			
 			local hex = v:ToHex()
 			
-			return nh, ns, nv,  nr, ng, nb,  hex
+			return {nh, ns, nv,  nr, ng, nb,  hex}
 		end)
+	end
+	
+	local function render(self)
+		local color = self.props.Color
+		local updateColor = self.UpdateColor
+		local colorComponents = self.ColorComponents
 		
 		local List = {}
 		
 		local function createStrip(title, element)
 			table.insert(List, I:Frame(P()
 				:LayoutOrder(#List)
-				:Size(1, 0, 0.1, 0)
+				:Size(1, 0, 0.12, 0)
 				:Invisible()
 			):Children(
 				I:TextLabel(P()
 					:JustifyLeft(0,0)
 					:Font("Roboto")
 					:Text(title)
-					:TextSize(I:ScaledTextSize("DebugColorPickerSliderTitle"))
+					:ScaledTextSize("DebugColorPickerSliderTitle")
 					:TextColor3(1,1,1)
 					:Size(0.1, 0, 1, 0)
-					:TextXAlignment("Left")
+					:TextXAlignment("Center")
 					:TextYAlignment("Center")
+					:Invisible()
 				),
 				
 				I:Frame(P()
@@ -74,24 +84,26 @@ function ColorPicker:__ui(G, I, P)
 				:Prop("Min", 0)
 				:Prop("Max", 1)
 				:Prop("Increment", 0.001)
-				:Prop("UseThisBinding", colorComponents:map(function(...)
-					local comps = {...}
+				:Prop("UseThisBinding", colorComponents:map(function(comps)
 					return comps[componentIndex]
 				end))
+				:Prop("DontUpdateBinding", true)
 				:Prop("Callback", callback)
 				
 				:BackgroundColor3(1, 1, 1)
 				
 				:Prop("Children", {
 					I:UIGradient(P()
-						:Color(colorComponents:map(function(...)
-							local comps = {...}
-							
+						:Color(colorComponents:map(function(comps)
 							local C1, C2
 							
 							if componentIndex == 1 then
-								C1 = Color3.fromHSV(0, comps[2], comps[3])
-								C2 = Color3.fromHSV(1, comps[2], comps[3])
+								local seq = {}
+								local n = 19-- 20 keypoint limit
+								for i = 0, n do
+									table.insert(seq, ColorSequenceKeypoint.new(i/n, Color3.fromHSV(i/n, comps[2], comps[3])))
+								end
+								return ColorSequence.new(seq)
 							elseif componentIndex == 2 then
 								C1 = Color3.fromHSV(comps[1], 0, comps[3])
 								C2 = Color3.fromHSV(comps[1], 1, comps[3])
@@ -117,49 +129,50 @@ function ColorPicker:__ui(G, I, P)
 		end
 		
 		createSlider("H", 1, function(updatedValue)
-			local nh, ns, nv,  nr, ng, nb,  hex = colorComponents:getValue()
+			local nh, ns, nv,  nr, ng, nb,  hex = table.unpack(colorComponents:getValue())
 			local newColor = Color3.fromHSV(updatedValue, ns, nv)
 			self.LastNon0Hue = updatedValue
 			updateColor(newColor)
 		end)
 		
 		createSlider("S", 2, function(updatedValue)
-			local nh, ns, nv,  nr, ng, nb,  hex = colorComponents:getValue()
+			local nh, ns, nv,  nr, ng, nb,  hex = table.unpack(colorComponents:getValue())
 			updateColor(Color3.fromHSV(self.LastNon0Hue, updatedValue, nv))
 		end)
 		
 		createSlider("V", 3, function(updatedValue)
-			local nh, ns, nv,  nr, ng, nb,  hex = colorComponents:getValue()
+			local nh, ns, nv,  nr, ng, nb,  hex = table.unpack(colorComponents:getValue())
 			updateColor(Color3.fromHSV(self.LastNon0Hue, ns, updatedValue))
 		end)
 		
 		createSlider("R", 4, function(updatedValue)
-			local nh, ns, nv,  nr, ng, nb,  hex = colorComponents:getValue()
+			local nh, ns, nv,  nr, ng, nb,  hex = table.unpack(colorComponents:getValue())
 			local newColor = Color3.new(updatedValue, ng, nb)
 			self.LastNon0Hue = newColor:ToHSV()
 			updateColor(newColor)
 		end)
 		
 		createSlider("G", 5, function(updatedValue)
-			local nh, ns, nv,  nr, ng, nb,  hex = colorComponents:getValue()
+			local nh, ns, nv,  nr, ng, nb,  hex = table.unpack(colorComponents:getValue())
 			local newColor = Color3.new(nr, updatedValue, nb)
 			self.LastNon0Hue = newColor:ToHSV()
 			updateColor(newColor)
 		end)
 		
 		createSlider("B", 6, function(updatedValue)
-			local nh, ns, nv,  nr, ng, nb,  hex = colorComponents:getValue()
+			local nh, ns, nv,  nr, ng, nb,  hex = table.unpack(colorComponents:getValue())
 			local newColor = Color3.new(nr, ng, updatedValue)
 			self.LastNon0Hue = newColor:ToHSV()
 			updateColor(newColor)
 		end)
 		
 		createStrip("HEX", I:DebugTextBox(P()
-			:Prop("TextBinding", colorComponents:map(function(nh, ns, nv,  nr, ng, nb,  hex)
-				return hex
+			:Prop("TextBinding", colorComponents:map(function(comps)
+				return comps[#comps]
 			end))
 			:Prop("Min", 6)
 			:Prop("Max", 6)
+			:Prop("DontUpdateBinding", true)
 			:Prop("Verify", function(value)
 				local suc, err = pcall(function()
 					Color3.fromHex(value)
@@ -182,13 +195,13 @@ function ColorPicker:__ui(G, I, P)
 				:AutoButtonColor(false)
 				:AspectRatioProp(1)
 				:Size(0.9, 0, 1, 0)
-				:JustifyTop(0.05, 0)
+				:JustifyTop(0.03, 0)
 				:Image(ColorWheel)
 				:Invisible()
 				:Ref(self.WheelRef)
 				
-				:ImageColor3(colorComponents:map(function(nh, ns, nv,  nr, ng, nb,  hex)
-					return Color3.new(nv, nv, nv)
+				:ImageColor3(colorComponents:map(function(comps)
+					return Color3.new(comps[3], comps[3], comps[3])
 				end))
 				
 				:MouseButton1Down(function()
@@ -202,8 +215,8 @@ function ColorPicker:__ui(G, I, P)
 					:Invisible()
 					
 					:AnchorPoint(0.5, 0.5)
-					:Position(colorComponents:map(function(nh, ns, nv,  nr, ng, nb,  hex)
-						local x, y = Vectors.XYOnCircle(0,0, ns/2, math.pi/2 - self.LastNon0Hue * math.pi * 2)
+					:Position(colorComponents:map(function(comps)
+						local x, y = Vectors.XYOnCircle(0,0, comps[2]/2, math.pi/2 - self.LastNon0Hue * math.pi * 2)
 
 						return UDim2.new(0.5 + x, 0, 0.5 - y, 0)
 					end))
@@ -220,7 +233,7 @@ function ColorPicker:__ui(G, I, P)
 				:Invisible()
 			):Children(
 				I:UIListLayout(P()
-					:Padding(0.01, 0)
+					:Padding(0.04, 0)
 					:FillDirection("Vertical")
 					:HorizontalAlignment("Center")
 					:SortOrder("LayoutOrder")
@@ -243,20 +256,22 @@ function ColorPicker:__ui(G, I, P)
 			if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
 				grabbed = nil
 			else
-				local wheel = self.WheelRef:getValue()
+				local wheel = grabbed.WheelRef:getValue()
 				if not wheel then
 					grabbed = nil
 				else
 					local center = wheel.AbsolutePosition + wheel.AbsoluteSize/2
-					local mousePosition = UserInputService:GetMouseLocation()
+					local mousePosition = UserInputService:GetMouseLocation() - GuiService:GetGuiInset()
 					
 					local delta = center - mousePosition
 					
-					local s = math.min(delta.Magnitude, 1)
+					local s = math.min(delta.Magnitude / wheel.AbsoluteSize.X * 2, 1)
 					local angle = math.atan2(-delta.X, delta.Y)
 					local h = angle % (math.pi * 2) / (math.pi * 2)
 
 					local _, _, v = grabbed.props.Color:getValue():ToHSV()
+					
+					h, s, v = constrainValue(h, 0, 1, 0.001), constrainValue(s, 0, 1, 0.001), constrainValue(v, 0, 1, 0.001)
 					
 					local color = Color3.fromHSV(h, s, v)
 					
