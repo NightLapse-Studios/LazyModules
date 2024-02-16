@@ -1,7 +1,7 @@
 local createSignal = require(script.Parent.createSignal)
 local Symbol = require(script.Parent.Symbol)
 local Type = require(script.Parent.Type)
-local Flipper = require(game.ReplicatedFirst.Modules.Flipper)
+local Flipper = require(game.ReplicatedFirst.Util.Flipper)
 local RoactTweenHandler = require(script.Parent.RoactTweenHandler)
 
 local config = require(script.Parent.GlobalConfig).get()

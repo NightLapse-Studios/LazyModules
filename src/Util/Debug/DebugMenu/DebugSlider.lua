@@ -20,7 +20,10 @@ end
 
 function Slider:__init(G)
 	Math = G.Load("Math")
-	UserInput = G.Load("UserInput")
+	
+	if G.CONTEXT == "CLIENT" then
+		UserInput = G.Load("UserInput")
+	end
 end
 
 function Slider:__ui(G, I, P)

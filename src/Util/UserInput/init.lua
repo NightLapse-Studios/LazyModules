@@ -47,30 +47,15 @@ local Config
 local GestureDetector = _G.Game.PreLoad(script.GestureDetector)
 local Enums = _G.Game.Enums
 local AssociativeList = require(game.ReplicatedFirst.Util.AssociativeList)
-local Mobile = _G.Game.PreLoad(script.Mobile)
-local Game
 
-local Camera = workspace.CurrentCamera
-
-local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
--- TODO @2.0 Port mobile functionality of ContextActionService
+
 local mod = {
 	Handlers = { },
 	Intercepts = { },
 	Hooks = { },
-	IsMobile = _G.Game.PlatformVar(false, true)
 }
-
-
-mod.SetGestureDisplayMode = GestureDetector.SetDisplayMode
-mod.UnsetGestureDisplayMode = GestureDetector.UnsetDisplayMode
-
-mod.AddMobileButton = Mobile.AddButton
-mod.RemoveMobileButton = Mobile.RemoveButton
-mod.DoesMobileButtonExist = Mobile.DoesButtonExist
-
 
 local PendingCustomInputs = { }
 
@@ -182,78 +167,16 @@ end
 mod.EnumAssociations = EnumAssociations
 
 local ListenerCreatedCallbacks = {
-	[Enums.UserInputType.DPad] = Mobile.PushDPadUser
+	
 }
 
 local ListenerDestroyedCallbacks = {
-	[Enums.UserInputType.DPad] = Mobile.RemoveDPadUser
-}
-
-
-
-local function AnyGestureCfg(self, ...)
-	local dir_list = { ... }
-	for i,v in dir_list do
-		local maskable = { v }
-		Mobile.PushGestureButton(self, maskable)
-		table.insert(self.extra, maskable)
-	end
-end
-
-local function SpecificGestureCfg(self)
-	local maskable = { self.keycode }
-	Mobile.PushGestureButton(self, maskable)
-	table.insert(self.extra, maskable)
-end
-
-local MobileCfgFuncs = {
-	[Enums.AuxiliaryInputCodes.InputGestures.Any] = AnyGestureCfg,
-	[Enums.InputGestures.Left] = SpecificGestureCfg,
-	[Enums.InputGestures.Right] = SpecificGestureCfg,
-	[Enums.InputGestures.Up] = SpecificGestureCfg,
-	[Enums.InputGestures.Down] = SpecificGestureCfg,
-}
-
-
-
-local function AnyGestureCleanup(self)
-	for i,v in self.extra do
-		Mobile.RemoveGestureButton(self, v)
-	end
-
-	table.clear(self.extra)
-end
-
-local function SpecificGestureCleanup(self)
-	local maskable = self.extra[1]
-	Mobile.RemoveGestureButton(self, maskable)
-	table.clear(self.extra)
-end
-
-local MobileCfgCleanup = {
-	[Enums.AuxiliaryInputCodes.InputGestures.Any] = AnyGestureCleanup,
-	[Enums.InputGestures.Left] = SpecificGestureCleanup,
-	[Enums.InputGestures.Right] = SpecificGestureCleanup,
-	[Enums.InputGestures.Up] = SpecificGestureCleanup,
-	[Enums.InputGestures.Down] = SpecificGestureCleanup,
+	
 }
 
 
 local ListenerType = { }
 ListenerType.__index = ListenerType
-
-function ListenerType:MobileCfg(...)
-	local f = MobileCfgFuncs[self.keycode]
-
-	if not f then
-		error("Attempt to mobile-configure keycode " .. self.keycode .. " that has no associated cfg funcs")
-	end
-
-	f(self, ...)
-
-	return self
-end
-
 
 
 function ListenerType:Disconnect()
@@ -263,10 +186,6 @@ function ListenerType:Disconnect()
 
 	if ListenerDestroyedCallbacks[self.keycode] then
 		ListenerDestroyedCallbacks[self.keycode](self)
-	end
-
-	if MobileCfgCleanup[self.keycode] then
-		MobileCfgCleanup[self.keycode](self)
 	end
 
 	local list = mod[self.Type][self.keycode]
@@ -398,24 +317,6 @@ function mod.GetLastGesture()
 	return GestureDetector.Last
 end
 
-local function desktop_mouse_pos()
-	local Mouse = game.Players.LocalPlayer:GetMouse()
-	return Vector2.new(Mouse.X, Mouse.Y)
-end
-
--- we must enforce lockcenter on mobile, because roblox does some weird thing
-local TouchResponsibleForMouse: InputObject|false = false
-local function mobile_mouse_pos()
-	local inset = GuiService:GetGuiInset()
-	return Camera.ViewportSize/2 - inset
-end
-
-function mod.GetMousePos()
-	return Game.PlatformVar(desktop_mouse_pos, mobile_mouse_pos)()
-end
-
-
-
 function mod:__init(G)
 	Game = G
 	local Stack = G.Load("Stack")
@@ -450,31 +351,6 @@ function mod:__build_signals(G, B)
 		elseif original_input.KeyCode == Enum.KeyCode.ButtonL2 and original_input.UserInputState ~= Enum.UserInputState.Change then
 			new_input.KeyCode = Enum.KeyCode.Unknown
 			new_input.UserInputType = Enum.UserInputType.MouseButton2
-		end
-	end
-	
-	local function TransformTouch(original_input, new_input)
-		-- @2.0 test if MouseMovement ends on mobile
-		if original_input.UserInputType ~= Enum.UserInputType.Touch then
-			return
-		end
-
-		if Mobile.IsInputBoundToDetector("MovementDetector", original_input) then
-			return
-		end
-
-		if original_input.UserInputState == Enum.UserInputState.Begin then
-			if TouchResponsibleForMouse == false then
-				new_input.UserInputType = Enum.UserInputType.MouseButton1
-				TouchResponsibleForMouse = original_input
-			end
-		elseif TouchResponsibleForMouse == original_input then
-			if original_input.UserInputState == Enum.UserInputState.Change then
-				new_input.UserInputType = Enum.UserInputType.MouseMovement
-			elseif original_input.UserInputState == Enum.UserInputState.End then
-				new_input.UserInputType = Enum.UserInputType.MouseButton1
-				TouchResponsibleForMouse = false
-			end
 		end
 	end
 
@@ -515,12 +391,9 @@ function mod:__build_signals(G, B)
 			UserInputType = original_input.UserInputType
 		}
 
-		-- Anyway here's how mobile touches are converted into more generic inputs
-		TransformTouch(original_input, new_input)
 		DetectGestures(original_input, new_input)
-
+		
 		TransformTriggers(original_input, new_input)
-		--DetectGesturesStage2(original_input, new_input)
 
 		return new_input
 	end

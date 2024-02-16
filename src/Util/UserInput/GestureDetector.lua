@@ -2,20 +2,13 @@ local Game = _G.Game
 
 local mod = {
 	IsReady = false,
-	DebugSignals = false,
-	DisplayMode = Game.Enums.GestureDisplayMode.Off,
 	LastGesture = Game.Enums.InputGestures.None
 }
 
 local UserInput
-local MouseIcon
-local Roact
-local Assets
-local CircleBuffer = Game.PreLoad(game.ReplicatedFirst.Util.CircleBuffer)
 local DebugMenu = _G.Game.DebugMenu
 local Enums = Game.PreLoad(game.ReplicatedFirst.Util.Enums)
-local Tweens = Game.PreLoad(game.ReplicatedFirst.Modules.Tweens)
-local I, P, D
+local CircleBuffer = Game.PreLoad(game.ReplicatedFirst.Util.CircleBuffer)
 
 local SIG_SAMPLE_LEN = 32
 local DETECTION_SAMPLES = 5
@@ -24,50 +17,23 @@ local MIN_GESTURE_MAG = 25 * ((Game.ScreenSizeXRatio + Game.ScreenSizeYRatio) / 
 -- Used when ConsumeDelta isn't available
 local Pos = Vector3.new(0, 0, 0)
 
-local GestureIconRef
-local IndicatorSize = UDim2.new(0, 32 * Game.ScreenSizeXRatio, 0, 32 * Game.ScreenSizeYRatio)
+local PI = math.pi
+local OffsetRange = PI / 5
 
-local IndicatorFadeOutTween = Tweens.new()
-	:SetEasingStyle(Enum.EasingStyle.Quad)
-	:SetEasingDirection(Enum.EasingDirection.In)
-	:SetLength(17/60)
-	:SetDelay(22/60)
-
-local IndicatorFadeInTween = Tweens.new()
-	:SetEasingStyle(Enum.EasingStyle.Back)
-	:SetEasingDirection(Enum.EasingDirection.Out)
-	:SetLength(8/60)
-
-local SignalTree = {}
-local AllSignals = {}
-
-local function NewSignal(c1, c2)
+local function NewSignal()
 	local t = {
 		Buffer = CircleBuffer.new(SIG_SAMPLE_LEN),
-		Color = c1,
-		SampleFrames = table.create(SIG_SAMPLE_LEN),
-		MagnitudeBindings = table.create(SIG_SAMPLE_LEN),
+		
 		FilteredSig = {
 			Buffer = CircleBuffer.new(SIG_SAMPLE_LEN),
-			Color = c2,
-			SampleFrames = table.create(SIG_SAMPLE_LEN),
-			MagnitudeBindings = table.create(SIG_SAMPLE_LEN),
 		}
 	}
-
-	table.insert(SignalTree, t)
-	table.insert(AllSignals, t)
-	table.insert(AllSignals, t.FilteredSig)
 
 	return t
 end
 
-local MagSig = NewSignal(Color3.new(.1, .8, .1), Color3.new(.8, .1, .1))
-local AngleSig = NewSignal(Color3.new(0.074510, 0.588235, 0.588235), Color3.new(0.800000, 0.321569, 0.101961))
-
-
-local PI = math.pi
-local OffsetRange = PI / 5
+local MagSig = NewSignal()
+local AngleSig = NewSignal()
 
 local function IsLeft(ang: number)
 	return ang > (-PI / 2 - OffsetRange) and ang < (-PI / 2 + OffsetRange)
@@ -98,39 +64,6 @@ local function get_dir(ang)
 	end
 
 	return false
-end
-
-local function display_gesture_dir(gesture_code)
-	if GestureIconRef then
-		MouseIcon.Unadorne(GestureIconRef)
-		GestureIconRef = nil
-	end
-
-	if mod.DisplayMode == Enums.GestureDisplayMode.Off then
-		return
-	end
-
-	if gesture_code == Enums.InputGestures.Right then
-		-- print("Right")
-		GestureIconRef = MouseIcon.Adorne(Assets.Images.UIArrow, 0, UDim2.new(0,0,0,0))
-	elseif gesture_code == Enums.InputGestures.Left then
-		-- print("Left")
-		GestureIconRef = MouseIcon.Adorne(Assets.Images.UIArrow, 180, UDim2.new(0,0,0,0))
-	elseif gesture_code == Enums.InputGestures.Up then
-		-- print("Up")
-		GestureIconRef = MouseIcon.Adorne(Assets.Images.UIArrow, 90, UDim2.new(0,0,0,0))
-	elseif gesture_code == Enums.InputGestures.Down then
-		-- print("Down")
-		GestureIconRef = MouseIcon.Adorne(Assets.Images.UIArrow, 90, UDim2.new(0,0,0,0))
-	end
-
-	local icon_frame = GestureIconRef[1]
-	icon_frame.ImageTransparency = 1
-	IndicatorFadeInTween:Run(icon_frame, {Size = IndicatorSize, ImageTransparency = 0}, true)
-
-	if mod.DisplayMode == Enums.GestureDisplayMode.Temp then
-		IndicatorFadeOutTween:Run(icon_frame, {Size = UDim2.new(0, 0, 0, 0), ImageTransparency = 1}, true)
-	end
 end
 
 local LastDetectedGestureDir = 0
@@ -176,38 +109,13 @@ local function detect_gestures(mag_sig, angle_sig)
 
 	mod.LastGesture = input.KeyCode
 
-	display_gesture_dir(last_dir)
-
 	LastDetectedGestureDir = last_dir
 
 	return last_dir, total_mag
 end
 
-local DisplayModeStack = _G.Game.Maskables.Stack()
-	:OnTopValueChanged(function(wrapper)
-		local mode = if wrapper then wrapper[1] else Enums.GestureDisplayMode.Off
-		mod.DisplayMode = mode
-		display_gesture_dir(LastDetectedGestureDir)
-	end)
-	:FINISH()
-
--- Accepts something from Enums.GestureDisplayMode
-function mod.SetDisplayMode(mode: number)
-	local wrapper = { mode }
-	DisplayModeStack:set(wrapper)
-
-	return wrapper
-end
-
-function mod.UnsetDisplayMode(wrapper: table)
-	DisplayModeStack:remove(wrapper)
-end
-
 function mod:__init(G)
 	UserInput = G.Load("UserInput")
-	Roact = G.Load("Roact")
-	MouseIcon = G.Load("MouseIcon")
-	Assets = G.Load("Assets")
 end
 
 local SMOOTHING_SAMPLE_CT = 6
@@ -215,30 +123,8 @@ local SampleConfig = { }
 local alphabet = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z" }
 for i = 1, SMOOTHING_SAMPLE_CT, 1 do
 	if game:GetService("RunService"):IsStudio() then
-		local binding = DebugMenu.RegisterOverrideSlider(alphabet[i] .. "_MUL", 0.25, 0, 1, 0.01, "Z Transform")
-		table.insert(SampleConfig, binding)
-	end
-end
-
-local function update_bindings()
-	-- Find max value to calculate zoom
-	for _, sig in AllSignals do
-		local max = 0
-		local UIZoom = 1
-		local sig_buf = sig.Buffer
-		for i,v in ipairs(sig_buf) do
-			max = math.max(max, math.abs(v))
-		end
-
-		UIZoom = 0.5 / max
-
-		local sig_buf = sig.Buffer
-		local magnitude_bindings = sig.MagnitudeBindings
-
-		for i = 1, SIG_SAMPLE_LEN do
-			local raw = sig_buf:readFromFront(SIG_SAMPLE_LEN - i + 1)
-			magnitude_bindings[i](raw * UIZoom)
-		end
+		--[[ local binding = DebugMenu.RegisterOverrideSlider(alphabet[i] .. "_MUL", 0.25, 0, 1, 0.01, "Z Transform")
+		table.insert(SampleConfig, binding) ]]
 	end
 end
 
@@ -271,10 +157,6 @@ local function push_new_dt(dt: Vector3)
 	print(dt_vec2.Y, dt_vec2.X, "\n" .. ang) ]]
 	AngleSig.Buffer:push(math.atan2(dt_vec2.X, dt_vec2.Y))
 
-	if mod.DebugSignals then
-		update_bindings()
-	end
-
 	if MagSig.Buffer:getSize() < MagSig.Buffer.Length then
 		return
 	end
@@ -305,98 +187,9 @@ function mod.ConsumeDelta(dt: Vector3)
 	push_new_dt(dt)
 end
 
-
-
-
-local VisualizerComponent
-function mod:__ui(G, i, p)
-	I = i
-	P = p
-
-	local function init_signal(sig)
-		for i = 1, SIG_SAMPLE_LEN do
-			sig.Buffer:push(0)
-			local binding, updBinding = Roact.createBinding(0)
-			table.insert(sig.MagnitudeBindings, updBinding)
-
-			local f = I:Frame(P()
-				:Size(0, 5, 0, 5)
-				:BackgroundColor3(sig.Color)
-				:AnchorPoint(0.5, 0.5)
-				:Position(binding:map(function(v)
-					return UDim2.new(i / SIG_SAMPLE_LEN, 0, 0.5 + v, 0)
-				end))
-			)
-
-			table.insert(sig.SampleFrames, f)
-		end
-	end
-
-	local function init_signals(sig)
-		init_signal(sig)
-
-		if sig.FilteredSig then
-			init_signals(sig.FilteredSig)
-		end
-	end
-
-	for _, sig in SignalTree do
-		init_signals(sig)
-	end
-
-	local function vis_init(self)
-
-	end
-
-	local function vis_render(self)
-		local group_containers = {
-			I:Element("VerticalLayout", P()
-				:Padding(0, 8)
-			)
-		}
-		for i, v in SignalTree do
-			local c = I:Element("VisibleContainerFrame", P()
-				:Size(1, 0, 1 / #SignalTree, -8)
-				:LayoutOrder(i)
-			)
-
-			local function insert_tree(sig)
-				c:InsertChild(I:Fragment(sig.SampleFrames))
-				if sig.FilteredSig then
-					insert_tree(sig.FilteredSig)
-				end
-			end
-
-			insert_tree(v)
-
-			table.insert(group_containers, c)
-		end
-		
-		local container = I:Element("VisibleContainerFrame", P()
-			:Size(0.42, 0, 0.6, 0)
-			:AnchorPoint(1, 1)
-			:Position(1, -5, 0.9, 0)
-		):Children(
-			I:Fragment(group_containers)
-		)
-
-		return container
-	end
-
-	VisualizerComponent = I:Stateful("GestureSignalVis", I
-		:Init(vis_init)
-		:Render(vis_render)
-	)
-end
-
 function mod:__run()
-	if mod.DebugSignals then
-		Roact.mount(Roact.createElement(VisualizerComponent), game.Players.LocalPlayer.PlayerGui.BaseInterface_NoInset)
-	end
-
 	mod.IsReady = true
 end
-
 
 
 function mod:__tests(G, T)

@@ -193,24 +193,6 @@ local function signals_wrapper(module, name)
 	reset_context(prior_context)
 end
 
-local function load_data_wrapper(obj, name, data)
-	local prior_context = set_context(LOAD_CONTEXTS.LOAD_DATASTORES)
-	
-	-- we use the latest version for client loading
-	-- the server is responsible for handling the deserialization of different versions
-	-- the data the client recieves is serialized from the newest function
-	
-	local successA, successB = pcall(obj.DS3Versions[obj.DS3Versions.Latest], obj, data)
-	
-	if (not successA) or (not successB) then
-		warn("Error deserializing " .. name .. " on the client: ")
-		warn(successA)
-		warn(successB)
-	end
-	
-	reset_context(prior_context)
-end
-
 local function get_gamestate_wrapper(module, plr)
 	local s, r = pcall(function() return module.__no_lazymodules end)
 	if s and r then
@@ -510,11 +492,7 @@ function mod.Begin(Game, Main)
 		local CanContinue = Instance.new("BindableEvent")
 		
 		local ClientReadyEvent = game.ReplicatedStorage:WaitForChild("ClientReadyEvent")
-		ClientReadyEvent.OnClientEvent:Connect(function(packet)
-			local datastores, gamestate = table.unpack(packet)
-			
-			mod:__load_data(datastores)
-			
+		ClientReadyEvent.OnClientEvent:Connect(function(gamestate)
 			mod:__load_gamestate(gamestate, GameStateLoaded)
 			
 			while GameStateLoaded:is_awaiting() do
@@ -528,7 +506,6 @@ function mod.Begin(Game, Main)
 		local prior_context = set_context(LOAD_CONTEXTS.AWAITING_SERVER_DATA)
 		
 		ClientReadyEvent:FireServer()
-		
 		CanContinue.Event:Wait()
 		
 		reset_context(prior_context)
@@ -542,10 +519,12 @@ function mod.Begin(Game, Main)
 		local ClientReadyEvent = Instance.new("RemoteEvent")
 		ClientReadyEvent.Name = "ClientReadyEvent"
 		ClientReadyEvent.OnServerEvent:Connect(function(player)
-			-- @Setup Collect other clients' data as well for first arg
-			local other_client_datas = { }
+			while (not Game[player]) or (not Game[player].ServerLoaded) do
+				task.wait()
+			end
+			
 			local gamestate = mod:__get_gamestate(player)
-			ClientReadyEvent:FireClient(player, {other_client_datas, gamestate})
+			ClientReadyEvent:FireClient(player, gamestate)
 		end)
 		
 		ClientReadyEvent.Parent = game.ReplicatedStorage
@@ -590,18 +569,6 @@ function mod:__init(G)
 	end
 
 	self.Initialized = true
-end
-
-
-function mod:__load_data(data)
-	-- TODO: Bring back this functionality
---[[ 	for i = 1, #Game._data_object_names do
-		local names = Game._data_object_names[i]
-		
-		local name, storeName = names[1], names[2]
-		
-		load_data_wrapper(CollectedModules[name], name, data[storeName])
-	end ]]
 end
 
 function mod:__get_gamestate(plr)

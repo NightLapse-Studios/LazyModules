@@ -125,10 +125,9 @@ Config.ModuleCollectionFolders = {
     if RunService:IsServer() then game.ServerScriptService else game.StarterPlayer.StarterPlayerScripts
 }
 Config.ModuleCollectionBlacklist = {
-    game.ReplicatedFirst.Modules.Roact,
+    game.ReplicatedFirst.Util.Roact,
     game.ReplicatedFirst.Util.LazyModules,
     Server = {
-        game.ReplicatedFirst.Modules.GUI,
         game.ReplicatedFirst.Util.UserInput
     },
     Client = {

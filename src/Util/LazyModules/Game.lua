@@ -19,8 +19,7 @@ LazyModules.CollectModules(Game)
 -- Data synced this way will be available by _G.Game[plr][<module_name>]
 do
 	local Players = Game.PreLoad(game.ReplicatedFirst.Modules.Players)
-	Players.RegisterPlayerDataModule(game.ReplicatedFirst.Modules.PlayerStats)
-	Players.RegisterPlayerDataModule(game.ReplicatedFirst.Modules.PlayerInventory)
+	--Players.RegisterPlayerDataModule(PathToModule)
 end
 
 if Game.CONTEXT == "CLIENT" then
@@ -32,7 +31,7 @@ if Game.CONTEXT == "CLIENT" then
 	character:WaitForChild("Humanoid")
 	local fired = false
 	local b = Instance.new("BindableEvent")
-	Game.PreLoad(game.ReplicatedFirst.Modules.Instances).OnAllLoaded(character, function()
+	Game.PreLoad(game.ReplicatedFirst.Util.Instances).OnAllLoaded(character, function()
 		fired = true
 		b:Fire()
 	end)

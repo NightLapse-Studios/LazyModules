@@ -538,7 +538,7 @@ function PropSet:Border(thick, color)
 	self:Children(
 		I:UIStroke(P()
 			:ApplyStrokeMode(Enum.ApplyStrokeMode.Border)
-			:Color(color or Style.SecondaryColor2)
+			:Color(color or Color3.new(0, 0, 0))
 			:Thickness(thick or 2)
 		)
 	)
@@ -621,7 +621,7 @@ function PropSet:AspectRatioProp(ratio)
 	self:Children(
 		I:UIAspectRatioConstraint(P()
 			:AspectRatio(ratio)
-		))
+		)
 	)
 
 	return self
@@ -768,7 +768,7 @@ local function getMaxSize(rbx: TextLabel, constantText)
 	local font = rbx.Font
 
 	local maxSize = 100
-	local minSize = font == Style.LabelFont and 7 or 11
+	local minSize = 11
 	
 	local absMinSize = minSize
 	
@@ -1084,8 +1084,6 @@ end
 
 
 function I:__init(G)
-	Style = G.Load(game.ReplicatedFirst.Modules.GUI.Style)
-	
 	local roactType = Roact.Type
 	
 	-- create :[propName]() functions
