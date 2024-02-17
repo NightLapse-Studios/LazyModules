@@ -201,13 +201,16 @@ end
 Table.Clear2 = table.clear
 
 function Table.Max(Tbl, compute)
-	local values = Tbl
+	local values
 	
 	if compute then
-		for i, v in values do
+		values = {}
+		for i, v in Tbl do
 			local value = compute(i, v)
 			values[i] = value
 		end
+	else
+		values = Tbl
 	end
 	
 	local maxIndex, maxV
@@ -228,13 +231,17 @@ function Table.Max(Tbl, compute)
 end
 
 function Table.Min(Tbl, compute)
-	local values = Tbl
+	local values
 	
 	if compute then
+		values = {}
+		
 		for i, v in values do
 			local value = compute(i, v)
 			values[i] = value
 		end
+	else
+		values = Tbl
 	end
 	
 	local minIndex, minV

@@ -79,8 +79,10 @@ function mod.DebugGlobalAxis(model: Model|BasePart, wait, dist)
 end
 
 function mod.VisualizeLine(pos1, pos2, color, thickness, extra_data, singular_name)	
-	local length = (pos1 - pos2).Magnitude
-	local cf = CFrame.new(pos1, pos1 + pos2) * CFrame.new(0, 0, -math.abs(length / 2))
+	local vector = pos1 - pos2
+	local length = vector.Magnitude
+	local midPoint = (pos1 + pos2) * 0.5
+	local cf = CFrame.lookAt(midPoint, midPoint + vector)
 	local size = Vector3.new(thickness, thickness, length)
 	
 	return mod.MarkSpotDbg(cf, color, size, extra_data, singular_name)

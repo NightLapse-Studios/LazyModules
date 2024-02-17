@@ -271,32 +271,7 @@ src
 			🟡GestureDetector.lua
 			🟡Mobile.lua
 	📁 shared
-		🟢Assets.lua
-		🟢Audio.lua
-		⚫ExpressionParser.lua
-		⚫Math.lua
-		🟢MouseIcon.lua
-		⚫Soundmap.lua
-		⚫Strings.lua
-		🟢Tweens.lua
-		📁 GUI
-			⚫init.lua
-			⚫Checkbox.lua
-			⚫ColorPicker.lua
-			⚫Dialogue.lua
-			⚫DropDownContainer.lua
-			⚫DropDownSelector.lua
-			⚫ScreenFocusUtil.lua
-			⚫Slider.lua
-			⚫Style.lua
-			⚫Textbox.lua
-			⚫ToolTipUI.lua
-			⚫Windows.lua
-	📁 replicated_first
-		🟢Mouse.rbxm
-	📁 replicated_storage
-		🟢GUIs.rbxm
-		🟡RectangularArrow.rbxm (model needs to be aligned with default pivot)
+		
 ```
 
 
