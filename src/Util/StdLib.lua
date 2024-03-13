@@ -5,7 +5,7 @@
 local Game = _G.Game
 assert(Game, "StdLib is running prior to LazyModules initialization\n\tOr LazyModules is not running as expected")
 
-local Config = require(game.ReplicatedFirst.Util.BUILDCONFIG)
+local Config = require(game.ReplicatedFirst.Util.Config)
 
 local mod = { }
 local Libs = {
@@ -14,7 +14,7 @@ local Libs = {
 	Debug = Game.PreLoad(game.ReplicatedFirst.Util.Debug),
 	DebugMenu = Game.PreLoad(game.ReplicatedFirst.Util.Debug.DebugMenu),
 	Maskables = Game.PreLoad(game.ReplicatedFirst.Util.Maskables),
-	Config = Game.PreLoad(game.ReplicatedFirst.Util.BUILDCONFIG),
+	Config = Game.PreLoad(game.ReplicatedFirst.Util.Config),
 }
 
 local function print_s(...)

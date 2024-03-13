@@ -79,7 +79,8 @@ local LOAD_CONTEXTS = require(game.ReplicatedFirst.Util.Enums).LOAD_CONTEXTS
 local CONTEXT = mod.CONTEXT
 local SOURCE_NAME = debug.info(function() return end, "s")
 
-local config = require(game.ReplicatedFirst.Util.BUILDCONFIG)
+local Roact = require(game.ReplicatedFirst.Util.Roact)
+local Config = require(game.ReplicatedFirst.Util.Config)
 local AsyncList = require(game.ReplicatedFirst.Util.AsyncList)
 
 local depth = 0
@@ -193,24 +194,6 @@ local function signals_wrapper(module, name)
 	reset_context(prior_context)
 end
 
-local function load_data_wrapper(obj, name, data)
-	local prior_context = set_context(LOAD_CONTEXTS.LOAD_DATASTORES)
-	
-	-- we use the latest version for client loading
-	-- the server is responsible for handling the deserialization of different versions
-	-- the data the client recieves is serialized from the newest function
-	
-	local successA, successB = pcall(obj.DS3Versions[obj.DS3Versions.Latest], obj, data)
-	
-	if (not successA) or (not successB) then
-		warn("Error deserializing " .. name .. " on the client: ")
-		warn(successA)
-		warn(successB)
-	end
-	
-	reset_context(prior_context)
-end
-
 local function get_gamestate_wrapper(module, plr)
 	local s, r = pcall(function() return module.__no_lazymodules end)
 	if s and r then
@@ -286,14 +269,12 @@ local function ui_wrapper(module, name)
 
 	local prior_context = set_context(LOAD_CONTEXTS.RUN)
 
-	local builder = UI:Builder( name )
-
 	-- Note that UI will not exist on server contexts
-	if config.LogUIInit then
+	if Config.LogUIInit then
 		print(" -- > UI INIT: " .. name)
 	end
 
-	module:__ui(Game, builder, UI.P)
+	module:__ui(Game, UI, UI.P, Roact)
 	reset_context(prior_context)
 end
 
@@ -317,7 +298,7 @@ local function try_init(module, name, astrisk)
 		Initialized[name] = true
 		depth += 1
 
-		if config.LogLoads then
+		if Config.LogLoads then
 			print(indent() .. name .. astrisk)
 		end
 
@@ -373,7 +354,7 @@ function mod.PreLoad(script: Instance, opt_name: string?): any
 
 	local module = CollectedModules[opt_name]
 	if not module then
-		if config.LogPreLoads then
+		if Config.LogPreLoads then
 			print(opt_name)
 		end
 
@@ -437,8 +418,8 @@ end
 
 
 
-local CollectionBlacklist = config.ModuleCollectionBlacklist
-local ContextCollectionBlacklist = if CONTEXT == "SERVER" then config.ModuleCollectionBlacklist.Server else config.ModuleCollectionBlacklist.Client
+local CollectionBlacklist = Config.ModuleCollectionBlacklist
+local ContextCollectionBlacklist = if CONTEXT == "SERVER" then Config.ModuleCollectionBlacklist.Server else Config.ModuleCollectionBlacklist.Client
 
 local function recursive_collect(instance: Instance)
 	for _,v in instance:GetChildren() do
@@ -475,7 +456,7 @@ end
 
 
 function mod.CollectModules(Game)
-	for _, dir in config.ModuleCollectionFolders do
+	for _, dir in Config.ModuleCollectionFolders do
 		recursive_collect(dir)
 	end
 end
@@ -512,11 +493,7 @@ function mod.Begin(Game, Main)
 		local CanContinue = Instance.new("BindableEvent")
 		
 		local ClientReadyEvent = game.ReplicatedStorage:WaitForChild("ClientReadyEvent")
-		ClientReadyEvent.OnClientEvent:Connect(function(packet)
-			local datastores, gamestate = table.unpack(packet)
-			
-			mod:__load_data(datastores)
-			
+		ClientReadyEvent.OnClientEvent:Connect(function(gamestate)
 			mod:__load_gamestate(gamestate, GameStateLoaded)
 			
 			while GameStateLoaded:is_awaiting() do
@@ -530,7 +507,6 @@ function mod.Begin(Game, Main)
 		local prior_context = set_context(LOAD_CONTEXTS.AWAITING_SERVER_DATA)
 		
 		ClientReadyEvent:FireServer()
-		
 		CanContinue.Event:Wait()
 		
 		reset_context(prior_context)
@@ -544,10 +520,12 @@ function mod.Begin(Game, Main)
 		local ClientReadyEvent = Instance.new("RemoteEvent")
 		ClientReadyEvent.Name = "ClientReadyEvent"
 		ClientReadyEvent.OnServerEvent:Connect(function(player)
-			-- @Setup Collect other clients' data as well for first arg
-			local other_client_datas = { }
+			while (not Game[player]) or (not Game[player].ServerLoaded) do
+				task.wait()
+			end
+			
 			local gamestate = mod:__get_gamestate(player)
-			ClientReadyEvent:FireClient(player, {other_client_datas, gamestate})
+			ClientReadyEvent:FireClient(player, gamestate)
 		end)
 		
 		ClientReadyEvent.Parent = game.ReplicatedStorage
@@ -555,8 +533,8 @@ function mod.Begin(Game, Main)
 	
 	--We do this last so that UI and stuff can be set up too. Even game processes over large periods of time can
 	-- potentially be tested
-	if config.TESTING ~= false then
-		assert(config.TESTING == true or config.TESTING == "CLIENT" or config.TESTING == "SERVER")
+	if Config.TESTING ~= false then
+		assert(Config.TESTING == true or Config.TESTING == "CLIENT" or Config.TESTING == "SERVER")
 		mod:__tests(Game)
 	end
 
@@ -592,18 +570,6 @@ function mod:__init(G)
 	end
 
 	self.Initialized = true
-end
-
-
-function mod:__load_data(data)
-	-- TODO: Bring back this functionality
---[[ 	for i = 1, #Game._data_object_names do
-		local names = Game._data_object_names[i]
-		
-		local name, storeName = names[1], names[2]
-		
-		load_data_wrapper(CollectedModules[name], name, data[storeName])
-	end ]]
 end
 
 function mod:__get_gamestate(plr)
@@ -671,6 +637,8 @@ function mod:__tests(G)
 end
 
 function mod:__run(G)
+	local ui_tasks = {}
+	
 	for i,v in PreLoads do
 		if typeof(v == "table") then
 			--Roact managed to ruin everything
@@ -678,9 +646,25 @@ function mod:__run(G)
 			if CONTEXT == "CLIENT" then
 				s, r = pcall(function() return v.__ui end)
 				if s and r then
-					ui_wrapper(v, i)
+					table.insert(ui_tasks, task.spawn(ui_wrapper, v, i))
 				end
 			end
+		end
+	end
+	
+	while true do
+		local do_wait = false
+		for _, thread in ui_tasks do
+			if coroutine.status(thread) ~= "dead" then
+				do_wait = true
+				break
+			end
+		end
+		
+		if do_wait then
+			task.wait()
+		else
+			break
 		end
 	end
 	

@@ -11,9 +11,36 @@ local Configurator = Meta.CONFIGURATOR({ __index = MaskableStack })
 	:SETTER(META_CONTEXTS.BOTH, "OnTopValueChanged", "__OnTopValueChanged")
 	:FINISH()
 
-function MaskableStack:set(thing: any)
+function MaskableStack:__getTopValue()
+	local highestPriority = 0
+	local topThing = nil
+	
+	for i = #self.stack, 1, -1 do
+		local thing = self.stack[i]
+		local priority = self.priorities[thing]
+		
+		if priority > highestPriority then
+			topThing = thing
+			highestPriority = priority
+		end
+	end
+	
+	return topThing
+end
+
+function MaskableStack:set(thing: any, priority: number)
+	priority = priority or 1
+	
+	self.priorities[thing] = priority
+	
 	table.insert(self.stack, thing)
-	self.__OnTopValueChanged(self.stack[#self.stack])
+	
+	local newTopValue = self:__getTopValue()
+	
+	if newTopValue ~= self.topValue then
+		self.topValue = newTopValue
+		self.__OnTopValueChanged(self.topValue)
+	end
 end
 
 function MaskableStack:remove(thing: any)
@@ -24,21 +51,27 @@ function MaskableStack:remove(thing: any)
 		return
 	end
 
-	local was_top = idx == #self.stack
+	local was_top = self.topValue == thing
 	table.remove(self.stack, idx)
 
+	self.priorities[thing] = nil
+	
 	if was_top then
-		self.__OnTopValueChanged(self.stack[#self.stack])
+		self.topValue = self:__getTopValue()
+		self.__OnTopValueChanged(self.topValue)
 	end
 end
 
 function MaskableStack:forceUpdate()
-	self.__OnTopValueChanged(self.stack[#self.stack])
+	self.__OnTopValueChanged(self.topValue)
 end
 
 function mod.Stack()
 	local t = {
+		topValue = nil,
 		stack = { },
+		priorities = { },
+		
 		__OnTopValueChanged = no_op_func
 	}
 

@@ -43,7 +43,6 @@ local PlayerScripts = if IsServer then false else game.Players.LocalPlayer.Playe
 local CONTEXT = IsServer and "SERVER" or "CLIENT"
 
 --event abstraction modules
-local GameEvent
 local Transmitter
 local Broadcaster
 local Event
@@ -51,7 +50,6 @@ local Event
 --lists
 local Transmitters
 local Broadcasters
-local GameEvents
 local Events
 
 local WaitingList
@@ -67,17 +65,6 @@ function mod:GetEvent(identifier, cb, force_context: string?)
 	local success = Event.Events.Identifiers:get(identifier, cb)
 	if not success then
 		error("\nEvent: " .. mod.CurrentModule .. " " .. identifier)
-	end
-end
-
-function mod:GetGameEvent(verb, noun, cb, force_context: string)
-	if force_context and force_context ~= Globals.CONTEXT then
-		return
-	end
-
-	local success = GameEvent.GameEvents.Verbs:get(verb, noun, cb)
-	if not success then
-		error("\nGameEvent: " .. mod.CurrentModule .. " " .. verb .. " " .. noun)
 	end
 end
 
@@ -139,8 +126,6 @@ local mt_ServerBroadcaster
 local mt_ClientBroadcaster
 local mt_ServerEvent
 local mt_ClientEvent
-local mt_ServerGameEvent
-local mt_ClientGameEvent
 
 function mod:__init(G, LazyModules)
 	Globals = G
@@ -155,12 +140,10 @@ function mod:__init(G, LazyModules)
 	PSA = require(ReplicatedFirst.Util.SparseList)
 	WaitingList = PSA.new()
 
-	GameEvent = require(script.GameEvent)
 	Transmitter = require(script.Transmitter)
 	Broadcaster = require(script.Broadcaster)
 	Event = require(script.Event)
 
-	GameEvent:__init(G, mod)
 	Transmitter:__init(G, mod)
 	Broadcaster:__init(G, mod)
 	Event:__init(G, mod)
@@ -169,19 +152,15 @@ function mod:__init(G, LazyModules)
 	mt_ServerTransmitter = Transmitter.server_mt
 	mt_ClientBroadcaster = Broadcaster.client_mt
 	mt_ServerBroadcaster = Broadcaster.server_mt
-	mt_ClientGameEvent = GameEvent.client_mt
-	mt_ServerGameEvent = GameEvent.server_mt
 	mt_ClientEvent = Event.client_mt
 	mt_ServerEvent = Event.server_mt
 
 	mod.NewEvent = Event.NewEvent
-	mod.NewGameEvent = GameEvent.NewGameEvent
 	mod.NewTransmitter = Transmitter.NewTransmitter
 	mod.NewBroadcaster = Broadcaster.NewBroadcaster
 
 	Transmitters = Transmitter.Transmitters
 	Broadcasters = Broadcaster.Broadcasters
-	GameEvents = GameEvent.GameEvents
 	Events = Event.Events
 end
 
@@ -212,7 +191,6 @@ end
 function mod.BuildSignals(G)
 	local wait_dur = 0
 	wait_dur += wait_for(Event.Events.Identifiers)
-	wait_dur += wait_for(GameEvent.GameEvents.Identifiers)
 	wait_dur += wait_for(Transmitter.Transmitters.Identifiers)
 	wait_dur += wait_for(Broadcaster.Broadcasters.Identifiers)
 
@@ -256,26 +234,6 @@ function mod.BuildSignals(G)
 		end
 	end
 
-	for module, identifers in GameEvents.Modules.provided do
-		for ident, event in identifers do
-			local transmitter_str = "GameEvent `" .. module .. "::" .. ident .. "` "
-
-			event:Build()
-
-			for i,v in event.Implications do
-				if typeof(v) == "string" then
-					warn(transmitter_str .. "has unresolved implication for `" .. event.Verb .. "`\n\n(GameEvent `" .. event.Verb .. " " .. i .. "` does not exist)\n")
-				end
-			end
-
-			if CONTEXT == "CLIENT" then
-				setmetatable(event, mt_ClientGameEvent)
-			elseif CONTEXT == "SERVER" then
-				setmetatable(event, mt_ServerGameEvent)
-			end
-		end
-	end
-
 	for module, identifers in Events.Modules.provided do
 		for ident, event in identifers do
 			if CONTEXT == "CLIENT" then
@@ -303,11 +261,6 @@ function mod.BuildSignals(G)
 			end
 		end
 		for module, identifers in Broadcasters.Modules.provided do
-			for _, event in identifers do
-				__monitor(event)
-			end
-		end
-		for module, identifers in GameEvents.Modules.provided do
 			for _, event in identifers do
 				__monitor(event)
 			end

@@ -1,21 +1,22 @@
---!strict
+-- Uncomment as needed.
+
 local ReplicatedFirst = game.ReplicatedFirst
+local StarterGui = game:GetService("StarterGui")
 
 local Loader = { }
 
-local StarterGui = game:GetService("StarterGui")
-StarterGui:ClearAllChildren()
-
 --[[ Start the loading screen ]]
--- @Setup
-ReplicatedFirst:RemoveDefaultLoadingScreen()
 
+--ReplicatedFirst:RemoveDefaultLoadingScreen()
 
 local function DisableCoreGuis()
-	StarterGui:ClearAllChildren()
-	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
-	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
-	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.EmotesMenu, false)
+	--StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	--StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Captures, false)
+	--StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, false)
+	--StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.EmotesMenu, false)
+	--StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
+	--StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+	--StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.SelfView, false)
 end
 
 
@@ -28,6 +29,5 @@ if not Success then
 end
 
 -- Turn off loading screen
--- @Setup
 
 return Loader

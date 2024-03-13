@@ -120,43 +120,45 @@ end
 
 7) Roact++
 
-	Perhaps the craziest thing we did was make a wrapper and expansion for Roact. Check [DebugMenu.lua](src/Util/Debug/DebugMenu.lua) for a practical stateful UI example, and [UI.lua](src/Util/LazyModules/UI.lua) + [createElement.lua](src/shared/Roact/createElement.lua) for most implementation.
+	Perhaps the craziest thing we did was make a wrapper and expansion for Roact. Check [DebugMenu.lua](src/Util/Debug/DebugMenu.lua) for a practical stateful UI example, and [UI.lua](src/Util/LazyModules/UI.lua) for most implementation.
 
 	UI has its own build step which runs just before `__run` (`__ui` is second to last). UI has its own step because it is nice ergonomically and, in theory, would encourage deep UI integration with systems.
-
 ```lua
--- I for IFrame I guess
+-- I for IFrame or UI
 -- P for Props
 function mod:__ui(G, I, P)
 	-- P() opens up a new prop set.
 	local element = I:Frame(P()
 		-- With automatic constructors, we don't have to type UDim2.new anymore :^)
 		:Size(0.5, 0, 0.5, 0)
-		-- YESSIR THIS IS WHAT WE CAME FOR
-		:JustifyLeft(0, 5)
 		:BackgroundColor3(0.1, 0.2, 0.1)
-		-- Automatic constructors have a version which accepts an object instead
-		:BackgroundColor3_Raw(Color3.new(0.1, 0.2, 0.1))
-		:Children(
-			-- Inline compatibility with roact
-			Roact.createElement("Frame", {
-				Size = UDim2.new(1, 0, 1, 0)
-			}, {
-				-- you can graduallly port UI with this level of compatibility
-				I:Frame(P()
-					:Size(1, 0, 1, 0)
-				)
-			})
-		)
-
+		-- Passing in the object directly still works though, passing in bindings directly works as well.
+		:BackgroundColor3(Color3.new(0.1, 0.2, 0.1))
+		
+		-- We can also define custom functions that directly edit this propset.
+		:JustifyLeft(0, 5)
+		
+		-- for advanced custom components, you may need to pass in custom props.
 		:Prop("CustomProp", 100)
+	):Children(
+		-- Inline compatibility with roact for porting easability.
+		Roact.createElement("Frame", {
+			Size = UDim2.new(1, 0, 1, 0)
+		}, {
+			-- you can graduallly port UI with this level of compatibility
+			I:Frame(P()
+				:Size(1, 0, 1, 0)
+			)
+		})
 	)
+	
+	
 end
 ```
 
 8) In-file testing
 
-	Another landmark feature for LM is an in-file startup step which can run tests. It runs after `__run` and can be toggled from BUILDCONFIG.lua. Like TestEZ, it can focus on specific files.
+	Another landmark feature for LM is an in-file startup step which can run tests. It runs after `__run` and can be toggled from Config.lua. Like TestEZ, it can focus on specific files.
 
 ```lua
 function module:__tests(G, T)
@@ -229,7 +231,7 @@ src
 		🟢APIUtils.lua
 		🟢AssociativeList.lua
 		🟢AsyncList.lua
-		🟢BUILDCONFIG.lua
+		🟢Config.lua
 		🟢CircleBuffer.lua
 		🟢Enums.lua
 		🟡Error.lua
@@ -269,32 +271,7 @@ src
 			🟡GestureDetector.lua
 			🟡Mobile.lua
 	📁 shared
-		🟢Assets.lua
-		🟢Audio.lua
-		⚫ExpressionParser.lua
-		⚫Math.lua
-		🟢MouseIcon.lua
-		⚫Soundmap.lua
-		⚫Strings.lua
-		🟢Tweens.lua
-		📁 GUI
-			⚫init.lua
-			⚫Checkbox.lua
-			⚫ColorPicker.lua
-			⚫Dialogue.lua
-			⚫DropDownContainer.lua
-			⚫DropDownSelector.lua
-			⚫ScreenFocusUtil.lua
-			⚫Slider.lua
-			⚫Style.lua
-			⚫Textbox.lua
-			⚫ToolTipUI.lua
-			⚫Windows.lua
-	📁 replicated_first
-		🟢Mouse.rbxm
-	📁 replicated_storage
-		🟢GUIs.rbxm
-		🟡RectangularArrow.rbxm (model needs to be aligned with default pivot)
+		
 ```
 
 

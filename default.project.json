@@ -1,5 +1,8 @@
 {
   "name": "LazyModules Project",
+  "servePlaceIds": [
+		111111
+	],
   "tree": {
     "$className": "DataModel",
     "$ignoreUnknownInstances": true,

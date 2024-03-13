@@ -1,32 +1,25 @@
---!strict
-
 --[[
-	--TODO: This got messy after I started moving functionality into `Roact::createElement` module
-		(which used to only be a function).
-		This file needs some cleanup/organizing but whatever
-
-
 	Unlike most things in the Util folder, this file has the normal lifecycle and but it does so through a manual
 	call to G.LightLoad from LazyModules since it's part of that system
 
-	StdElements are available for use after the __ui pass, although they can be used earlier but the timing of their
+	Elements are available for use after the __ui pass, although they can be used earlier but the timing of their
 	initialization is not guaranteed. They will become available in whichever order modules happen to be loaded.
 
 	** See mod:__finalize for further docs.
 
-	** See Menu.lua for some usage examples, including StdElements.
+	** See Menu.lua for some usage examples, including Elements.
 
-	** See GUI.lua for examples of how to register StdElements.
+	** See GUI.lua for examples of how to register Elements.
 
 	Tweens:
-			Tweens play when they are mounted, they are bindings.
+			Tweens play when they are mounted, they are an extension to bindings.
 			If they are unmounted, their motor still runs, but the sequence will not advance to the next step until mounted again.
 
 			@param start default 0, should be a number
 			@return a tween sequence for chain definitions
 			I:Tween(start)
 
-			--Motor chains, occur when the previous step is complete.
+			--Motor chains. Start when the previous step is complete.
 			:spring(target, frequency, dampingRatio)
 			:linear(target, velocity)
 			:instant(target)
@@ -39,153 +32,187 @@
 			:repeatThis(count) -- repeats the last chained object for count times.
 			:pause(t) -- adds a chain which pauses the tween sequence for t seconds before continuing.
 
-			-- external use
-			:wipe() -- clears the tween sequence
-			:reset() -- resets the tween sequence completely.
-			:pause() -- pauses the playing of the chain and and the motor and all.
-			:resume() -- resumes playing of the chain.
+			-- external
+			:wipe() -- wipes the tween sequence and puts the motor back to its initial value
+			:reset() -- resets the tween sequence again at the start of the chain and initial value of the motor.
+			:pause() -- pauses the playing of the chain and motor.
+			:resume() -- resumes playing of the chain and motor.
+			:skip() -- skips to the next step in the chain, without changing the value of the motor.
+			:jump() -- skips to the next step in the chain, and starts the motor at the target_value of the step being jumped.
 
-			most likely you will do like this
-				local tween = I:Tween():[initial chain played upon mount]
-
-				TextColor = tween:map(I:ColorMap(c1, c2)),
-
-				eg_playerClicked = function()
-					tween:wipe():linear()
-					or just
-					tween:reset()
-				end
+			@examples
+				-- a tween that when mounted will oscilate between 0 and 1, forever.
+				local tween = I:Tween(0):spring(1, 4, 0)
+				
+				-- because tweens are bindings, we can map them or join them.
+				I:Frame(P()
+					:Size(tween:map(function(v)
+						return UDim2.new(v, 0, v, 0)
+					))
+				)
+				
+				-- tweens can be controlled externally like so
+				-- in this example, everytime the button is clicked, the tween will go to 0 (the start value), then go linearly to 1
+				I:ImageButton(P()
+					:Activated(function()
+						tween:wipe():linear(1, 4)
+					end)
+				)
 ]]
 
-local mod = {
-	Events = {
-		Types = { },
-		Modules = { }
-	}
-}
+local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
 
-local Style
-local safe_require
-
-local IsServer = game:GetService("RunService"):IsServer()
-
-local Roact = require(game.ReplicatedFirst.Modules.Roact)
+local IsServer = RunService:IsServer()
 local CONTEXT = IsServer and "SERVER" or "CLIENT"
 
+local I = {
+	Type = "Builder",
+	Context = CONTEXT,
+}
+
+setmetatable(I, {
+	__index = function(t, index)
+		return function(...)
+			local total = 0
+			repeat total += task.wait() until (rawget(t, index) or total > 1)
+			
+			if not rawget(t, index) then
+				error(index .. " is not registered")
+			end
+			
+			return rawget(t, index)(...)
+		end
+	end
+})
+
+local Roact = require(game.ReplicatedFirst.Util.Roact)
+local ClassicSignal = require(game.ReplicatedFirst.Util.ClassicSignal)
+
+-- differentiate between color3 and colorSequence
+local function decodeColors(...)
+	local args = {...}
+	
+	if type(args[1]) == "number" then
+		if #args == 3 then
+			return Color3.new(args[1], args[2], args[3])
+		else
+			local seq = {}
+			
+			for i = 1, #args, 2 do
+				table.insert(seq, ColorSequenceKeypoint.new(args[i], args[i + 1]))
+			end
+			
+			return ColorSequence.new(seq)
+		end
+	else
+		-- Color3 was passed in
+		return args[1]
+	end
+end
+
+-- differentiate between float and float sequence
+local function decodeNumbers(...)
+	local args = {...}
+	
+	if #args == 1 then
+		return args[1]
+	else
+		local seq = {}
+		
+		for i = 1, #args, 3 do
+			table.insert(seq, NumberSequenceKeypoint.new(args[i], args[i + 1], args[i + 3]))
+		end
+		
+		return NumberSequence.new(seq)
+	end
+end
+
+-- differentiate between UDim2 and UDim
+local function decodeUDims(...)
+	local args = {...}
+	
+	if #args == 4 then
+		return UDim2.new(args[1], args[2], args[3], args[4])
+	elseif #args == 2 then
+		return UDim.new(args[1], args[2])
+	else
+		return args[1]
+	end
+end
+
 local TypeBindings = {
-	UDim = UDim.new,
-	UDim2 = UDim2.new,
 	Vector2 = Vector2.new,
 	Vector3 = Vector3.new,
-	Color3 = Color3.new,
 	Rect = Rect.new,
-	--LocalizationTable = LocalizationService:
-	Event = "Event",
-	Enum = "Enum",
+	
+	-- Some classes have the same property names as other classes, but different types.
+	-- we have to treat them as if they are the same type, and interpret the paramaters to differentiate bettwen types.
+	ColorSequence = decodeColors,
+	Color3 = decodeColors,
+	
+	float = decodeNumbers,
+	NumberSequence = decodeNumbers,
+	
+	UDim = decodeUDims,
+	UDim2 = decodeUDims,
+	
+	-- just for clarity, servers no interpretation purpose in the code.
 	bool = "primitive",
 	int = "primitive",
-	float = "primitive",
 	string = "primitive",
 	Content = "primitive",
-	LocalizationTable = "reference",
+	
 	GuiObject = "reference",
-	SelectionImageObject = "reference",
-	Activated = "Event",
-	MouseButton1Click = "Event",
-	MouseButton1Down = "Event",
-	MouseButton1Up = "Event",
-	MouseButton2Click = "Event",
-	MouseButton2Down = "Event",
-	MouseButton2Up = "Event",
-	MouseEnter = "Event",
-	MouseLeave = "Event",
-	FocusLost = "Event",
-	Focused = "Event",
-	ReturnPressedFromOnScreenKeyboard = "Event",
-	DidLoop = "Event",
-	Ended = "Event",
-	Loaded = "Event",
-	Paused = "Event",
-	Played = "Event",
-	PageEnter = "Event",
-	PageLeave = "Event",
-	Stopped = "Event",
---[[ 	Color = "ColorSequence",
-	Enabled = "bool",
-	Offset = "Vector2",
-	Rotation = "float",
-	Transparency = "NumberSequence",
-	CornerRadius = "UDim",
-	MaxTextSize = "int",
-	MinTextSize = "int",
-	MaxSize = "Vector2",
-	MinSize = "Vector2",
-	AspectRatio = "float",
-	AspectType = "Enum",
-	DominantAxis = "Enum",
-	FillDirection = "Enum",
-	HorizontalAlignment = "Enum",
-	SortOrder = "Enum",
-	VerticalAlignment = "Enum",
-	CellPadding = "UDim2",
-	CellSize = "UDim2",
-	FillDirectionMaxCells = "int",
-	StartCorner = "Enum",
-	Padding = "UDim",
-	Animated = "bool",
-	Circular = "bool",
-	EasingDirection = "Enum",
-	EasingStyle = "Enum",
-	TweenTime = "float",
-	GamepadInputEnabled = "bool",
-	ScrollWheelInputEnabled = "bool",
-	TouchInputEnabled = "bool",
-	FillEmptySpaceColumns = "bool",
-	FillEmptySpaceRows = "bool",
-	MajorAxis = "Enum",
-	PaddingBottom = "UDim",
-	PaddingLeft = "UDim",
-	PaddingRight = "UDim",
-	PaddingTop = "UDim",
-	Scale = "float",
-	ApplyStrokeMode = "Enum",
-	LineJoinMode = "Enum",
-	Thickness = "float", ]]
+	Instance = "reference",
+	LocalizationTable = "reference",
+	
+	-- Roact.Event
+	Event = "Event",
+	
+	-- overwritten below to functions that support strings
 	[Enum.SelectionBehavior] = "Enum",
-	[Enum.SelectionBehavior] = "Enum",
-	[Enum.SelectionBehavior] = "Enum",
-	[Enum.SelectionBehavior] = "Enum",
-	[Enum.AutomaticSize] = "Enum",
 	[Enum.BorderMode] = "Enum",
 	[Enum.SizeConstraint] = "Enum",
 	[Enum.FrameStyle] = "Enum",
 	[Enum.ResamplerMode] = "Enum",
 	[Enum.ScaleType] = "Enum",
-	[Enum.TextTruncate] = "Enum",
-	[Enum.TextXAlignment] = "Enum",
-	[Enum.TextYAlignment] = "Enum",
-	[Enum.ResamplerMode] = "Enum",
-	[Enum.ScaleType] = "Enum",
-	[Enum.TextTruncate] = "Enum",
-	[Enum.TextXAlignment] = "Enum",
-	[Enum.TextYAlignment] = "Enum",
 	[Enum.AutomaticSize] = "Enum",
 	[Enum.ElasticBehavior] = "Enum",
-	[Enum.ScrollBarInset] = "Enum",
 	[Enum.ScrollingDirection] = "Enum",
 	[Enum.ScrollBarInset] = "Enum",
 	[Enum.VerticalScrollBarPosition] = "Enum",
 	[Enum.TextTruncate] = "Enum",
 	[Enum.TextXAlignment] = "Enum",
 	[Enum.TextYAlignment] = "Enum",
-	NextSelectionDown = "reference",
-	NextSelectionLeft = "reference",
-	NextSelectionRight = "reference",
-	NextSelectionUp = "reference",
+	[Enum.AspectType] = "Enum",
+	[Enum.DominantAxis] = "Enum",
+	[Enum.FillDirection] = "Enum",
+	[Enum.HorizontalAlignment] = "Enum",
+	[Enum.SortOrder] = "Enum",
+	[Enum.VerticalAlignment] = "Enum",
+	[Enum.StartCorner] = "Enum",
+	[Enum.EasingDirection] = "Enum",
+	[Enum.EasingStyle] = "Enum",
+	[Enum.TableMajorAxis] = "Enum",
+	[Enum.ApplyStrokeMode] = "Enum",
+	[Enum.LineJoinMode] = "Enum",
+	[Enum.ZIndexBehavior] = "Enum",
 }
 
--- @TODO @IMPORTANT: fix same property different types. currently for these you must do _Raw for function types or just provide the raw for primitive types,
--- next to them there is a comment saying what they ACTUALLY are.
+for enum, v in TypeBindings do
+	if v == "Enum" then
+		TypeBindings[enum] = function(arg)
+			if type(arg) == "userdata" then
+				-- Enum passed directly
+				return arg
+			else
+				-- string passed
+				return enum[arg]
+			end
+		end
+	end
+end
 
 local Classes = {
 	GuiButton = {
@@ -255,6 +282,13 @@ local Classes = {
 	},
 	Frame = {
 
+	},
+	ScreenGui = {
+		DisplayOrder = "int",
+		Enabled = "bool",
+		IgnoreGuiInset = "bool",
+		ResetOnSpawn = "bool",
+		ZIndexBehavior = Enum.ZIndexBehavior,
 	},
 	BillboardGui = {
 		Adornee = "Instance",
@@ -377,7 +411,7 @@ local Classes = {
 	VideoFrame = {
 		Looped = "bool",
 		Playing = "bool",
-		TimePosition = "double",
+		TimePosition = "float",
 		Video = "Content",
 		Volume = "float",
 		DidLoop = "Event",
@@ -396,11 +430,11 @@ local Classes = {
 	},
 
 	UIGradient = {
-		Color = "Color3", -- Sequence
+		Color = "ColorSequence",
 		Enabled = "bool",
 		Offset = "Vector2",
 		Rotation = "float",
-		Transparency = "float" -- Sequence
+		Transparency = "NumberSequence"
 	},
 	UICorner = {
 		CornerRadius = "UDim",
@@ -415,20 +449,20 @@ local Classes = {
 	},
 	UIAspectRatioConstraint = {
 		AspectRatio = "float",
-		AspectType = "Enum",
-		DominantAxis = "Enum",
+		AspectType = Enum.AspectType,
+		DominantAxis = Enum.DominantAxis,
 	},
 	UIGridStyleLayout = {
-		FillDirection = "Enum",
-		HorizontalAlignment = "Enum",
-		SortOrder = "Enum",
-		VerticalAlignment = "Enum",
+		FillDirection = Enum.FillDirection,
+		HorizontalAlignment = Enum.HorizontalAlignment,
+		SortOrder = Enum.SortOrder,
+		VerticalAlignment = Enum.VerticalAlignment,
 	},
 	UIGridLayout = {
 		CellPadding = "UDim2",
 		CellSize = "UDim2",
 		FillDirectionMaxCells = "int",
-		StartCorner = "Enum",
+		StartCorner = Enum.StartCorner,
 	},
 	UIListLayout = {
 		Padding = "UDim"
@@ -436,8 +470,8 @@ local Classes = {
 	UIPageLayout = {
 		Animated = "bool",
 		Circular = "bool",
-		EasingDirection = "Enum",
-		EasingStyle = "Enum",
+		EasingDirection = Enum.EasingDirection,
+		EasingStyle = Enum.EasingStyle,
 		Padding = "UDim",
 		TweenTime = "float",
 		GamepadInputEnabled = "bool",
@@ -450,8 +484,8 @@ local Classes = {
 	UITableLayout = {
 		FillEmptySpaceColumns = "bool",
 		FillEmptySpaceRows = "bool",
-		Padding = "UDim",-- UDim2
-		MajorAxis = "Enum"
+		Padding = "UDim2",
+		MajorAxis = Enum.TableMajorAxis
 	},
 	UIPadding = {
 		PaddingBottom = "UDim",
@@ -463,101 +497,36 @@ local Classes = {
 		Scale = "float"
 	},
 	UIStroke = {
-		ApplyStrokeMode = "Enum",
+		ApplyStrokeMode = Enum.ApplyStrokeMode,
 		Color = "Color3",
-		LineJoinMode = "Enum",
+		LineJoinMode = Enum.LineJoinMode,
 		Thickness = "float",
 		Transparency = "float",
 		Enabled = "bool"
 	},
 }
 
-local UIBuilder = {
-	Type = "Builder",
-	Context = CONTEXT,
-	--TODO: Allow nested stateful elements to be made simultaneously
-	BuildingStateful = { },
-	BuildingElements = { },
-	Current = { },
-	FinishedSet = { },
-	--Here we store things such as extended componenets, since these contian 
-	Processors = { },
-	Nesteds = { },
-
-	--Wrapper functions for making extending components
-	Stateful = function(self, name)
-		local component = Roact.Component:extend(name)
-		for i,v in self.BuildingStateful do
-			component[i] = v
-		end
-		self.BuildingStateful = { }
-		return component
-	end,
-
-	Init = function(self, func)
-		--assert(self.BuildingStateful[Roact.Type] == Roact.Type.StatefulComponentInstance)
-		self.BuildingStateful.init = func
-		return self
-	end,
-
-	Render = function(self, func)
-		--assert(self.BuildingStateful[Roact.Type] == Roact.Type.StatefulComponentInstance)
-		self.BuildingStateful.render = func
-		return self
-	end,
-
-	DidMount = function(self, func)
-		--assert(self.BuildingStateful[Roact.Type] == Roact.Type.StatefulComponentInstance)
-		self.BuildingStateful.didMount = func
-		return self
-	end,
-
-	WillUnmount = function(self, func)
-		--assert(self.BuildingStateful[Roact.Type] == Roact.Type.StatefulComponentInstance)
-		self.BuildingStateful.willUnmount = func
-		return self
-	end,
-
-	WillUpdate = function(self, func)
-		--assert(self.BuildingStateful[Roact.Type] == Roact.Type.StatefulComponentInstance)
-		self.BuildingStateful.willUpdate = func
-		return self
-	end,
-
-	--TextToSize
-}
-UIBuilder.__index = UIBuilder
-
---[[ local elements_set_list = UIBuilder.BuildingElements
-local function alloc_prop_set()
-	local new = { }
-	table.insert(elements_set_list, new)
-	UIBuilder.Current = new
-
-	return new
-end ]]
-
---[[ local function dealloc_prop_set()
-	if UIBuilder.Current == nil then
-		error("UIBuilder: Current is nil")
-	end
-	UIBuilder.Current = elements_set_list[#elements_set_list - 1]
-	UIBuilder.FinishedSet = table.remove(elements_set_list)
-
-	return UIBuilder.FinishedSet
-end ]]
-
--- mod.A = alloc_prop_set
--- mod.D = dealloc_prop_set
-
---Some ham fisted logic to allow stuff to work
 
 local PropSet = { }
+
+setmetatable(PropSet, {
+	__index = function(t, index)
+		return function(...)
+			local total = 0
+			repeat total += task.wait() until (rawget(t, index) or total > 1)
+			
+			if not rawget(t, index) then
+				error(index .. " is not registered")
+			end
+			
+			return rawget(t, index)(...)
+		end
+	end
+})
+
 local mt_PropSet = { __index = PropSet }
 
-
-
-function mod.P()
+function I.P()
 	local set = {
 		props = { }
 	}
@@ -566,13 +535,11 @@ function mod.P()
 	return set
 end
 
+local P = I.P
+
 function PropSet:RoundCorners(scale, pixels)
---[[ 	local old_pos = self.Position
-	if old_pos then
-		self:Position(scaling, spacing, old_pos.Y.Scale, old_pos.Y.Offset)
-	end ]]
 	self:Children(
-		mod:UICorner(mod.P()
+		I:UICorner(P()
 			:CornerRadius(scale or 0, pixels or 4)
 		)
 	)
@@ -582,9 +549,9 @@ end
 
 function PropSet:Border(thick, color)
 	self:Children(
-		mod:UIStroke(mod.P()
+		I:UIStroke(P()
 			:ApplyStrokeMode(Enum.ApplyStrokeMode.Border)
-			:Color_Raw(color or Style.SecondaryColor2)
+			:Color(color or Color3.new(0, 0, 0))
 			:Thickness(thick or 2)
 		)
 	)
@@ -655,9 +622,9 @@ function PropSet:Line(fromPos: UDim2, toPos: UDim2, thick)
 	end
 
 	self:AnchorPoint(0.5, 0.5)
-	self:Size_Raw(size)
+	self:Size(size)
 	self:Rotation(rotation)
-	self:Position_Raw(position)
+	self:Position(position)
 
 	return self
 end
@@ -665,9 +632,9 @@ end
 function PropSet:AspectRatioProp(ratio)
 	-- Aspect Ratio is X/Y, so the larger the ratio, the larger Width.
 	self:Children(
-		UIBuilder:UIAspectRatioConstraint(mod.D(mod.A(), UIBuilder
+		I:UIAspectRatioConstraint(P()
 			:AspectRatio(ratio)
-		))
+		)
 	)
 
 	return self
@@ -676,7 +643,7 @@ end
 function PropSet:MoveBy(xs, xo, ys, yo)
 	local pos = self.props.Position or UDim2.new()
 	pos += UDim2.new(xs, xo, ys, yo)
-	self:Position_Raw(pos)
+	self:Position(pos)
 	return self
 end
 
@@ -789,60 +756,118 @@ function PropSet:Inset(scaling, spacing)
 	return self
 end
 
-local currentCamera = workspace.CurrentCamera
 
-local function calcSize(size, rbx: Instance)
-	local min = 0
+--[[
+	TextScaled Groups.
+]]
+local scaledTextGroups = {}
 
-	if rbx:IsA("TextSource") or rbx:IsA("TextButton") or rbx:IsA("TextBox") then
-		local font = rbx.Font
-		min = font == Style.LabelFont and 7 or 11
+local function getMaxSize(rbx: TextLabel, constantText)
+	local sizeX, sizeY = rbx.AbsoluteSize.X, rbx.AbsoluteSize.Y
+	local isAutoSizeX = rbx.AutomaticSize == Enum.AutomaticSize.X or rbx.AutomaticSize == Enum.AutomaticSize.XY
+	local isAutoSizeY = rbx.AutomaticSize == Enum.AutomaticSize.Y or rbx.AutomaticSize == Enum.AutomaticSize.XY
+	
+	if isAutoSizeX then
+		sizeX = 99999
 	end
+	
+	if isAutoSizeY then
+		sizeY = 99999
+	end
+	
+	local text = constantText or rbx.Text
+	text = " " .. text .. " "
+	
+	local font = rbx.Font
 
+	local maxSize = 100
+	local minSize = 11
+	
+	local absMinSize = minSize
+	
+	local container = Vector2.new(sizeX, 99999)-- dont use SizeY here so that textWrapped works automatically
+	
+	while minSize <= maxSize do
+		local midSize = math.floor((minSize + maxSize) / 2)
+		local textSize = TextService:GetTextSize(text, midSize, font, container)
 
-	local viewportSize = currentCamera.ViewportSize
-	local newSize = math.max(min, math.ceil(size * viewportSize.X / 1920 * viewportSize.Y / 1080))
-	return newSize
+		local tooLarge = textSize.Y > sizeY or textSize.X > sizeX
+
+		if tooLarge then
+			maxSize = midSize - 1
+		else
+			minSize = midSize + 1
+		end
+	end
+	
+	if absMinSize == maxSize then
+		return maxSize
+	else
+		return maxSize - 1
+	end
 end
 
-function PropSet:ScaledTextSize(size)
-	local binding, updBinding = Roact.createBinding(0)
-
-	local old = self.props[Roact.Change.AbsoluteSize]
-	self.props[Roact.Change.AbsoluteSize] = function(rbx)
-		if old then
-			old(rbx)
-		end
-
-		if not (rbx and rbx.Parent) then
-			return
-		end
-
-		updBinding(calcSize(size, rbx))
+function PropSet:ScaledTextSize(groupName, constantText)
+	if type(constantText) == "number" then
+		constantText = string.rep(" ", constantText)
 	end
-
-	local old2 = self.props[Roact.Change.Parent]
-	self.props[Roact.Change.Parent] = function(rbx)
-		if old2 then
-			old2(rbx)
-		end
-
-		if not (rbx and rbx.Parent) then
-			return
-		end
-
-		updBinding(calcSize(size, rbx))
+	
+	local group = scaledTextGroups[groupName]
+	if not group then
+		local binding = I:Binding(0)
+		
+		scaledTextGroups[groupName] = {
+			Binding = binding,
+			Refs = {},
+			
+			ConstantText = constantText,
+		}
+		
+		group = scaledTextGroups[groupName]
 	end
+	
+	local ref = I:CreateRef()
+	self:Ref(ref)
+	
+	table.insert(group.Refs, ref)
+	
+	self:TextSize(group.Binding)
+	
+	return self
+end
 
-	self.props[Roact.Ref] = function(rbx)
-		if not (rbx and rbx.Parent) then
-			return
+if not IsServer then
+	RunService.Stepped:Connect(function()
+		for name, group in pairs(scaledTextGroups) do
+			local refs = group.Refs
+			
+			local min = 100
+			
+			local did = false
+			
+			for i = #refs, 1, -1 do
+				local ref = refs[i]
+				local rbx = ref:getValue()
+				
+				if not rbx then
+					continue
+				end
+				
+				did = true
+				
+				local max = getMaxSize(rbx, group.ConstantText)
+				if max < min then
+					min = max
+				end
+			end
+			
+			if not did then
+				min = 7-- the first frame that the text is rendered will be this size
+			end
+			
+			group.Binding.update(min)
 		end
-
-		updBinding(calcSize(size, rbx))
-	end
-
-	return binding
+	end)
 end
 
 function PropSet:Attribute(name, value)
@@ -859,33 +884,6 @@ function PropSet:Ref(value)
 	self.props[Roact.Ref] = value
 	return self
 end
-
-
---[[ function UIBuilder:ColorSequenceMap(...)
-	local args = {...}
-
-	local colors = { }
-
-	local i = 1
-	while i < #args do
-		local arg = args[i]
-		if type(arg) == "number" then
-			colors[#colors+1] = Color3.new(arg, args[i + 1], args[i + 2])
-			i += 2
-		else
-			colors[#colors+1] = arg
-		end
-		i += 1
-	end
-
-	return function(v)
-		return ColorSequence.new(colors[1]:Lerp(colors[3], v), colors[2]:Lerp(colors[4], v))
-	end
-end ]]
-
---[[ function UIBuilder:ForwardRef(func)
-	return Roact.forwardRef(func)
-end ]]
 
 
 function PropSet:Children(...)
@@ -910,70 +908,163 @@ function PropSet:InsertChild(child)
 	return self
 end
 
-function mod:Binding(default)
-	return Roact.createBinding(default)
-end
-
-function mod:JoinBindings(bindings)
-	return Roact.joinBindings(bindings)
-end
-
-function mod:Fragment(t: table)
-	return Roact.createFragment(t)
-end
-
 function PropSet:Change(name, callback)
 	self.props[Roact.Change[name]] = callback
 	return self
 end
 
-function mod:CreateRef()
+--A small system which allows us to register external functions which modify the props of the element being built
+function I:RegisterModifier(name, func)
+	assert(PropSet[name] == nil)
+	
+	PropSet[name] = function(self, ...)
+		func(self, ...)
+		return self
+	end
+end
+
+
+-- Portal functionality
+function I:Portal(prop_set)
+	local props = prop_set.props
+	local element = Roact.createElement(Roact.Portal, props)
+	
+	return element
+end
+
+function PropSet:Target(instance)
+	self.props.target = instance
+	return self
+end
+
+
+-- Stateful functionality
+function I:Stateful(prop_set)
+	local props = prop_set.props
+	
+	local component = Roact.Component:extend(props.Name)
+	component.init = props.init
+	component.render = props.render
+	component.didMount = props.didMount
+	component.willUnmount = props.willUnmount
+	component.willUpdate = props.willUpdate
+	component.shouldUpdate = props.shouldUpdate
+	component.didUpdate = props.didUpdate
+	
+	I[props.Name] = function(_self, this_prop_set: table)
+		local this_props = this_prop_set.props
+		local element = Roact.createElement(component, this_props)
+		
+		return element
+	end
+	
+	return component
+end
+
+function PropSet:Init(func)
+	self.props.init = func
+	return self
+end
+
+function PropSet:Render(func)
+	self.props.render = func
+	return self
+end
+
+function PropSet:DidMount(func)
+	self.props.didMount = func
+	return self
+end
+
+function PropSet:WillUnmount(func)
+	self.props.willUnmount = func
+	return self
+end
+
+function PropSet:WillUpdate(func)
+	self.props.willUpdate = func
+	return self
+end
+
+function PropSet:ShouldUpdate(func)
+	self.props.shouldUpdate = func
+	return self
+end
+
+function PropSet:DidUpdate(func)
+	self.props.didUpdate = func
+	return self
+end
+
+
+function I:Binding(default)
+	return Roact.createBinding(default)
+end
+
+function I:JoinBindings(bindings)
+	return Roact.joinBindings(bindings)
+end
+
+function I:Fragment(t: table)
+	return Roact.createFragment(t)
+end
+
+function I:CreateRef()
 	return Roact.createRef()
 end
 
-function mod:Tween(start)
+function I:Mount(tree, parent)
+	return Roact.mount(tree, parent)
+end
+
+function I:Unmount(handle)
+	Roact.unmount(handle)
+end
+
+function I:Tween(start)
 	start = start or 0
 
 	local binding, _ = Roact.createBinding(start)
 	return binding:getTween()
 end
 
-function mod:NumberMap(n1, n2)
-	return function(v)
-		return n1 * (1 - v) + n2 * v
-	end
-end
 
-function mod:LerpMap(c1, c2)
-	return function(v)
-		return c1:Lerp(c2, v)
-	end
-end
+local StandardElements = {}
+local StandardElementsAwaiting = {}
 
-
-function mod:Dynamic(func, ...)
-	local element = Roact.createElement(func, UIBuilder.FinishedSet)
-	UIBuilder.FinishedSet = { }
-	return element
-end
-
-local StandardElements = { }
-
-function mod:NewStdElement(name, element_prototype)
+function I:NewElement(name, element_prototype)
 	assert(StandardElements[name] == nil)
-
+	
 	StandardElements[name] = element_prototype
+	
+	if StandardElementsAwaiting[name] then
+		for _, callback in StandardElementsAwaiting[name] do
+			callback()
+		end
+		
+		StandardElementsAwaiting[name] = nil
+	end
 end
 
-function mod:StdElement(name, prop_set)
-	assert(StandardElements[name] ~= nil)
+function I:Element(name, prop_set)
+	if not StandardElements[name] then
+		local signal = ClassicSignal.new()
+		
+		StandardElementsAwaiting[name] = StandardElementsAwaiting[name] or {}
+		
+		table.insert(StandardElementsAwaiting, function()
+			signal:Fire()
+		end)
+		
+		if signal.FireCount == 0 then
+			signal:Wait(1)
+		end
+	end
+	
 	local element_prototype = StandardElements[name]
 
-	--Elements not assigned to functions will do a deep clone
-	-- functional elements will function like normal roact elements
-	-- Mostly this was done because I went through all the effort of doing the deep clone thing
-	-- before realizing there's missing functionality when it comes to elements with lots of nesting
-	-- as far as how they acquire props.
+	-- 1) function elements have to read the props passed in
+	-- 2) elements that are just trees will be deep-cloned and then have their highest most props automatically merged with this prop_set
 	local element
 	if typeof(element_prototype) == "function" then
 		element = element_prototype(prop_set.props)
@@ -985,224 +1076,73 @@ function mod:StdElement(name, prop_set)
 	return element
 end
 
---[[ function mod:Classify(std_element: string, desc: string)
-	assert(StandardElements[desc] ~= nil)
-	self.Classifications[desc] = self.Classifications[desc] or { }
-	self.Classifications[desc][std_element] = StandardElements[desc]
-end ]]
-
-
---A small system which allows us to register external functions which modify the props of the element being built
-function mod:RegisterStdModifier(name, func)
-	UIBuilder[name] = func
+function I:IsPositionInObject(position, object: GuiBase2d)
+	local topLeft = object.AbsolutePosition
+	local bottomRight = topLeft + object.AbsoluteSize
+	
+	return position.X < bottomRight.X and position.X > topLeft.X and position.Y < bottomRight.Y and position.Y > topLeft.Y
 end
 
-function mod:StdModifier(name, props)
-	local processor = mod[name]
-	assert(processor ~= nil)
-	processor(self, self, props)
-	return self
-end
+function I:IsScrollBarAtEnd(barRBX, damp)
+	damp = damp or 1
 
-function mod:Builder( module_name: string )
-	assert(module_name)
-	assert(typeof(module_name) == "string")
+	local maxYPosition = barRBX.AbsoluteCanvasSize.Y - barRBX.AbsoluteSize.Y
+	local currentYPosition = barRBX.CanvasPosition.Y
 
-	mod.CurrentModule = module_name
-	setmetatable(mod, UIBuilder)
-
-	return mod
-end
-
-local PropFuncs = { }
-
-function mod:__init(G)
-	safe_require = G.Load(game.ReplicatedFirst.Util.SafeRequire).require
-
-	Style = G.Load(game.ReplicatedFirst.Modules.GUI.Style)
-
-	--check if same props exist with different types
-	local hash = {}
-	for class, properties in pairs(Classes) do
-		for prop_name, type in properties do
-			if hash[prop_name] and hash[prop_name] ~= type then
-				error("Same Property, different types: ", prop_name)
-			end
-
-			hash[prop_name] = type
-		end
+	if currentYPosition + damp >= maxYPosition then-- add one to damp
+		return true
 	end
+	
+	return false
+end
 
-	hash = nil
 
-	-- create :[propName]() functions
-	for class, properties in pairs(Classes) do
-		for prop_name, type in properties do
-			local ctor = TypeBindings[type]
+local roactType = Roact.Type
 
-			if typeof(ctor) == "function" then
-				PropSet[prop_name] = function(_self, ...)
-					local value = ctor(...)
+-- create :[propName]() functions
+for class, properties in pairs(Classes) do
+	for prop_name, _type in properties do
+		local ctor = TypeBindings[_type]
+
+		if type(ctor) == "function" then
+			PropSet[prop_name] = function(_self, binding, ...)
+				if roactType.of(binding) == roactType.Binding then
+					_self.props[prop_name] = binding
+				else
+					local value = ctor(binding, ...)
 					_self.props[prop_name] = value
-					return _self
 				end
-
-				local raw_name = prop_name .. "_Raw"
-				PropSet[raw_name] = function(_self, value)
-					_self.props[prop_name] = value
-					return _self
-				end
-
-				--Deprecated, this was used when this module was a state maachine that compiled to roact
-				PropSet["Get" .. prop_name] = function(_self, ...)
-					return ctor(...)
-				end
-			elseif ctor == "Event" then
-				local event_key = Roact.Event[prop_name]
-				PropSet[prop_name] = function(_self, value)
-					_self.props[event_key] = value
-					return _self
-				end
-			elseif ctor == "Change" then
-				local event_key = Roact.Change[prop_name]
-				PropSet[prop_name] = function(_self, value)
-					_self.props[event_key] = value
-					return _self
-				end
-			else
-				PropSet[prop_name] = function(_self, value)
-					_self.props[prop_name] = value
-					return _self
-				end
-
-				-- Raw versions of primitive values are used for passing in bindings
-				local raw_name = prop_name .. "_Raw"
-				PropSet[raw_name] = function(_self, value)
-					_self.props[prop_name] = value
-					return _self
-				end
+				
+				return _self
+			end
+		elseif ctor == "Event" then
+			local event_key = Roact.Event[prop_name]
+			PropSet[prop_name] = function(_self, value)
+				_self.props[event_key] = value
+				return _self
+			end
+		elseif ctor == "Change" then
+			local event_key = Roact.Change[prop_name]
+			PropSet[prop_name] = function(_self, value)
+				_self.props[event_key] = value
+				return _self
+			end
+		else
+			PropSet[prop_name] = function(_self, value)
+				_self.props[prop_name] = value
+				return _self
 			end
 		end
+	end
 
-		--[[
-		TODO: These docs may be out of date
-			This is where most of the magic happens.
-			This set of functions can be used in two ways:
-
-		**Roact-based Usage**
-			To return an element to be built on the roact side (which is possible because of
-			the above functions inserted into the roact module)
-
-			Such usage may look like this, and is called:
-			I:Frame()
-				:Size(1, 0, 1, -5)
-				:Center()
-
-
-		**Lazy-based Usage**
-			OR it can be used to build an element's properties and then pass them to roact.
-			Such behavior is mostly relevant for registering "standard elements" such as in the GUI elements library
-				(GUI.lua)
-			However, even those are unnecessarily using that functionality, under the assumption that simple elements
-			 	are better built as elements (now thought of as tables) which we want to clone and override some props.
-				(mod::StdElement for where this difference is implemented)
-
-			Such usage may look like this (note the usage of `I` within the function call):
-			I:Frame(
-				I:Size(1, 0, 1, -5),
-				:Center()
-			)
-
-
-
-			The difference, semantically, is that the first usage is a simple call to the function, whereas the second
-			usage is a call to the function with the element's properties as arguments.
-
-			HOWEVER!!! The second example is more fragile and more complicated because it uses this module as a state
-				machine (stored in the mod::Curent table (TODO: Rename that)) and then passing that to
-				Roact.createElement at the last second. The args themselves are NOT EVER used.
-		]]
-
-		UIBuilder[class] = function(_self, prop_set: table)
-			local props = prop_set.props
-			local element = Roact.createElement(class, props)
-			--setmetatable(element, PropSet)
-			return element
-		end
+	I[class] = function(_self, prop_set: table)
+		local props = prop_set.props
+		local element = Roact.createElement(class, props)
+		
+		return element
 	end
 end
 
---This function takes in a table of names of instance types and scans for ones which are GuiObjects
--- If necessary, the instance list can be updated from MaximumADHD client tracker
-local function scan_instances()
-	local instance_list = safe_require(script.Parent.instance_list)
+setmetatable(Roact.elementModule, {__index = PropSet})
 
-	local function make_instance(name)
-		return Instance.new(name)
-	end
-
-	local function check_instance(ins)
-		return ins:IsA("GuiObject") or ins:IsA("UIComponent") or ins:IsA("UILayout")
-	end
-
-	warn("----------------------------------")
-	for i,v in instance_list do
-		local success, instance = pcall(make_instance, v)
-
-		if not success then continue end
-
-		local success, value = pcall(check_instance, instance)
-		if not success then
-			--warn(value)
-			continue
-		end
-		if not value then continue end
-
-		PropFuncs[v] = instance
-		print(instance.Name)
-	end
-end
-
-
---[[
-	Can't use this because of the upvalue problem with names of classes
-
-
-	if typeof(ctor) == "function" then
-	--We don't allocate new functions for each constructor, instead we reuse them
-	if PropFuncsCache[ctor] ~= nil then
-		UIBuilder[name] = PropFuncsCache[ctor]
-	else
-		local func = function(_self, ...)
-			local value = ctor(...)
-			UIBuilder.Current[name] = value
-			return _self
-		end
-
-		PropFuncsCache[ctor] = func
-		UIBuilder[name] = func
-	end
-
-	--Raw functions need to be manually used when the caller is passing in already-constructed data
-	local raw_name = name.."_Raw"
-	if PropFuncCaache_Raw[ctor] ~= nil then
-		UIBuilder[raw_name] = PropFuncCaache_Raw[ctor]
-	else
-		local raw_func = function(_self, value)
-			UIBuilder.Current[raw_name] = value
-			return _self
-		end
-		PropFuncCaache_Raw[ctor] = raw_func
-		UIBuilder[raw_name] = raw_func
-	end
-else
-	UIBuilder[name] = function(_self, value)
-		UIBuilder.Current[name] = value
-		return _self
-	end
-end
-]]
-
-setmetatable(Roact.elementModule, {__index = mod})
-
-return mod
+return I
