@@ -93,7 +93,7 @@ end
 
 
 
-function mod:SetModule( module_name: string )
+function mod.SetModule( module_name: string )
 	assert(typeof(module_name) == "string")
 
 	mod.CurrentModule = module_name

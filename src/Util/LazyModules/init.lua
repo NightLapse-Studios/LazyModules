@@ -243,7 +243,7 @@ local function try_signals(G, module, name)
 			return
 		end
 
-		Signals.SetModule(self, module_name)
+		Signals.SetModule(name)
 	
 		local prior_context = set_context(G, LOAD_CONTEXTS.SIGNAL_BUILDING)
 		module:__build_signals(G, Signals)
@@ -320,6 +320,8 @@ function LMGame:Begin(Main, name: string)
 		try_signals(self, module_val, mod_name)
 	end
 
+	Signals.BuildSignals(self)
+
 	for mod_name, module_val in self._CollectedModules do
 		if not can_init(mod_name) then continue end
 		try_ui(self, module_val, mod_name)
@@ -354,6 +356,10 @@ function LMGame:Get(name: string, opt_specific_context: ("CLIENT" | "SERVER")?)
 end
 
 function LMGame:Load(module: ModuleScript)
+	if self.LOADING_CONTEXT < LOAD_CONTEXTS.LOAD_INIT then
+		error("Game:Get before init stage is undefined and non-determinisitic")
+	end
+
 	assert(module:IsA("ModuleScript"))
 
 	local name = module.Name

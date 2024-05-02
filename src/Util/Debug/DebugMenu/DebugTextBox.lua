@@ -19,7 +19,7 @@
 ]]
 local Pumpkin = require(game.ReplicatedFirst.Util.Pumpkin)
 local I, P, Roact = Pumpkin, Pumpkin.P, Pumpkin.Roact
-local ExpressionParser = require(script.Parent:WaitForChild("ExpressionParser"))
+local ExpressionParser = require(game.ReplicatedFirst.Util.ExpressionParser)
 
 local TextBox = {}
 
