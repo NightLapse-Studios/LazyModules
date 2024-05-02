@@ -11,20 +11,18 @@
 ]]
 
 
+local async_list = require(game.ReplicatedFirst.Util.AsyncList)
+
 local mod = {
 	Transmitters = {
-		Identifiers = { },
-		Modules = { }
+		Identifiers = async_list.new(1),
+		Modules = async_list.new(2),
 	}
 }
 
 local Transmitters = mod.Transmitters
 
 --local INIT_CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
-
-local Globals
-local safe_require
-local async_list
 
 local IsServer = game:GetService("RunService"):IsServer()
 
@@ -85,7 +83,7 @@ local mt_TransmitterBuilder = { __index = TransmitterBuilder }
 mod.client_mt = { __index = ClientTransmitter }
 mod.server_mt = { __index = ServerTransmitter }
 
-function mod.NewTransmitter(self: Builder, identifier: string)
+function mod.NewTransmitter(signals_module, identifier: string)
 	local transmitter = remote_wrapper(identifier, mt_TransmitterBuilder)
 
 --[[ 	local Modules = Transmitters.Modules
@@ -93,27 +91,13 @@ function mod.NewTransmitter(self: Builder, identifier: string)
 
 	local _mod = Transmitters.Identifiers:inspect(identifier)
 	if _mod ~= nil then
-		error("Re-declared event `" .. identifier .. "` in `" .. self.CurrentModule .. "`.\nOriginally declared here: `" .. _mod .. "`")
+		error("Re-declared event `" .. identifier .. "` in `" .. signals_module.CurrentModule .. "`.\nOriginally declared here: `" .. _mod .. "`")
 	end
 
 	Transmitters.Identifiers:provide(transmitter, identifier)
-	Transmitters.Modules:provide(transmitter, self.CurrentModule, identifier)
+	Transmitters.Modules:provide(transmitter, signals_module.CurrentModule, identifier)
 
 	return transmitter
-end
-
-function mod:__init(G)
-	Globals = G
-
-	--The one true require tree
-	safe_require = require(game.ReplicatedFirst.Util.SafeRequire)
-	safe_require = safe_require.require
-
-	async_list = require(game.ReplicatedFirst.Util.AsyncList)
-	async_list:__init(G)
-
-	mod.Transmitters.Identifiers = async_list.new(1)
-	mod.Transmitters.Modules = async_list.new(2)
 end
 
 return mod

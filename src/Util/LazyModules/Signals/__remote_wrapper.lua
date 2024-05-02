@@ -35,7 +35,7 @@ function RemoteEventClass:FireAllClients(...)
 end
 
 
-function mod.wrapper(identifier: string, builder_mt: table)
+function mod.wrapper<T>(identifier: string, builder_mt: T)
 	-- TODO: check that all events made on the server are also made on the client
 	local transmitter
 	if IsServer then
@@ -58,7 +58,8 @@ function mod.wrapper(identifier: string, builder_mt: table)
 		local event = game.ReplicatedStorage:WaitForChild(identifier, 4)
 		
 		if not event then
-			warn("Waiting for event timed out! - " .. identifier .. "\n" .. lazymod_traceback())
+			-- By this point LM should exist
+			warn("Waiting for event timed out! - " .. identifier .. "\n" .. _G.Game.LazyModules.format_lazymodules_traceback())
 		end
 		
 		transmitter = setmetatable(

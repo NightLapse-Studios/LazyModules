@@ -44,8 +44,8 @@
 ]]
 
 local Config
-local GestureDetector = _G.Game.PreLoad(script.GestureDetector)
-local Enums = _G.Game.Enums
+local GestureDetector = require(script.GestureDetector)
+local Enums = require(game.ReplicatedFirst.Util.Enums)
 local AssociativeList = require(game.ReplicatedFirst.Util.AssociativeList)
 
 local RunService = game:GetService("RunService")
@@ -319,9 +319,9 @@ end
 
 function mod:__init(G)
 	Game = G
-	local Stack = G.Load("Stack")
-	Config = G.Load("Config")
-	GestureDetector = G.Load("GestureDetector")
+	local Stack = G:Get("Stack")
+	Config = G:Get("Config")
+	GestureDetector = G:Get("GestureDetector")
 
 	for i,v in Enum.KeyCode:GetEnumItems() do
 		mod.Handlers[v] = Stack.new()

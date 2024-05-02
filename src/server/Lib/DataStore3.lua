@@ -1,3 +1,4 @@
+--!strict
 
 local game = game
 
@@ -64,13 +65,12 @@ About Versions:
 ]]
 
 local Globals
-local Config
-local PSA
-local BindingsList
-local Enums = _G.Game.Enums
-assert(Enums)
+local Config = require(game.ReplicatedFirst.Util.Config)
+local SA = require(game.ReplicatedFirst.Util.SparseList)
+local Enums = require(game.ReplicatedFirst.Util.Enums)
 
-local SaveInStudio
+local SaveInStudio = Config.SaveDatastoresInStudio
+local BindingsList = SA.new()
 
 local DS3 = { }
 
@@ -81,18 +81,10 @@ local Autosave_Interval = 360.0
 local IsStudio = RunService:IsStudio()
 
 function DS3:__init(G)
-	Config = G.Load("Config")
-	PSA = G.Load("SparseList")
 	Globals = G
-	SaveInStudio = Config.SaveDatastoresInStudio
-	BindingsList = PSA.new()
 end
 
-function DS3:__build_signals(G, B)
-
-end
-
-function DS3:__finalize(G)
+function DS3:__run(G)
 	if (IsStudio and not SaveInStudio) then
 		return
 	end

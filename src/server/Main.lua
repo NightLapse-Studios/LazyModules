@@ -1,15 +1,9 @@
 local mod = { }
 
-local function OnTick(dt)
-	
-end
+local DebugMenu = require(game.ReplicatedFirst.Util.Debug.DebugMenu)
 
-function mod:__init(G)
-	
-end
-
-function mod:__finalize(G)
-	
-end
+DebugMenu.RegisterButton("Press", "Server", function(a)
+	print("Server", a)
+end)
 
 return mod

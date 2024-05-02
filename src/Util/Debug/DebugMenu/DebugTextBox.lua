@@ -17,143 +17,148 @@
 	-- called when the input after the FocusLost Event has passed all the checks.
 	Callback
 ]]
+local Pumpkin = require(game.ReplicatedFirst.Util.Pumpkin)
+local I, P, Roact = Pumpkin, Pumpkin.P, Pumpkin.Roact
+local ExpressionParser = require(script.Parent:WaitForChild("ExpressionParser"))
 
 local TextBox = {}
 
-function TextBox:__ui(G, I, P, Roact)
-	local ExpressionParser = G.Load("ExpressionParser")
-	local Math = G.Load("Math")
+local function round(num, Custom)
+	Custom = Custom or 1
 	
-	local function init(self)
-		self.LastText = self.props.TextBinding
-	end
+	local mult = 1 / Custom
+    return math.floor(num * mult + 0.5) / mult
+end
+
+local function init(self)
+	self.LastText = self.props.TextBinding
+end
+
+local function render(self)
+	local props = self.props
 	
-	local function render(self)
-		local props = self.props
+	local oldLost = props[Roact.Event.FocusLost]
+	local ref = props["ref"]
+
+	return I:TextBox(P()
+		:BorderSizePixel(1)
+		:BorderColor3(0,0,0)
+		:MultiLine(false)
+		:TextScaled(false)
+		:Font("Roboto")
+		:Ref(ref)
+		:Text(self.LastText:map(function(v)
+			if props.Increment then
+				return round(v, props.Increment)
+			end
+			return v
+		end))
+		:Size(1, 0, 1, 0)
+		:TextTruncate(Enum.TextTruncate.None)
+		:ClearTextOnFocus(false)
+		:TextWrapped(false)
+		:TextEditable(true)
+		:TextColor3(1,1,1)
+		:BackgroundColor3(0.16,0.16,0.16)
 		
-		local oldLost = props[Roact.Event.FocusLost]
-		local ref = props[Roact.Ref]
-	
-		return I:TextBox(P()
-			:BorderSizePixel(1)
-			:BorderColor3(0,0,0)
-			:MultiLine(false)
-			:TextScaled(false)
-			:Font("Roboto")
-			:Ref(ref)
-			:Text(self.LastText:map(function(v)
-				if props.Increment then
-					return Math.Round(v, props.Increment)
-				end
-				return v
-			end))
-			:Size(1, 0, 1, 0)
-			:TextTruncate(Enum.TextTruncate.None)
-			:ClearTextOnFocus(false)
-			:TextWrapped(false)
-			:TextEditable(true)
-			:TextColor3(1,1,1)
-			:BackgroundColor3(0.16,0.16,0.16)
-			
-			:FocusLost(function(rbx, enterPressed)
-				if props.IsNumber then
-					-- Expression Parser
-					local suc, num = pcall(ExpressionParser.Evaluate, rbx.Text)
-	
-					if suc and num then
-	
-						-- Rounding
-						if props.Increment then
-							num = Math.Round(num, props.Increment)
+		:FocusLost(function(rbx, enterPressed)
+			if props.IsNumber then
+				-- Expression Parser
+				local suc, num = pcall(ExpressionParser.Evaluate, rbx.Text)
+
+				if suc and num then
+
+					-- Rounding
+					if props.Increment then
+						num = round(num, props.Increment)
+					end
+
+					-- Clamping
+					num = math.clamp(num, props.Min or -math.huge, props.Max or math.huge)
+
+					-- Custom Verification
+					local verify = props.Verify
+					local passedCustom = true
+					if verify then
+						local suc2, new = pcall(verify, num)
+						if suc2 then
+							if new then
+								num = new
+							end
+						else
+							passedCustom = false
 						end
-	
-						-- Clamping
-						num = math.clamp(num, props.Min or -math.huge, props.Max or math.huge)
-	
+					end
+
+					-- Callbacks
+					if passedCustom then
+						if not self.props.DontUpdateBinding then
+							self.LastText.update(num)
+						end
+						props.Callback(num)
+
+						if oldLost then
+							oldLost(rbx, enterPressed)
+						end
+
+						return
+					end
+				end
+			else
+				local text = rbx.Text
+
+				-- Verify Char count
+				if (not props.Min) or #text >= props.Min then
+					if (not props.Max) or #text <= props.Max then
+
 						-- Custom Verification
 						local verify = props.Verify
 						local passedCustom = true
+
 						if verify then
-							local suc2, new = pcall(verify, num)
-							if suc2 then
+							local suc, new = pcall(verify, text)
+							if suc then
 								if new then
-									num = new
+									text = new
 								end
 							else
 								passedCustom = false
 							end
 						end
-	
-						-- Callbacks
+
+						-- callbacks
 						if passedCustom then
 							if not self.props.DontUpdateBinding then
-								self.LastText.update(num)
+								self.LastText.update(text)
 							end
-							props.Callback(num)
-	
+							props.Callback(text)
+
 							if oldLost then
 								oldLost(rbx, enterPressed)
 							end
-	
+
 							return
 						end
 					end
-				else
-					local text = rbx.Text
-	
-					-- Verify Char count
-					if (not props.Min) or #text >= props.Min then
-						if (not props.Max) or #text <= props.Max then
-	
-							-- Custom Verification
-							local verify = props.Verify
-							local passedCustom = true
-	
-							if verify then
-								local suc, new = pcall(verify, text)
-								if suc then
-									if new then
-										text = new
-									end
-								else
-									passedCustom = false
-								end
-							end
-	
-							-- callbacks
-							if passedCustom then
-								if not self.props.DontUpdateBinding then
-									self.LastText.update(text)
-								end
-								props.Callback(text)
-	
-								if oldLost then
-									oldLost(rbx, enterPressed)
-								end
-	
-								return
-							end
-						end
-					end
 				end
-	
-				-- reset text if not returned
-				if not self.props.DontUpdateBinding then
-					self.LastText.update(self.LastText:getValue())
-				end
-	
-				if oldLost then
-					oldLost(rbx, enterPressed)
-				end
-			end)
-		)
-	end
-	
-	I:Stateful(P()
-		:Name("DebugTextBox")
-		:Init(init)
-		:Render(render)
+			end
+
+			-- reset text if not returned
+			if not self.props.DontUpdateBinding then
+				self.LastText.update(self.LastText:getValue())
+			end
+
+			if oldLost then
+				oldLost(rbx, enterPressed)
+			end
+		end)
 	)
 end
+
+I:Stateful(P()
+	:Name("DebugTextBox")
+	:Init(init)
+	:Render(render)
+)
 
 return TextBox

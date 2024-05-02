@@ -3,7 +3,7 @@
 local mod = { }
 local mt_IDList = { __index = mod }
 
-local AssociativeList = _G.Game.PreLoad(game.ReplicatedFirst.Util.AssociativeList)
+local AssociativeList = require(game.ReplicatedFirst.Util.AssociativeList)
 
 function mod:add(item)
 	assert(typeof(item) ~= "number", "Cannot differentiate between numbers and their IDs")

@@ -47,7 +47,7 @@ local Tester = { }
 local mt_Tester = { __index = Tester }
 
 
-function mod:Builder( module_name: string )
+function mod.Tester( module_name: string )
 	assert(module_name)
 	assert(typeof(module_name) == "string")
 
@@ -212,15 +212,6 @@ do
 			return a1 < high and a1 >= low
 		end
 	end
-end
- 
-function mod:__init(G)
-	Globals = G
-end
-
--- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
-function mod:__finalize(G)
-
 end
 
 return mod

@@ -4,11 +4,12 @@
 local PlayerService = game:GetService("Players")
 
 local Game
-local AssociativeList
-local NameAssociations
-local IDAssociations
-local DataStore3
-local PlayerClass
+local AssociativeList = require(game.ReplicatedFirst.Util.AssociativeList)
+local DataStore3 = nil :: typeof(require(game.ServerScriptService.Lib.DataStore3))
+local PlayerClass = require(game.ReplicatedFirst.Modules.Players.PlayerClass)
+
+local IDAssociations = AssociativeList.new()
+local NameAssociations = AssociativeList.new()
 
 local AddRemotePlayerTransmitter
 
@@ -21,11 +22,7 @@ local ActualList = { }
 
 function mod:__init(G)
 	Game = G
-	AssociativeList = G.Load("AssociativeList")
-	NameAssociations = AssociativeList.new()
-	IDAssociations = AssociativeList.new()
-	DataStore3 = G.Load("DataStore3")
-	PlayerClass = G.Load("PlayerClass")
+	DataStore3 = G:Get("DataStore3")
 end
 
 -- A better PlayerAdded event

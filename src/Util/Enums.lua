@@ -9,16 +9,18 @@ local Enums = {
 	-- This enum must be numerically sorted acording to the order the steps are executed
 	-- These values describe the state of LazyModules startup
 	LOAD_CONTEXTS = {
-		PRELOAD = 1,
+		PRE_LOAD = 1,
 		LOAD_INIT = 2,
 		SIGNAL_BUILDING = 4,
+		UI = 5,
 
-		AWAITING_SERVER_DATA = 5,
-		LOAD_DATASTORES = 6,
-		LOAD_GAMESTATE = 7,
+		AWAITING_SERVER_DATA = 16,
+		LOAD_DATASTORES = 17,
+		LOAD_GAMESTATE = 18,
 
-		FINALIZE = 8,
-		RUN = 9,
+		FINALIZE = 19,
+		RUN = 20,
+		TESTING = 21,
 
 		FINISHED = 1000
 	},

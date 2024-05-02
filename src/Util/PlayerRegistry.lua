@@ -9,13 +9,14 @@
 	--TODO: Tests
 	--TODO: Analyze if this module covers all the sensible use cases
 ]]
-
 local mod = { }
-local mt_PlayerRegistry = { __index = mod }
-local Registry = _G.Game.PreLoad(script.Parent.Registry)
-
 local Registries = { }
 
+local Players = game:GetService("Players")
+local Registry
+
+local PlayerRegistry = { }
+PlayerRegistry.__index = PlayerRegistry
 
 -- These manage this type of registry by using the above `Registries` list as an upvalue
 local function PlayerJoined(plr)
@@ -33,7 +34,7 @@ end
 function mod.new(ctor)
 	local t = Registry.new(ctor)
 		:LoadExisting(function(self)
-			for i, plr in game.Players:GetPlayers() do
+			for i, plr in Players:GetPlayers() do
 				self.Registry[plr] = self.__ctor(plr)
 			end
 		end)
@@ -45,14 +46,14 @@ function mod.new(ctor)
 	return t
 end
 
-
-
 function mod:__build_signals(G, B)
-	game.Players.PlayerAdded:Connect(PlayerJoined)
+	Players.PlayerAdded:Connect(PlayerJoined)
+	Players.PlayerRemoving:Connect(PlayerLeaved)
 end
 
 function mod:__init(G)
-	Registry = G.Load("Registry")
+	Registry = G:Get("Registry")
 end
+
 
 return mod

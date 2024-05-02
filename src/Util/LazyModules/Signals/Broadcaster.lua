@@ -14,11 +14,12 @@
 
 	Search `NewBroadcaster` for example patterns in other modules
 ]]
+local async_list = require(game.ReplicatedFirst.Util.AsyncList)
 
 local mod = {
 	Broadcasters = {
-		Identifiers = { },
-		Modules = { }
+		Identifiers = async_list.new(1),
+		Modules = async_list.new(2),
 	}
 }
 
@@ -26,14 +27,9 @@ local Broadcasters = mod.Broadcasters
 
 --local INIT_CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 
-local Globals
-local safe_require
-local async_list
-local ClassicSignal
+local ClassicSignal = require(game.ReplicatedFirst.Util.LazyModules.Signals.ClassicSignal)
 
 local IsServer = game:GetService("RunService"):IsServer()
-
-local Players = game.Players
 
 local remote_wrapper = require(script.Parent.__remote_wrapper).wrapper
 
@@ -134,7 +130,7 @@ local function default_should_accept()
 end
 
 -- Broadcasters use a client->server?->all-clients model
-function mod.NewBroadcaster(self: Builder, identifier: string)
+function mod.NewBroadcaster(current_module: string, identifier: string)
 	local broadcaster = remote_wrapper(identifier, mt_BroadcastBuilder)
 	broadcaster[2] = ClassicSignal.new()
 	broadcaster.Connections = 0
@@ -142,29 +138,13 @@ function mod.NewBroadcaster(self: Builder, identifier: string)
 	setmetatable(broadcaster, mt_BroadcastBuilder)
 
 	if Broadcasters.Identifiers:inspect(identifier) ~= nil then
-		error("Re-declared broadcaster `" .. identifier .. "` in `" .. self.CurrentModule .. "`")
+		error("Re-declared broadcaster `" .. identifier .. "` in `" .. current_module .. "`")
 	end
 
 	Broadcasters.Identifiers:provide(broadcaster, identifier)
-	Broadcasters.Modules:provide(broadcaster, self.CurrentModule, identifier)
+	Broadcasters.Modules:provide(broadcaster, current_module, identifier)
 
 	return broadcaster
-end
-
-function mod:__init(G)
-	Globals = G
-
-	--The one true require tree
-	safe_require = require(game.ReplicatedFirst.Util.SafeRequire)
-	safe_require = safe_require.require
-
-	ClassicSignal = require(game.ReplicatedFirst.Util.LazyModules.Signals.ClassicSignal)
-
-	async_list = require(game.ReplicatedFirst.Util.AsyncList)
-	async_list:__init(G)
-
-	mod.Broadcasters.Identifiers = async_list.new(1)
-	mod.Broadcasters.Modules = async_list.new(2)
 end
 
 return mod

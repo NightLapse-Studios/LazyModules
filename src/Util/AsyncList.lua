@@ -1,4 +1,5 @@
 --!strict
+--!native
 
 --[[
 
@@ -7,27 +8,67 @@
 
 ]]
 
+local SparseList = require(game.ReplicatedFirst.Util.SparseList)
+
 local mod = { }
-local mt_AsyncValue = { __index = mod }
-local SparseList
+
+local AsyncList = { }
+AsyncList.__index = AsyncList
+
+type _provided = {}
+
+export type AsyncList<T> = {
+	provided: 		T,
+	awaiting: 		SparseList.SparseList,
+	__index_ct: 	number,
+
+	is_awaiting: 	(AsyncList<T>) -> boolean,
+	provide: 		(AsyncList<T>, value: any, ...any) -> (),
+	
+	get:			(AsyncList<T>, ...any) -> any?,
+	inspect: 		(AsyncList<T>, ...any) -> any?,
+	remove: 		(AsyncList<T>, ...any) -> (),
+	__fill_indices: (AsyncList<T>, { [any]: any }, { any }, any) -> ({ [any]: any }),
+	__await: 		(AsyncList<T>, { }, number, (any) -> (), number) -> (),
+}
+
+type indexer_table = { [unknown]: indexer_table }
+
+local function provided_type_factory(index_ct: number)
+	local provided_type = { }
+	for i = 1, index_ct - 1 do
+		-- local a = if i ~= index_ct then { } else (1 :: any)
+		local t = { }
+		provided_type[1] = t
+		provided_type = t
+	end
+
+	provided_type[1] = 1 :: any
+
+	return provided_type
+end
 
 -- @param index_ct the length of the sequence of indexes for the list, f[a][b] is 2 indexes
-function mod.new(index_ct: number)
+-- The number of indices to use is dependent on how you intend to call :provide
+function mod.new<T...>(index_ct: number)
 	local t = {
 		provided = { },
 		awaiting = SparseList.new(),
 		__index_ct = index_ct,
 	}
-	return setmetatable(t, mt_AsyncValue)
+
+	setmetatable(t, AsyncList)
+
+	return (t :: any) :: AsyncList<typeof(provided_type_factory(index_ct))>
 end
 
 -- returns if anything is waiting on a value
-function mod:is_awaiting()
+function AsyncList:is_awaiting()
 	return self.awaiting:is_empty() ~= true
 end
 
 -- Initializes the indexers and returns the final table
-function mod:__fill_indices(target_tbl, indexers, value)
+function AsyncList:__fill_indices(target_tbl, indexers, value)
 	local t = target_tbl
 
 	if value then
@@ -48,7 +89,7 @@ function mod:__fill_indices(target_tbl, indexers, value)
 end
 
 -- set value to be at the given sequence of indexes
-function mod:provide(value: any, ...)
+function AsyncList:provide(value: any, ...)
 	local indexers = { ... }
 	if #indexers ~= self.__index_ct then
 		error("Value provided to AsyncValue list has the wrong number of indexers")
@@ -57,7 +98,7 @@ function mod:provide(value: any, ...)
 	self:__fill_indices(self.provided, indexers, value)
 end
 
-function mod:__await(t, index, callback, id)
+function AsyncList:__await(t, index, callback, id)
 	local waiting_idx = self.awaiting:insert(id)
 
 	if t[index] == nil then
@@ -76,7 +117,7 @@ end
 
 -- the first paramaters are the sequence of indexes
 -- the last paramater is the function to call when the value is provided in the indexes
-function mod:get(...)
+function AsyncList:get(...)
 	local indexers = { ... }
 	local callback = table.remove(indexers, #indexers)
 	assert(typeof(callback) == "function")
@@ -106,7 +147,7 @@ function mod:get(...)
 		t = a
 	end
 
-	local co = coroutine.create(mod.__await)
+	local co = coroutine.create(AsyncList.__await)
 	local succ, ret = coroutine.resume(co, self, t, indexers[#indexers], callback, id)
 
 	if not succ then
@@ -125,7 +166,7 @@ function mod:get(...)
 end
 
 -- returns plainly what is stored at the given sequence of indexes
-function mod:inspect(...)
+function AsyncList:inspect(...)
 	local indexers = { ... }
 
 	local indices = math.min(#indexers, self.__index_ct - 1)
@@ -147,7 +188,7 @@ function mod:inspect(...)
 	return if exists then t[indexers[#indexers]] else nil
 end
 
-function mod:remove(...)
+function AsyncList:remove(...)
 	local indexers = { ... }
 
 	local indices = math.min(#indexers, self.__index_ct - 1)
@@ -235,10 +276,6 @@ function mod:__tests(G, T)
 			T.Equal, list:inspect("b", "a", "r"), nil
 		)
 	end)
-end
-
-function mod:__init(G)
-	SparseList = require(game.ReplicatedFirst.Util.SparseList)
 end
 
 return mod

@@ -1,8 +1,8 @@
 {
   "name": "LazyModules Project",
   "servePlaceIds": [
-		111111
-	],
+    0
+  ],
   "tree": {
     "$className": "DataModel",
     "$ignoreUnknownInstances": true,
@@ -43,6 +43,10 @@
       "$className": "Workspace",
       "$ignoreUnknownInstances": true,
       "$path": "src/workspace"
+    },
+    "Players": {
+      "$className": "Players",
+      "$ignoreUnknownInstances": true
     }
   }
 }

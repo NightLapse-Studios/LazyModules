@@ -1,14 +1,33 @@
+--!strict
+--!native
 
-local PSA = { }
-local module = { }
+local mod = { }
+local SparseList = { }
+SparseList.__index = SparseList
 
 export type SparseList = {
-	Contents: { any },
-	insert_stack: { number }
-}
-local mt = { __index = PSA }
+	Contents: 		{ any },
+	insert_stack: 	{ number },
 
-local function push_stack(stack, val): nil
+	insert: 		(SparseList, item: any) -> number,
+	remove: 		(SparseList, idx: number) -> any,
+	find_remove: 	(SparseList, item: any) -> boolean,
+	is_empty:		(SparseList) -> boolean,
+	dump: 			(SparseList) -> string,
+}
+
+function mod.new( opt_len: number? ): SparseList
+	local n = {
+		Contents = opt_len and table.create(opt_len) or { },
+		insert_stack = { }
+	}
+
+	setmetatable(n, SparseList)
+
+	return (n :: any):: SparseList
+end
+
+local function push_stack(stack, val)
 	stack[#stack + 1] = val
 end
 
@@ -26,14 +45,14 @@ local function pop_stack(stack): number?
 	return ret
 end
 
-function PSA:insert(item: any): number
-	local insert_idx  = (pop_stack(self.insert_stack) or (#self.Contents + 1)) :: number
+function SparseList:insert(item: any): number
+	local insert_idx  = (pop_stack(self.insert_stack) or (#self.Contents + 1))
 	self.Contents[ insert_idx ] = item
 
 	return insert_idx
 end
 
-function PSA:remove(idx: number): any
+function SparseList:remove(idx: number): any
 	local store = self.Contents[idx]
 	
 	if store == nil then
@@ -46,7 +65,7 @@ function PSA:remove(idx: number): any
 	return store
 end
 
-function PSA:find_remove(item: any): boolean
+function SparseList:find_remove(item: any): boolean
 	for i,v in pairs(self.Contents) do
 		if v == item then
 			self:remove(i)
@@ -58,7 +77,7 @@ function PSA:find_remove(item: any): boolean
 	return false
 end
 
-function PSA:is_empty(): boolean
+function SparseList:is_empty(): boolean
 	for _, _ in self.Contents do
 		return false
 	end
@@ -66,7 +85,7 @@ function PSA:is_empty(): boolean
 	return true
 end
 
-function PSA:dump()
+function SparseList:dump()
 	local s = ""
 	for i,v in self.Contents do
 		if v then
@@ -77,32 +96,21 @@ function PSA:dump()
 	return s
 end
 
-function module.newFromList( list: { any } ): SparseList
-	local n: SparseList = {
+function mod.newFromList( list: { any } ): SparseList
+	local n = {
 		Contents = list,
-		insert_stack = { } :: { number }
+		insert_stack = { }
 	}
 
-	setmetatable(n, mt)
+	setmetatable(n, SparseList)
 
-	return n
+	return (n :: any) :: SparseList
 end
 
-function module.new( opt_len: number? ): SparseList
-	local n: SparseList = {
-		Contents = opt_len and (table.create(opt_len) :: { any }) or ({ } :: { any }),
-		insert_stack = { } :: { number }
-	}
-
-	setmetatable(n, mt)
-
-	return n
-end
-
-function module:__tests(G, T)
+function mod:__tests(G, T)
 	local a,s,d,f,g = 1,2,3,4,5
 	local function generic_psa()
-		local psa = module.new(16)
+		local psa = mod.new(16)
 		psa:insert(a)
 		psa:insert(s)
 		psa:insert(d)
@@ -172,4 +180,4 @@ function module:__tests(G, T)
 	end)
 end
 
-return module
+return mod

@@ -1,100 +1,56 @@
 --!strict
---[[
-	This module is required from the client/server global scripts.
-	Its role is to take over all module loading after it is required from globals
+--!native
 
-	Any module depended that this module depends on must use regular `require`
-		and potentially emulate the call to `__init(self, G)`
-
-	Any module loaded using `Load` or `PreLoad` will be tracked and intialized by this module
-	Modules managed by this must be a table without special metatable redirection.
-		For example Roact implements `strict.lua` which will not allow us to *check* for missing fields in Roact modules
-		The solution chosen here is to turn the error into a warning... rip startup output.
-
-
-	Primary goals:
-		Answer the question "When does this code run"
-		Answer "When can I run this code"
-		Answer "Does this code depend on some state, or is it depended on by some state?"
-		Identify dependency issues before they would cause a problem
-		Make it obvious where the organization in a module comes from
-		Prevent module communication from being used in unintended ways
-		Make network communication obvious
-		Implement abstractions for common design patterns
-			(e.g. network communication has Transmitters (server <-> client) and Broadcasters (client-> server?-> all_clients)
-			(see `Signals.lua`)
-		Make single-file client-server scripts feasible and safer than multi-file approaches ( TODO: completeness )
-			(still allowing for multi-file approaches, but there will be fewer safety checks)
-
-
-`__init(G)`:
-	FUNCTION, selfcall?
-
-	Calls `G.Load` on required modules and other behavior that requires other systems to be availalbe
-
-`__no_preload`:
-	FLAG, boolean?
-
-__no_preload modules may depend on pre-loaded modules but pre-loaded modules will still be initialized in the same
-	phase as all others. __no_preload modules need to be manually loaded at a special time
-	(I don't know of other use cases than to define a custom load step for getting server data)
-
-`__build_signals`:(G, B):
-	FUNCTION, selfcall?
-
-	Use a Builder object to make structured network events and cross-module signals. It's just fancy wrappers around
-		events but applies rules that implement structures to help organize networked code, and prevent abuse of
-		hooking things.
-
-`__finalize(G)`:
-	FUNCTION, selfcall?
-
-	Start executing some runtime behavior. Signals are guaranteed to exist and other modules are assumed to be working
-		as if the game is running but not loaded.
-	This is the first step on the client in which standard server data such as PlayerStats exists
-
-`__run(G)`:
-	FUNCTION, selfcall?
-
-	A final finalization step, really. Things such as UI all rely on eachother which also all rely on PlayerStats
-		So without this step there would be no UI file capable of setting the initial page of the menu since not even
-		interface.lua can have any guarantees about when it is hit by __finalize relative to other modules
-
-
-	Additionally, LazyModules exposes some other general
-]]
-local mod = {
-	--TODO: This flag needs to be removed
-	Initialized = false,
-	Signals = false,
-
-	CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT",
-}
-
-local CollectedModules: { [string]: script }  = { }
-local PreLoads: { [string]: script } = { }
-local Initialized: {[string]: boolean} = { }
-
-local LOAD_CONTEXTS = require(game.ReplicatedFirst.Util.Enums).LOAD_CONTEXTS
-local CONTEXT = mod.CONTEXT
-local SOURCE_NAME = debug.info(function() return end, "s")
-
-local Roact = require(game.ReplicatedFirst.Util.Roact)
+local safe_require = require(game.ReplicatedFirst.Util.SafeRequire).require
 local Config = require(game.ReplicatedFirst.Util.Config)
 local AsyncList = require(game.ReplicatedFirst.Util.AsyncList)
 
-local depth = 0
+local Enums = require(game.ReplicatedFirst.Util.Enums)
+
+local mod = { }
+
+local LOAD_CONTEXTS = Enums.LOAD_CONTEXTS
+local CONTEXT = if game:GetService("RunService"):IsServer()  then ("SERVER" :: ServerContext) else ("CLIENT" :: ClientContext)
+local SOURCE_NAME = debug.info(function() return end, "s")
 
 
-local Game
--- This module is required from __run in this module
--- Because it needs to go through the whole loading process in order to rely on Assets, etc
-local UI
-local Signals
-local Tests
-local safe_require
+
+local Signals = require(script.Signals)
+local Tests = require(script.Tests)
+local Pumpkin = require(game.ReplicatedFirst.Util.Pumpkin)
+
+
+
+local Initialized = { }
+
+local function set_context(G, context: number)
+	local prior = G.LOADING_CONTEXT
+
+	if (context < prior) then
+		error(`\n{CONTEXT} \n LM Init: returning to older startup context than current.\nOld context: {prior}\nNew context: {context}\n\nThis is likely LM misuse or an LM bug`)
+	end
+
+	G.LOADING_CONTEXT = context
+
+	return prior
+end
+
+local function reset_context(G, prev: number)
+	G.LOADING_CONTEXT = prev
+end
+
+local function can_init(mod_name)
+	if Initialized[mod_name] then
+		warn("Module " .. mod_name .. " already initialized (??)")
+		return false
+	end
+
+	return true
+end
+
 
 -- Convenience function
+local depth = 0
 local function indent()
 	local _indent = ""
 	for i = 1, depth, 1 do
@@ -102,30 +58,6 @@ local function indent()
 	end
 
 	return _indent
-end
-
--- Determine for our scripts if they are initializing or not
-local function set_context(context: number)
-	local prior = Game.LOADING_CONTEXT
-
-	-- Do some additional context considerations and error checking
-	--prior, context = process_context(prior, context)
-
-	-- If our new context is initializing, then the prior contexts must have been initializing too.
-	if context == LOAD_CONTEXTS.LOAD_INIT then
-		if not (prior >= LOAD_CONTEXTS.LOAD_INIT) then
-			error("\n" .. CONTEXT .. " init: Module is attempting to load during pre-loading" ..
-				"Hint: if LazyModules executes an `__init` function, then it must be caused by another module's `__init` function\nExcept for the first module in the init tree")
-		end
-	end
-
-	Game.LOADING_CONTEXT = context
-
-	return prior
-end
-
-local function reset_context(prev: number)
-	Game.LOADING_CONTEXT = prev
 end
 
 local function warn_load_err(name: string)
@@ -154,275 +86,79 @@ function mod.format_lazymodules_traceback()
 	return traceback
 end
 
-local function init_wrapper(module, name)
-	local s, r = pcall(function() return module.__no_lazymodules end)
-	if s and r then
-		return
-	end
+local LMGame = { }
+LMGame.__index = LMGame
 
-	local prior_context = set_context(LOAD_CONTEXTS.LOAD_INIT)
-	if typeof(module.__init) ~= "function" then
-		-- Some legacy decisions for Roact's ability to be managed by LM have necessitated this check
-		-- TODO: Fix? Remove?
-		return
-	end
+function mod.newGame()
+	local newGame = {
+		-- List of modules by name and their return value
+		_CollectedModules = { },
+		-- Reverse lookup of modules by their value to their name
+		_ModuleNames = { },
+		_Initialized = { },
+		CONTEXT = CONTEXT,
+		LOADING_CONTEXT = -1
+	}
 
-	module:__init(Game)
-	reset_context(prior_context)
+	setmetatable(newGame, LMGame)
+
+	return (newGame :: any) :: Game
 end
 
-local function signals_wrapper(module, name)
-	local s, r = pcall(function() return module.__no_lazymodules end)
-	if s and r then
-		return
-	end
-
-	local prior_context = set_context(LOAD_CONTEXTS.SIGNAL_BUILDING)
-
-	-- Configure the builder for this module
-	local builder = Signals:Builder( name )
-
-	-- Pass the builder to the module
-	-- The module will use the builder to register its signals
-	if typeof(module.__build_signals) ~= "function" then
-		-- Some legacy decisions for Roact's ability to be managed by LM have necessitated this check
-		-- TODO: Fix? Remove?
-		print(0)
-		return
-	end
-	module:__build_signals(Game, builder)
-	reset_context(prior_context)
+local function add_module<O, S, T>(obj: O, name: S, module: T): ItemWith<O, S, T>
+	obj[name] = module
+	return obj :: ItemWith<O, S, T>
 end
 
-local function get_gamestate_wrapper(module, plr)
-	local s, r = pcall(function() return module.__no_lazymodules end)
-	if s and r then
+function LMGame:_require<M>(script: ModuleScript, name: string)
+	local prior_context = set_context(self, LOAD_CONTEXTS.PRE_LOAD)
+
+	local module_value = safe_require(script)
+
+	if typeof(module_value) ~= "table" then
 		return
 	end
 
-	-- player being necessary for gamestate is unlikely, but incase necessary.
-	-- @param name is a the name of the module on the client that should receive this state via __load_gamestate,
-	-- will default to the name of the module.
-	local state, name = module:__get_gamestate(plr)
-	
-	return state, name
-end
+	reset_context(self, prior_context)
 
-local function load_gamestate_wrapper(module, modulestate, loadedList, moduleName)
-	local s, r = pcall(function() return module.__no_lazymodules end)
-	if s and r then
-		return
-	end
-
-	local prior_context = set_context(LOAD_CONTEXTS.LOAD_GAMESTATE)
-	
-	local loaded_func = function()
-		loadedList:provide(true, moduleName)
-	end
-	local after_func = function(name, callback)
-		loadedList:get(name, callback)
-	end
-
-	if not modulestate then
-		loaded_func()
-	else
-		-- @param1, the state returned by __get_gamestate
-		-- @param2, a function that you MUST call when you have finished loading, see Gamemodes.lua for a good example.
-		-- @param3, a function that you can pass another module name into to ensure its state loades before your callback is called.
-		module:__load_gamestate(modulestate, loaded_func, after_func)
-	end
-	
-	reset_context(prior_context)
-end
-
-local function tests_wrapper(module, name)
-	local s, r = pcall(function() return module.__no_lazymodules end)
-	if s and r then
-		return
-	end
-
-	-- Configure the builder for this module
-	local builder = Tests:Builder( name )
-
-	-- __tests **may** yield, we leverage this as a feature
-	-- However it means that __tests cannot rely on eachother (probably a good thing)
-	module:__tests(Game, builder)
-	builder:Finished()
-end
-
-local function finalize_wrapper(module, name)
-	local s, r = pcall(function() return module.__no_lazymodules end)
-	if s and r then
-		return
-	end
-
-	local prior_context = set_context(LOAD_CONTEXTS.FINALIZE)
-	module:__finalize(Game)
-	reset_context(prior_context)
-end
-
-local function ui_wrapper(module, name)
-	local s, r = pcall(function() return module.__no_lazymodules end)
-	if s and r then
-		return
-	end
-
-	local prior_context = set_context(LOAD_CONTEXTS.RUN)
-
-	-- Note that UI will not exist on server contexts
-	if Config.LogUIInit then
-		print(" -- > UI INIT: " .. name)
-	end
-
-	module:__ui(Game, UI, UI.P, Roact)
-	reset_context(prior_context)
-end
-
-local function run_wrapper(module, name)
-	local s, r = pcall(function() return module.__no_lazymodules end)
-	if s and r then
-		return
-	end
-
-	local prior_context = set_context(LOAD_CONTEXTS.RUN)
-
-	-- Note that UI will not exist on server contexts
-	module:__run(Game, UI)
-	reset_context(prior_context)
-end
-
-local function try_init(module, name, astrisk)
-	astrisk = astrisk or ""
-
-	if Initialized[name] ~= true then
-		Initialized[name] = true
-		depth += 1
-
-		if Config.LogLoads then
-			print(indent() .. name .. astrisk)
-		end
-
-		local s, r = pcall(function() return module.__init end)
-		if s and r then
-			init_wrapper(module, name)
-		end
-		s, r = pcall(function() return module.__build_signals end)
-		if s and r then
-			signals_wrapper(module, name)
-		end
-
-		depth -= 1
-	end
-end
-
---[[
-	Some modules return using metatables that allows PreLoad to have side effects
-	This avoids indexing
-	A string is also required so that naming overrides are processed by the time __raw_load is called
-]]
-function mod.__raw_load(script: Instance, name: string): any
-	local prior_context = set_context(LOAD_CONTEXTS.PRELOAD)
-
-	local module = safe_require(script)
-
-	if typeof(module) ~= "table" then
-		return
-	end
-
-	reset_context(prior_context)
-	
 	-- Guard against multiple inits on one module
-	if Initialized[name] ~= nil then
-		return module
+	if self._Initialized[name] ~= nil then
+		return module_value
 	end
 
-	CollectedModules[name] = module
-	PreLoads[name] = module
-	Initialized[name] = false
+	self._CollectedModules = add_module(self._CollectedModules, name, module_value)
+	self._ModuleNames[module_value] = name
+	self._Initialized[name] = false
 
-	return module
+	return module_value
 end
 
-function mod.PreLoad(script: Instance, opt_name: string?): any
+local function preload(self, script: ModuleScript, opt_name: string?)
 	-- This check was discovered because referencing string.Name doesn't error, but returns nil for some reason
 	-- It is common to mistakenly pass a string into thie function
 	if typeof(script.Name) ~= "string" then
 		error("Value passed into LazyModules.PreLoad must be a script")
 	end
 
-	opt_name = opt_name or script.Name
+	opt_name = (opt_name or script.Name) :: string
 
-	local module = CollectedModules[opt_name]
+	local module = self._CollectedModules[opt_name]
 	if not module then
 		if Config.LogPreLoads then
 			print(opt_name)
 		end
 
-		module = mod.__raw_load(script, opt_name)
+		module = self:_require(script, opt_name)
 	end
 
 	return module
 end
 
-function mod.Load(script: (string | Instance)): any?
-	local module
-	if typeof(script) == "string" then
-		-- A script's name has been passed in
-		module = CollectedModules[script]
+local CollectionBlacklist: {Instance} = Config.ModuleCollectionBlacklist
+local ContextCollectionBlacklist: {Instance} = if CONTEXT == "SERVER" then Config.ModuleCollectionBlacklist.Server else Config.ModuleCollectionBlacklist.Client
 
-		if not module then
-			warn_load_err(script)
-			return
-		end
-	elseif script then
-		-- A script has been passed in
-		module = mod.__raw_load(script, script.Name)
-
-		if not module then
-			warn_load_err(script.Name)
-		end
-
-		try_init(module, script.Name, " **FROM INSTANCE**")
-
-		return module
-	end
-
-	try_init(module, script)
-
-	return module
-end
-
-function mod.LightLoad(script: Instance): any?
-	local module
-
-	-- A script has been passed in
-	module = mod.__raw_load(script, script.Name)
-
-	try_init(module, script.Name)
-
-	local s, r
-	if CONTEXT == "CLIENT" then
-		s, r = pcall(function() return module.__ui end)
-		if s and r then
-			ui_wrapper(module, script.Name)
-		end
-	end
-
-	if module.__run or module.__finalize then
-		warn("Module `" .. script.Name .. "` has loading stages which are not supported by LightLoad")
-		--warn("\tRequired from:\n" .. mod.format_lazymodules_traceback())
-	end
-
-	return module
-end
-
-
-
-local CollectionBlacklist = Config.ModuleCollectionBlacklist
-local ContextCollectionBlacklist = if CONTEXT == "SERVER" then Config.ModuleCollectionBlacklist.Server else Config.ModuleCollectionBlacklist.Client
-
-local function recursive_collect(instance: Instance)
-	for _,v in instance:GetChildren() do
+function LMGame:_recursive_collect(instance: Folder | ModuleScript)
+	for _,v: Instance in instance:GetChildren() do
 		if table.find(CollectionBlacklist, v) or table.find(ContextCollectionBlacklist, v) then
 			continue
 		end
@@ -432,7 +168,7 @@ local function recursive_collect(instance: Instance)
 		end
 
 		if v:IsA("Folder") then
-			recursive_collect(v)
+			self:_recursive_collect(v)
 			continue
 		end
 
@@ -442,240 +178,202 @@ local function recursive_collect(instance: Instance)
 
 		-- This is kind of flimsy since PreLoad can do this on its own
 		-- TODO: A Call to PreLoad before we collect can cause false positives
-		if CollectedModules[v.Name] ~= nil then
-			if PreLoads[v.Name] ~= CollectedModules[v.Name] then
-				warn("Error durring module collection:\nModule name already used: " .. v.Name)
-			end
+		if self._CollectedModules[v.Name] ~= nil then
+			warn("Error durring module collection:\nModule name already used: " .. v.Name)
 		end
 
-		CollectedModules[v.Name] = mod.PreLoad(v)
+		preload(self, v)
 
-		recursive_collect(v)
+		self:_recursive_collect(v)
 	end
 end
 
 
-function mod.CollectModules(Game)
-	for _, dir in Config.ModuleCollectionFolders do
-		recursive_collect(dir)
+function LMGame:CollectModules()
+	for _, dir: Folder in Config.ModuleCollectionFolders do
+		self:_recursive_collect(dir)
 	end
+
+	return self
+end
+
+function LMGame:__init(G)
+
 end
 
 
+export type ServerContext = "SERVER"
+export type ClientContext = "CLIENT"
+
+type ItemWith<O, S, T> = O & { [S]: T }
+
+-- export type InitializingGame = typeof(mod.newGame())
+export type Game = typeof(mod.newGame():CollectModules())
+
+--[[ type API = {
+	newGame: () -> Game
+} ]]
 
 
-local IsServer = game:GetService("RunService"):IsServer()
+local function try_init(G, module, name)
+	if Config.LogLoads then
+		print("LM init: " .. name)
+	end
 
---[[
-	To support gradually moving to this heirarchy, modules that need an __init call
-	but are depended on by only pre-loaded modules, we'll initialize them anyway.
-
-	These modules can be a problem if their parent scripts have no idea that the it might not be ready to do everything
-]]
-function mod.Begin(Game, Main)
-	Game.LOADING_CONTEXT = LOAD_CONTEXTS.LOAD_INIT
-
-	-- TODO: @NoCommit Game.Main junk
-	try_init(Main, "Main")
-
-	for i,v in PreLoads do
-		if typeof(v) ~= "table" then continue end
-
-		local did_init = Initialized[i]
-		if did_init == false then
-			try_init(v, i, " DANGLING!!!")
+	local s, r = pcall(function() return module.__init end)
+	if s and r then
+		if typeof(module.__init) ~= "function" then
+			return
 		end
-	end
-
-	if not IsServer then
-		local GameStateLoaded = AsyncList.new(1)
-		
-		local CanContinue = Instance.new("BindableEvent")
-		
-		local ClientReadyEvent = game.ReplicatedStorage:WaitForChild("ClientReadyEvent")
-		ClientReadyEvent.OnClientEvent:Connect(function(gamestate)
-			mod:__load_gamestate(gamestate, GameStateLoaded)
-			
-			while GameStateLoaded:is_awaiting() do
-				--print(GameStateLoaded.awaiting.Contents)
-				task.wait()
-			end
-			
-			CanContinue:Fire()
-		end)
-		
-		local prior_context = set_context(LOAD_CONTEXTS.AWAITING_SERVER_DATA)
-		
-		ClientReadyEvent:FireServer()
-		CanContinue.Event:Wait()
-		
-		reset_context(prior_context)
-	end
-
-	mod:__finalize(Game)
 	
-	mod:__run(Game)
-	
-	if IsServer then
-		local ClientReadyEvent = Instance.new("RemoteEvent")
-		ClientReadyEvent.Name = "ClientReadyEvent"
-		ClientReadyEvent.OnServerEvent:Connect(function(player)
-			while (not Game[player]) or (not Game[player].ServerLoaded) do
-				task.wait()
-			end
-			
-			local gamestate = mod:__get_gamestate(player)
-			ClientReadyEvent:FireClient(player, gamestate)
-		end)
-		
-		ClientReadyEvent.Parent = game.ReplicatedStorage
+		local prior_context = set_context(G, LOAD_CONTEXTS.LOAD_INIT)
+		module:__init(G)
+		reset_context(G, prior_context)
 	end
-	
-	--We do this last so that UI and stuff can be set up too. Even game processes over large periods of time can
-	-- potentially be tested
-	if Config.TESTING ~= false then
-		assert(Config.TESTING == true or Config.TESTING == "CLIENT" or Config.TESTING == "SERVER")
-		mod:__tests(Game)
-	end
-
-	set_context(LOAD_CONTEXTS.FINISHED)
 end
 
-local APIUtils = require(game.ReplicatedFirst.Util.APIUtils)
-APIUtils.EXPORT_LIST(mod)
-	:ADD("LazyModules", mod)
-	:ADD("LightLoad")
-	:ADD("Load")
-	:ADD("PreLoad")
-	:ADD("CONTEXT")
-
-function mod:__init(G)
-	Game = G
-
-	Game.LOADING_CONTEXT = -1
-	--The one true require tree
-	safe_require = require(script.Parent.SafeRequire)
-	safe_require = safe_require.require
-
-	Signals = require(script.Signals)
-	Signals:__init(G, mod)
-	mod.Signals = Signals
-
-	Tests = require(script.Tests)
-	Tests:__init(G, mod)
-	mod.Tests = Tests
-
-	if CONTEXT == "CLIENT" then
-		UI = mod.PreLoad(script.UI)
+local function try_signals(G, module, name)
+	if Config.LogLoads then
+		print("LM signals: " .. name)
 	end
 
-	self.Initialized = true
-end
-
-function mod:__get_gamestate(plr)
-	local gamestate = {}
-	
-	for i,v in PreLoads do
-		if typeof(v == "table") then
-			local s, r
-			s, r = pcall(function() return v.__get_gamestate end)
-			if s and r then
-				local state, name = get_gamestate_wrapper(v, plr)
-				
-				if not name then
-					name = i
-				end
-				
-				gamestate[name] = state
-			end
+	local s, r = pcall(function() return module.__build_signals end)
+	if s and r then
+		if typeof(module.__build_signals) ~= "function" then
+			return
 		end
-	end
+
+		Signals.SetModule(self, module_name)
 	
-	return gamestate
-end
-
-function mod:__load_gamestate(gamestate, GameStateLoadedList)
-	for i,v in PreLoads do
-		if typeof(v == "table") then
-			local s, r
-			s, r = pcall(function() return v.__load_gamestate end)
-			if s and r then
-				load_gamestate_wrapper(v, gamestate[i], GameStateLoadedList, i)
-			end
-		end
+		local prior_context = set_context(G, LOAD_CONTEXTS.SIGNAL_BUILDING)
+		module:__build_signals(G, Signals)
+		reset_context(G, prior_context)
 	end
 end
 
-function mod:__finalize(G)
-	-- Signals must do its thing first since it implements the stage which comes before this one.
-	-- It really serves no purpose until its "finalized"
-	Signals.BuildSignals(G)
-
-	for i,v in PreLoads do
-		if typeof(v == "table") then
-			--Roact managed to ruin everything
-			local s, r = pcall(function() return v.__finalize end)
-			if s and r then
-				finalize_wrapper(v, i)
-			end
-		end
+local function try_ui(G, module, name)
+	if Config.LogLoads then
+		print("LM ui: " .. name)
 	end
-end
 
-function mod:__tests(G)
-	print("\n\t\tTESTING\n")
-
-	for i,v in PreLoads do
-		if typeof(v == "table") then
-			--Roact managed to ruin everything
-			local s, r = pcall(function() return v.__tests end)
-			if s and r then
-				tests_wrapper(v, i)
-			end
+	local s, r = pcall(function() return module.__ui end)
+	if s and r then
+		if typeof(module.__ui) ~= "function" then
+			return
 		end
-	end
-end
-
-function mod:__run(G)
-	local ui_tasks = {}
 	
-	for i,v in PreLoads do
-		if typeof(v == "table") then
-			--Roact managed to ruin everything
-			local s, r
-			if CONTEXT == "CLIENT" then
-				s, r = pcall(function() return v.__ui end)
-				if s and r then
-					table.insert(ui_tasks, task.spawn(ui_wrapper, v, i))
-				end
-			end
-		end
+		local prior_context = set_context(G, LOAD_CONTEXTS.AWAITING_SERVER_DATA)
+		module:__ui(G, Pumpkin, Pumpkin.P, Pumpkin.Roact)
+		reset_context(G, prior_context)
 	end
+end
+
+local function try_run(G, module, name)
+	if Config.LogLoads then
+		print("LM run: " .. name)
+	end
+
+	local s, r = pcall(function() return module.__run end)
+	if s and r then
+		if typeof(module.__run) ~= "function" then
+			return
+		end
 	
-	while true do
-		local do_wait = false
-		for _, thread in ui_tasks do
-			if coroutine.status(thread) ~= "dead" then
-				do_wait = true
-				break
-			end
+		local prior_context = set_context(G, LOAD_CONTEXTS.LOAD_INIT)
+		module:__run(G)
+		reset_context(G, prior_context)
+	end
+end
+
+local function try_tests(G, module, name)
+	if Config.LogLoads then
+		print("LM TESTING: " .. name)
+	end
+
+	local s, r = pcall(function() return module.__tests end)
+	if s and r then
+		if typeof(module.__tests) ~= "function" then
+			return
 		end
 		
-		if do_wait then
-			task.wait()
-		else
-			break
-		end
-	end
+		local tester = Tests.Tester(name)
 	
-	for i,v in PreLoads do
-		if typeof(v == "table") then
-			local s, r = pcall(function() return v.__run end)
-			if s and r then
-				run_wrapper(v, i)
-			end
-		end
+		local prior_context = set_context(G, LOAD_CONTEXTS.TESTING)
+		module:__tests(G, tester)
+		tester:Finished()
+		reset_context(G, prior_context)
 	end
 end
+
+function LMGame:Begin(Main, name: string)
+	for mod_name, module_val in self._CollectedModules do
+		if not can_init(mod_name) then
+			warn("Module " .. mod_name .. " already initialized (this is probably a huge bug)")
+			continue
+		end
+
+		try_init(self, module_val, mod_name)
+	end
+
+	for mod_name, module_val in self._CollectedModules do
+		if not can_init(mod_name) then continue end
+		try_signals(self, module_val, mod_name)
+	end
+
+	for mod_name, module_val in self._CollectedModules do
+		if not can_init(mod_name) then continue end
+		try_ui(self, module_val, mod_name)
+	end
+
+	for mod_name, module_val in self._CollectedModules do
+		if not can_init(mod_name) then continue end
+		try_run(self, module_val, mod_name)
+
+		Initialized[mod_name] = true
+	end
+
+	for mod_name, module_val in self._CollectedModules do
+		try_tests(self, module_val, mod_name)
+	end
+end
+
+function LMGame:Get(name: string, opt_specific_context: ("CLIENT" | "SERVER")?)
+	if self.LOADING_CONTEXT < LOAD_CONTEXTS.LOAD_INIT then
+		error("Game:Get before init stage is undefined and non-determinisitic")
+	end
+
+	local mod = self._CollectedModules[name]
+
+	if not mod then
+		if opt_specific_context and self.CONTEXT == opt_specific_context then
+			warn(`Attempt to get unfound module {name}. Provide a context to silence if this is context related`)
+		end
+	end
+
+	return mod
+end
+
+function LMGame:Load(module: ModuleScript)
+	assert(module:IsA("ModuleScript"))
+
+	local name = module.Name
+	local mod_which_shouldnt_exist = self._CollectedModules[name]
+
+	if mod_which_shouldnt_exist then
+		error(`Won't load already-collected module {name}!\nGame:Load is intended for uncollected modules.\nTypically you will add a folder of modules to Config.CollectionBlacklist and load them manually`)
+	end
+
+	local module_val = safe_require(module)
+	try_init(self, module_val, name)
+	-- Signals may not resolve until the tick after which this is called
+	-- Potentially more but generally contrived situtations are what causes waits of additional ticks
+	try_signals(self, module_val, name)
+	try_ui(self, module_val, name)
+	try_run(self, module_val, name)
+	try_tests(self, module_val, name)
+
+	return module_val
+end
+
 
 return mod

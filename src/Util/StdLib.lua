@@ -1,21 +1,21 @@
+--!strict
 --[[
 	Loads a set of modules, places their API exports in the Game object on __init
 ]]
-
-local Game = _G.Game
-assert(Game, "StdLib is running prior to LazyModules initialization\n\tOr LazyModules is not running as expected")
 
 local Config = require(game.ReplicatedFirst.Util.Config)
 
 local mod = { }
 local Libs = {
-	Enums = Game.PreLoad(game.ReplicatedFirst.Util.Enums),
-	Meta = Game.PreLoad(game.ReplicatedFirst.Util.Meta),
-	Debug = Game.PreLoad(game.ReplicatedFirst.Util.Debug),
-	DebugMenu = Game.PreLoad(game.ReplicatedFirst.Util.Debug.DebugMenu),
-	Maskables = Game.PreLoad(game.ReplicatedFirst.Util.Maskables),
-	Config = Game.PreLoad(game.ReplicatedFirst.Util.Config),
+	Enums = require(game.ReplicatedFirst.Util.Enums),
+	Meta = require(game.ReplicatedFirst.Util.Meta),
+	Debug = require(game.ReplicatedFirst.Util.Debug),
+	DebugMenu = require(game.ReplicatedFirst.Util.Debug.DebugMenu),
+	Maskables = require(game.ReplicatedFirst.Util.Maskables),
+	Config = require(game.ReplicatedFirst.Util.Config),
 }
+
+local Game
 
 local function print_s(...)
 	if Game.CONTEXT == "SERVER" then
@@ -59,11 +59,12 @@ else
 end
 
 function mod.LoadExports(G)
-	APIUtils.LOAD_EXPORTS(Libs, Game)
+	Game = G
+	APIUtils.LOAD_EXPORTS(Libs, G)
 
 	for i,v in Libs do
 		if APIUtils.HAS_API_EXPORTS(v) then
-			APIUtils.LOAD_EXPORTS(v, Game)
+			APIUtils.LOAD_EXPORTS(v, G)
 		end
 	end
 end

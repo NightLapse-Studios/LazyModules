@@ -2,7 +2,9 @@
 
 local mod = { }
 
-function mod.require(_s: Script)
+
+
+function mod.require<M>(_s: M)
 	assert(_s, "No script passed to require")
 
 	local co = coroutine.create(require)
@@ -18,7 +20,7 @@ function mod.require(_s: Script)
 		return ret, true, trace
 	end
 
-	return ret, false, nil
+	return ret :: typeof(require(_s)), false, nil
 end
 
 return mod

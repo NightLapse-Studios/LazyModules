@@ -73,6 +73,7 @@ end
 --=          Runtime configuration            =--
 --=                                           =--
 --=============================================--
+
 -- Must point to the one main place, no matter what.
 Config.MaxPlayers = 35
 Config.GroupID = 5418470
@@ -91,7 +92,7 @@ Config.Gravity = Vector3.new(0, -32.2, 0)-- Bullets
 --=============================================--
 
 -- Run lazymodules tests stage
-Config.TESTING = false
+Config.TESTING = true
 -- Optional string, a module name
 Config.FocusTestOn = false
 
@@ -125,8 +126,8 @@ Config.ModuleCollectionFolders = {
     if RunService:IsServer() then game.ServerScriptService else game.StarterPlayer.StarterPlayerScripts
 }
 Config.ModuleCollectionBlacklist = {
-    game.ReplicatedFirst.Util.Roact,
     game.ReplicatedFirst.Util.LazyModules,
+    game.ReplicatedFirst.Util.Pumpkin,
     Server = {
         game.ReplicatedFirst.Util.UserInput
     },
@@ -145,5 +146,7 @@ Config.ModuleCollectionBlacklist = {
 
 -- Debug hooks features for adjusting values at runtime from DebugMenu
 Config.VolumeOverrides = ContextVar(false, true, false, false)
+
+Config.SaveDatastoresInStudio = false
 
 return Config

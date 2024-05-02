@@ -1,4 +1,6 @@
 --!strict
+--!native
+
 --[[
 	Part of the LazyModules system
 
@@ -24,41 +26,40 @@ Valid usage:
 ]]
 local mod = {
 	Nouns = { },
+	CurrentModule = "",
 }
-
-local Globals
-local LazyModules
-local PSA
-local Err
-local safe_require
 
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local IsServer = game:GetService("RunService"):IsServer()
 
-local AnyEventIsWaiting = false
-
-local Players = game.Players
-
-local PlayerScripts = if IsServer then false else game.Players.LocalPlayer.PlayerScripts
 local CONTEXT = IsServer and "SERVER" or "CLIENT"
 
+local SparseList = require(ReplicatedFirst.Util.SparseList)
+
 --event abstraction modules
-local Transmitter
-local Broadcaster
-local Event
+local Transmitter = require(script.Transmitter)
+local Broadcaster = require(script.Broadcaster)
+local Event = require(script.Event)
 
---lists
-local Transmitters
-local Broadcasters
-local Events
+local Transmitters = Transmitter.Transmitters
+local Broadcasters = Broadcaster.Broadcasters
+local Events = Event.Events
 
-local WaitingList
+mod.NewEvent = Event.NewEvent
+mod.NewTransmitter = Transmitter.NewTransmitter
+mod.NewBroadcaster = Broadcaster.NewBroadcaster
 
+local mt_ClientTransmitter = Transmitter.client_mt
+local mt_ServerTransmitter = Transmitter.server_mt
+local mt_ClientBroadcaster = Broadcaster.client_mt
+local mt_ServerBroadcaster = Broadcaster.server_mt
+local mt_ClientEvent = Event.client_mt
+local mt_ServerEvent = Event.server_mt
 
-
+local WaitingList = SparseList.new()
 
 function mod:GetEvent(identifier, cb, force_context: string?)
-	if force_context and force_context ~= Globals.CONTEXT then
+	if force_context and force_context ~= _G.Game.CONTEXT then
 		return
 	end
 
@@ -69,7 +70,7 @@ function mod:GetEvent(identifier, cb, force_context: string?)
 end
 
 function mod:GetTransmitter(identifier, cb, force_context: string)
-	if force_context and force_context ~= Globals.CONTEXT then
+	if force_context and force_context ~= _G.Game.CONTEXT then
 		return
 	end
 
@@ -80,7 +81,7 @@ function mod:GetTransmitter(identifier, cb, force_context: string)
 end
 
 function mod:GetBroadcaster(identifier, cb, force_context: string)
-	if force_context and force_context ~= Globals.CONTEXT then
+	if force_context and force_context ~= _G.Game.CONTEXT then
 		return
 	end
 
@@ -92,13 +93,10 @@ end
 
 
 
-function mod:Builder( module_name: string )
-	assert(module_name)
+function mod:SetModule( module_name: string )
 	assert(typeof(module_name) == "string")
 
 	mod.CurrentModule = module_name
-
-	return mod
 end
 
 
@@ -118,51 +116,6 @@ function mod:Monitor( ... )
 	end
 end
 
-
-
-local mt_ClientTransmitter
-local mt_ServerTransmitter
-local mt_ServerBroadcaster
-local mt_ClientBroadcaster
-local mt_ServerEvent
-local mt_ClientEvent
-
-function mod:__init(G, LazyModules)
-	Globals = G
-	LazyModules = LazyModules
-
-	safe_require = require(ReplicatedFirst.Util.SafeRequire)
-	safe_require = safe_require.require
-
-	local remote_wrapper = require(ReplicatedFirst.Util.LazyModules.Signals.__remote_wrapper)
-	remote_wrapper:__init(G, LazyModules)
-
-	PSA = require(ReplicatedFirst.Util.SparseList)
-	WaitingList = PSA.new()
-
-	Transmitter = require(script.Transmitter)
-	Broadcaster = require(script.Broadcaster)
-	Event = require(script.Event)
-
-	Transmitter:__init(G, mod)
-	Broadcaster:__init(G, mod)
-	Event:__init(G, mod)
-
-	mt_ClientTransmitter = Transmitter.client_mt
-	mt_ServerTransmitter = Transmitter.server_mt
-	mt_ClientBroadcaster = Broadcaster.client_mt
-	mt_ServerBroadcaster = Broadcaster.server_mt
-	mt_ClientEvent = Event.client_mt
-	mt_ServerEvent = Event.server_mt
-
-	mod.NewEvent = Event.NewEvent
-	mod.NewTransmitter = Transmitter.NewTransmitter
-	mod.NewBroadcaster = Broadcaster.NewBroadcaster
-
-	Transmitters = Transmitter.Transmitters
-	Broadcasters = Broadcaster.Broadcasters
-	Events = Event.Events
-end
 
 -- In practice, the number 32 appears to be able to be 1
 -- But I have a gut feeling that it's possible to validly use LazyModules but have delayed signals declared

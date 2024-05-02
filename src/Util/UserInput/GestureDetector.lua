@@ -1,24 +1,29 @@
-local Game = _G.Game
+--!strict
 
 local mod = {
 	IsReady = false,
-	LastGesture = Game.Enums.InputGestures.None
+	LastGesture = _G.Game.Enums.InputGestures.None
 }
 
 local UserInput
-local DebugMenu = _G.Game.DebugMenu
-local Enums = Game.PreLoad(game.ReplicatedFirst.Util.Enums)
-local CircleBuffer = Game.PreLoad(game.ReplicatedFirst.Util.CircleBuffer)
+local Enums = require(game.ReplicatedFirst.Util.Enums)
+local CircleBuffer = require(game.ReplicatedFirst.Util.CircleBuffer)
 
 local SIG_SAMPLE_LEN = 32
 local DETECTION_SAMPLES = 5
-local MIN_GESTURE_MAG = 25 * ((Game.ScreenSizeXRatio + Game.ScreenSizeYRatio) / 2)
+local MIN_GESTURE_MAG = 25 * ((_G.Game.ScreenSizeXRatio + _G.Game.ScreenSizeYRatio) / 2)
 
 -- Used when ConsumeDelta isn't available
 local Pos = Vector3.new(0, 0, 0)
 
 local PI = math.pi
 local OffsetRange = PI / 5
+
+local function init_signal(sig)
+	for i = 1, SIG_SAMPLE_LEN do
+		sig.Buffer:push(0)
+	end
+end
 
 local function NewSignal()
 	local t = {
@@ -28,6 +33,9 @@ local function NewSignal()
 			Buffer = CircleBuffer.new(SIG_SAMPLE_LEN),
 		}
 	}
+
+	init_signal(t)
+	init_signal(t.FilteredSig)
 
 	return t
 end
@@ -115,7 +123,7 @@ local function detect_gestures(mag_sig, angle_sig)
 end
 
 function mod:__init(G)
-	UserInput = G.Load("UserInput")
+	UserInput = G:Get("UserInput")
 end
 
 local SMOOTHING_SAMPLE_CT = 6
@@ -130,7 +138,6 @@ end
 
 local function apply_z_transform(sig, n: number)
 	assert(sig.FilteredSig)
-	local buffer = sig.Buffer
 
 	for _ = n, 1, -1 do
 		local l = SIG_SAMPLE_LEN
@@ -140,7 +147,7 @@ local function apply_z_transform(sig, n: number)
 		for i = 1, SMOOTHING_SAMPLE_CT, 1 do
 			local sample_mul = 0.25
 			local o = i - 1
-			local sample = buffer:readFromFront(l - o)
+			local sample = sig.Buffer:readFromFront(l - o)
 			SmoothingMul += sample_mul
 			Sum += sample * sample_mul
 		end
