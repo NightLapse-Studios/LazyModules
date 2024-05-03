@@ -48,7 +48,6 @@ local mt_Tester = { __index = Tester }
 
 
 function mod.Tester( module_name: string )
-	assert(module_name)
 	assert(typeof(module_name) == "string")
 
 	local t = {
@@ -108,8 +107,12 @@ function Tester:Test(name, test_func)
 end
 
 local ARGS_PER_CONDITION = 3
-local function check_conditions(conditions, output_buf, description: string, predicate: string)
+local function check_conditions(conditions, output_buf, description: string, predicate: string?)
 	local num_conditions = math.ceil(#conditions / ARGS_PER_CONDITION)
+
+	if predicate then
+		description = predicate .. description
+	end
 
 	local failures, failed = "", 0
 	local fail_reasons = ""
@@ -121,7 +124,7 @@ local function check_conditions(conditions, output_buf, description: string, pre
 		local is_ok = test(actual, expected)
 
 		if is_ok == false then
-			local separator = if failed == 0 then "" else ", "			
+			local separator = if failed == 0 then "" else ", "
 
 			local cond = tostring((i + ARGS_PER_CONDITION - 1) / ARGS_PER_CONDITION)
 			failures = failures .. separator .. cond
@@ -133,10 +136,10 @@ local function check_conditions(conditions, output_buf, description: string, pre
 
 	if failed > 0 then
 		output_buf.HasFailures = true
-		table.insert(output_buf,  "\t\t✖ " .. predicate .. description)
+		table.insert(output_buf,  "\t\t✖ " .. description)
 		table.insert(output_buf, "\t\t\tDue to " .. failed .. " of " .. num_conditions .. " condition(s): " .. failures .. fail_reasons)
 	else
-		table.insert(output_buf,  "\t\t✔ " .. predicate .. description)
+		table.insert(output_buf,  "\t\t✔ " .. description)
 	end
 end
 
@@ -181,6 +184,15 @@ function Tester:ExpectError(description: string, f, ...)
 	else
 		table.insert(output_buf,  "\t\t✔ While " .. description)
 	end
+end
+
+
+function Tester:ForContext(description: string, ...)
+	local conditions = { ... }
+	local output_buf = self.TestOutputs[self.CurrentTestName]
+
+	check_situation_call(conditions, output_buf)
+	check_conditions(conditions, output_buf, description)
 end
 
 -- Declare default test funcs

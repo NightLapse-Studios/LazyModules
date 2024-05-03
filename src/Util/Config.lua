@@ -92,13 +92,13 @@ Config.Gravity = Vector3.new(0, -32.2, 0)-- Bullets
 --=============================================--
 
 -- Run lazymodules tests stage
-Config.TESTING = true
+Config.TESTING = false
 -- Optional string, a module name
 Config.FocusTestOn = false
 
 -- The `Load` tree
 Config.LogLoads = false
-Config.LogPreLoads = false
+Config.LogLMRequires = false
 Config.LogUIInit = false
 
 -- Log when a network signal is fired (Signals.Monitor(...Signals) can be used for individual events)

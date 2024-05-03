@@ -102,7 +102,7 @@ function mod.newGame()
 
 	setmetatable(newGame, LMGame)
 
-	return (newGame :: any) :: Game
+	return newGame
 end
 
 local function add_module<O, S, T>(obj: O, name: S, module: T): ItemWith<O, S, T>
@@ -144,8 +144,8 @@ local function preload(self, script: ModuleScript, opt_name: string?)
 
 	local module = self._CollectedModules[opt_name]
 	if not module then
-		if Config.LogPreLoads then
-			print(opt_name)
+		if Config.LogLMRequires then
+			print("LM Require", opt_name)
 		end
 
 		module = self:_require(script, opt_name)
@@ -197,25 +197,8 @@ function LMGame:CollectModules()
 	return self
 end
 
-function LMGame:__init(G)
 
-end
-
-
-export type ServerContext = "SERVER"
-export type ClientContext = "CLIENT"
-
-type ItemWith<O, S, T> = O & { [S]: T }
-
--- export type InitializingGame = typeof(mod.newGame())
-export type Game = typeof(mod.newGame():CollectModules())
-
---[[ type API = {
-	newGame: () -> Game
-} ]]
-
-
-local function try_init(G, module, name)
+local function try_init(G: Game, module, name)
 	if Config.LogLoads then
 		print("LM init: " .. name)
 	end
@@ -232,7 +215,7 @@ local function try_init(G, module, name)
 	end
 end
 
-local function try_signals(G, module, name)
+local function try_signals(G: Game, module, name)
 	if Config.LogLoads then
 		print("LM signals: " .. name)
 	end
@@ -251,7 +234,7 @@ local function try_signals(G, module, name)
 	end
 end
 
-local function try_ui(G, module, name)
+local function try_ui(G: Game, module, name)
 	if Config.LogLoads then
 		print("LM ui: " .. name)
 	end
@@ -268,7 +251,7 @@ local function try_ui(G, module, name)
 	end
 end
 
-local function try_run(G, module, name)
+local function try_run(G: Game, module, name)
 	if Config.LogLoads then
 		print("LM run: " .. name)
 	end
@@ -285,7 +268,7 @@ local function try_run(G, module, name)
 	end
 end
 
-local function try_tests(G, module, name)
+local function try_tests(G: Game, module, name)
 	if Config.LogLoads then
 		print("LM TESTING: " .. name)
 	end
@@ -299,13 +282,97 @@ local function try_tests(G, module, name)
 		local tester = Tests.Tester(name)
 	
 		local prior_context = set_context(G, LOAD_CONTEXTS.TESTING)
-		module:__tests(G, tester)
+		task.spawn(module.__tests, module, G, tester)
 		tester:Finished()
 		reset_context(G, prior_context)
 	end
 end
 
-function LMGame:Begin(Main, name: string)
+local function load_gamestate_wrapper(module, module_name, data, loaded_list)
+	local loaded_func = function()
+		loaded_list:provide(true, module_name)
+	end
+	local after_func = function(name, callback)
+		loaded_list:get(name, callback)
+	end
+
+	if not data then
+		loaded_func()
+	else
+		-- @param1, the state returned by __get_gamestate
+		-- @param2, a function that you MUST call when you have finished loading, see Gamemodes.lua for a good example.
+		-- @param3, a function that you can pass another module name into to ensure its state loades before your callback is called.
+		module:__load_gamestate(data, loaded_func, after_func)
+	end
+end
+
+local function wait_for_server_game_state(G: Game)
+	local modules_loaded_list = AsyncList.new(1)
+	local CanContinue = Instance.new("BindableEvent")
+
+	local ClientReadyEvent = game.ReplicatedStorage:WaitForChild("ClientReadyEvent") :: RemoteEvent
+	ClientReadyEvent.OnClientEvent:Connect(function(game_state)
+		-- Wait for the server to send us our datastore value, at which point we get inserted into the Game object
+		while not G[game.Players.LocalPlayer] do
+			task.wait()
+		end
+
+		local prior_context = set_context(G, LOAD_CONTEXTS.LOAD_GAMESTATE)
+		
+		for module_name, data in game_state do
+			local module_value = G._CollectedModules[module_name]
+			load_gamestate_wrapper(module_value, module_name, data, modules_loaded_list)
+		end
+		
+		while modules_loaded_list:is_awaiting() do
+			print(modules_loaded_list.awaiting.Contents)
+			task.wait()
+		end
+
+		reset_context(G, prior_context)
+
+		CanContinue:Fire()
+	end)
+
+	local prior_context = set_context(G, LOAD_CONTEXTS.AWAITING_SERVER_DATA)
+	ClientReadyEvent:FireServer()
+	CanContinue.Event:Wait()
+	set_context(G, prior_context)
+end
+
+local function try_get_game_state(module_value, plr)
+	local s, r = pcall(function() return module_value.__get_gamestate end)
+	if s and r then
+		return module_value:__get_gamestate(plr)
+	end
+end
+
+function LMGame.GetClientData(self: Game, plr: Player)
+
+end
+
+local function setup_data_collectors(G: Game)
+	local ClientReadyEvent = Instance.new("RemoteEvent")
+	ClientReadyEvent.Name = "ClientReadyEvent"
+	ClientReadyEvent.Parent = game.ReplicatedStorage
+
+	-- This connection exists for the lifetime of the game
+	ClientReadyEvent.OnServerEvent:Connect(function(plr)
+		while (not G[plr]) or not (G[plr].ServerLoaded) do
+			task.wait()
+		end
+
+		local game_state = { }
+		
+		for module_name, module_value in G._CollectedModules do
+			game_state[module_name] = try_get_game_state(module_value, plr)
+		end
+
+		ClientReadyEvent:FireClient(plr, game_state)
+	end)
+end
+
+function LMGame.Begin(self: Game, Main, name: string)
 	for mod_name, module_val in self._CollectedModules do
 		if not can_init(mod_name) then
 			warn("Module " .. mod_name .. " already initialized (this is probably a huge bug)")
@@ -313,6 +380,10 @@ function LMGame:Begin(Main, name: string)
 		end
 
 		try_init(self, module_val, mod_name)
+	end
+
+	if CONTEXT == "CLIENT" then
+		wait_for_server_game_state(self)
 	end
 
 	for mod_name, module_val in self._CollectedModules do
@@ -334,12 +405,18 @@ function LMGame:Begin(Main, name: string)
 		Initialized[mod_name] = true
 	end
 
-	for mod_name, module_val in self._CollectedModules do
-		try_tests(self, module_val, mod_name)
+	if CONTEXT == "SERVER" then
+		setup_data_collectors(self)
+	end
+
+	if Config.TESTING then
+		for mod_name, module_val in self._CollectedModules do
+			try_tests(self, module_val, mod_name)
+		end
 	end
 end
 
-function LMGame:Get(name: string, opt_specific_context: ("CLIENT" | "SERVER")?)
+function LMGame.Get(self: Game, name: string, opt_specific_context: ("CLIENT" | "SERVER")?)
 	if self.LOADING_CONTEXT < LOAD_CONTEXTS.LOAD_INIT then
 		error("Game:Get before init stage is undefined and non-determinisitic")
 	end
@@ -355,7 +432,7 @@ function LMGame:Get(name: string, opt_specific_context: ("CLIENT" | "SERVER")?)
 	return mod
 end
 
-function LMGame:Load(module: ModuleScript)
+function LMGame.Load(self: Game, module: ModuleScript)
 	if self.LOADING_CONTEXT < LOAD_CONTEXTS.LOAD_INIT then
 		error("Game:Get before init stage is undefined and non-determinisitic")
 	end
@@ -380,6 +457,19 @@ function LMGame:Load(module: ModuleScript)
 
 	return module_val
 end
+
+
+
+export type ServerContext = "SERVER"
+export type ClientContext = "CLIENT"
+
+type ItemWith<O, S, T> = O & { [S]: T }
+
+export type Game = typeof(mod.newGame())
+
+--[[ type API = {
+	newGame: () -> Game
+} ]]
 
 
 return mod

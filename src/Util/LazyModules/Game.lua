@@ -24,8 +24,8 @@ if Game.CONTEXT == "CLIENT" then
 else
 	-- Register modules which have player-based data that will be fed into datastores as well as transmitted to clients
 	-- Data synced this way will be available by _G.Game[plr][<module_name>]
-	
-	-- local Players = Game.PreLoad(game.ReplicatedFirst.Modules.Players)
+
+	local Players = require(game.ReplicatedFirst.Modules.Players)
 	--Players.RegisterPlayerDataModule(PathToModule)
 end
 

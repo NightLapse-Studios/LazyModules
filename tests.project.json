@@ -1,0 +1,47 @@
+{
+  "name": "LazyModules Project",
+  "servePlaceIds": [
+    17373496574
+  ],
+  "tree": {
+    "$className": "DataModel",
+    "$ignoreUnknownInstances": true,
+    "ReplicatedFirst": {
+      "$className": "ReplicatedFirst",
+      "$path": "src/replicated_first",
+      "$ignoreUnknownInstances": true,
+      "Modules": {
+        "$path": "src/shared"
+      },
+      "Util": {
+        "$path": "src/util"
+      },
+      "TestModules": {
+        "$path": "tests/shared"
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "$path": "src/server"
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "$ignoreUnknownInstances": true
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$path": "src/client"
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$ignoreUnknownInstances": true
+    },
+    "Players": {
+      "$className": "Players",
+      "$ignoreUnknownInstances": true
+    }
+  }
+}
