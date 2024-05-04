@@ -598,20 +598,7 @@ function mod:__build_signals(G, B)
 		InputBegan(input, processed, true)
 	end)
 
-	RunService:BindToRenderStep("CustomInput", Enum.RenderPriority.Input.Value - 1, function()
-		for i,v in PendingCustomInputs do
-			if v.UserInputState == Enum.UserInputState.End then
-				InputEnded(v, false, true)
-			else
-				InputBegan(v, false, true)
-			end
-		end
-
-		table.clear(PendingCustomInputs)
-	end)
-
-	-- TODO @2.0 make sure this works by clicking out of the window a few times under strange conditions and what not
-	UserInputService.WindowFocusReleased:Connect(function()
+	local function release_all_inputs()
 		for _, v in Enum.KeyCode:GetEnumItems() do
 			InputEnded({
 				Delta = Vector3.new(0, 0, 0),
@@ -630,7 +617,31 @@ function mod:__build_signals(G, B)
 				UserInputType = Enum.UserInputType.Keyboard
 			})
 		end
+	end
+
+	local FocussedOnTextBox = false
+	RunService:BindToRenderStep("CustomInput", Enum.RenderPriority.Input.Value - 1, function()
+		for i,v in PendingCustomInputs do
+			if v.UserInputState == Enum.UserInputState.End then
+				InputEnded(v, false, true)
+			else
+				InputBegan(v, false, true)
+			end
+		end
+
+		table.clear(PendingCustomInputs)
+
+		if UserInputService:GetFocusedTextBox(self) ~= nil then
+			if FocussedOnTextBox == false then
+				release_all_inputs()
+				FocussedOnTextBox = true
+			end
+		elseif FocussedOnTextBox == true then
+			FocussedOnTextBox = false
+		end
 	end)
+
+	UserInputService.WindowFocusReleased:Connect(release_all_inputs)
 end
 
 return mod
