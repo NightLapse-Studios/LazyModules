@@ -27,7 +27,10 @@ Valid usage:
 local mod = {
 	Nouns = { },
 	CurrentModule = "",
+	SignalAPI = { }
 }
+
+local SignalAPI = mod.SignalAPI
 
 local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local IsServer = game:GetService("RunService"):IsServer()
@@ -41,13 +44,13 @@ local Transmitter = require(script.Transmitter)
 local Broadcaster = require(script.Broadcaster)
 local Event = require(script.Event)
 
+export type Transmitter = Transmitter.Transmitter
+export type Broadcaster = Broadcaster.Broadcaster
+export type Event = Event.Event
+
 local Transmitters = Transmitter.Transmitters
 local Broadcasters = Broadcaster.Broadcasters
 local Events = Event.Events
-
-mod.NewEvent = Event.NewEvent
-mod.NewTransmitter = Transmitter.NewTransmitter
-mod.NewBroadcaster = Broadcaster.NewBroadcaster
 
 local mt_ClientTransmitter = Transmitter.client_mt
 local mt_ServerTransmitter = Transmitter.server_mt
@@ -58,47 +61,54 @@ local mt_ServerEvent = Event.server_mt
 
 local WaitingList = SparseList.new()
 
-function mod:GetEvent(identifier, cb, force_context: string?)
+type EventGetter = (Event) -> ()
+
+SignalAPI.NewEvent = Event.NewEvent
+SignalAPI.NewTransmitter = Transmitter.NewTransmitter
+SignalAPI.NewBroadcaster = Broadcaster.NewBroadcaster
+
+function SignalAPI:GetEvent(identifier: string, cb: EventGetter, force_context: string?)
 	if force_context and force_context ~= _G.Game.CONTEXT then
 		return
 	end
 
 	local success = Event.Events.Identifiers:get(identifier, cb)
 	if not success then
-		error("\nEvent: " .. mod.CurrentModule .. " " .. identifier)
+		error("\nEvent: " .. self.CurrentModule .. " " .. identifier)
 	end
 end
 
-function mod:GetTransmitter(identifier, cb, force_context: string)
+function SignalAPI:GetTransmitter(identifier, cb, force_context: string)
 	if force_context and force_context ~= _G.Game.CONTEXT then
 		return
 	end
 
 	local success = Transmitter.Transmitters.Identifiers:get(identifier, cb)
 	if not success then
-		error("\nEvent: " .. mod.CurrentModule .. " " .. identifier)
+		error("\nEvent: " .. self.CurrentModule .. " " .. identifier)
 	end
 end
 
-function mod:GetBroadcaster(identifier, cb, force_context: string)
+function SignalAPI:GetBroadcaster(identifier, cb, force_context: string)
 	if force_context and force_context ~= _G.Game.CONTEXT then
 		return
 	end
 
 	local success = Broadcaster.Broadcasters.Identifiers:get(identifier, cb)
 	if not success then
-		error("\nEvent: " .. mod.CurrentModule .. " " .. identifier)
+		error("\nEvent: " .. self.CurrentModule .. " " .. identifier)
 	end
 end
 
+export type SignalAPI = typeof(SignalAPI)
 
 
-function mod.SetModule( module_name: string )
+
+function SignalAPI.SetModule(self: SignalAPI, module_name: string )
 	assert(typeof(module_name) == "string")
 
-	mod.CurrentModule = module_name
+	self.CurrentModule = module_name
 end
-
 
 local function monitor_func(signal, ...)
 	print(signal[1].Name)
@@ -108,7 +118,7 @@ local function __monitor(signal)
 	signal.monitor = monitor_func
 end
 
-function mod:Monitor( ... )
+function mod.Monitor( ... )
 	-- TODO: You can't put Signals.Events in here. We should probably sunset Events
 	local signals = { ... }
 	for i,v in signals do
@@ -141,7 +151,7 @@ local function wait_for(async_table)
 end
 
 -- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
-function mod.BuildSignals(G)
+function mod.BuildSignals(G: any)
 	local wait_dur = 0
 	wait_dur += wait_for(Event.Events.Identifiers)
 	wait_dur += wait_for(Transmitter.Transmitters.Identifiers)

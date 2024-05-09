@@ -1,6 +1,7 @@
 {
   "name": "LazyModules Project",
   "servePlaceIds": [
+    17373496574,
     0
   ],
   "tree": {
@@ -8,13 +9,15 @@
     "$ignoreUnknownInstances": true,
     "ReplicatedFirst": {
       "$className": "ReplicatedFirst",
-      "$path": "src/replicated_first",
       "$ignoreUnknownInstances": true,
       "Modules": {
         "$path": "src/shared"
       },
       "Util": {
-        "$path": "src/util"
+        "$path": "src/util",
+        "Config": {
+          "$path": "src/config"
+        }
       }
     },
     "ServerScriptService": {
@@ -23,7 +26,6 @@
     },
     "ReplicatedStorage": {
       "$className": "ReplicatedStorage",
-      "$path": "src/replicated_storage",
       "$ignoreUnknownInstances": true
     },
     "StarterPlayer": {
@@ -32,17 +34,7 @@
         "$className": "StarterPlayerScripts",
         "$path": "src/client",
         "$ignoreUnknownInstances": true
-      },
-      "StarterCharacterScripts": {
-        "$className": "StarterCharacterScripts",
-        "$path": "src/starter_character_scripts",
-        "$ignoreUnknownInstances": true
       }
-    },
-    "Workspace": {
-      "$className": "Workspace",
-      "$ignoreUnknownInstances": true,
-      "$path": "src/workspace"
     },
     "Players": {
       "$className": "Players",

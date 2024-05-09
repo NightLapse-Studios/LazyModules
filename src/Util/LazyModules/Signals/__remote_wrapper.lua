@@ -3,11 +3,9 @@ local IsServer = game:GetService("RunService"):IsServer()
 
 local mod = { }
 
-local lazymod_traceback
 local Game
 function mod:__init(G, LazyModules)
 	Game = G
-	lazymod_traceback = G.LazyModules.format_lazymodules_traceback
 end
 
 

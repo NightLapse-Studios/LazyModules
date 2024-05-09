@@ -6,21 +6,25 @@ local Enums = {
 		Test = "TestStore"
 	},
 
+	-- Stack-based list of contexts
+	-- There are brief ones and lasting ones, the brief ones are reset once the context wraps up
+	-- wheras the lasting ones are set permenantly prior to the associated brief contexts being used
+	-- Mostly for internal soundness checking
+	--
+	-- Also allows a thread from some stage to wait for specific stages to pass
+	-- 	for example loading players takes time and is "done" at known stages on client
+	--
 	-- This enum must be numerically sorted acording to the order the steps are executed
-	-- These values describe the state of LazyModules startup
 	LOAD_CONTEXTS = {
-		PRE_LOAD = 1,
-		LOAD_INIT = 2,
-		SIGNAL_BUILDING = 4,
-		UI = 5,
+		COLLECTION = 10,
+		REQUIRE = 11,
+		COLLECTED = 12,
 
-		AWAITING_SERVER_DATA = 16,
-		LOAD_DATASTORES = 17,
-		LOAD_GAMESTATE = 18,
-
-		FINALIZE = 19,
-		RUN = 20,
-		TESTING = 21,
+		GAME_BEGIN = 20,
+		LOAD_INIT = 21,
+		SIGNAL_BUILDING = 22,
+		UI = 23,
+		RUN = 24,
 
 		FINISHED = 1000
 	},

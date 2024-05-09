@@ -2,28 +2,33 @@
 --!native
 
 local safe_require = require(game.ReplicatedFirst.Util.SafeRequire).require
-local Config = require(game.ReplicatedFirst.Util.Config)
+local Config = require(game.ReplicatedFirst.Util.Config.Config)
 local AsyncList = require(game.ReplicatedFirst.Util.AsyncList)
-
 local Enums = require(game.ReplicatedFirst.Util.Enums)
 
-local mod = { }
-
-local LOAD_CONTEXTS = Enums.LOAD_CONTEXTS
-local CONTEXT = if game:GetService("RunService"):IsServer()  then ("SERVER" :: ServerContext) else ("CLIENT" :: ClientContext)
-local SOURCE_NAME = debug.info(function() return end, "s")
-
-
+local LMTypes = require(game.ReplicatedFirst.Util.LMTypes)
 
 local Signals = require(script.Signals)
 local Tests = require(script.Tests)
 local Pumpkin = require(game.ReplicatedFirst.Util.Pumpkin)
 
+type LMGame = LMTypes.LMGame
+type LazyModule = LMTypes.LazyModule
+
+local mod = { }
+
+local LOAD_CONTEXTS = Enums.LOAD_CONTEXTS
+local CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
+local SOURCE_NAME = debug.info(function() return end, "s")
+
+local CollectionBlacklist: {Instance} = Config.ModuleCollectionBlacklist
+local ContextCollectionBlacklist: {Instance} = if CONTEXT == "SERVER" then Config.ModuleCollectionBlacklist.Server else Config.ModuleCollectionBlacklist.Client
+
 
 
 local Initialized = { }
 
-local function set_context(G, context: number)
+local function set_context(G: LMGame, context: number)
 	local prior = G.LOADING_CONTEXT
 
 	if (context < prior) then
@@ -35,33 +40,17 @@ local function set_context(G, context: number)
 	return prior
 end
 
-local function reset_context(G, prev: number)
+local function reset_context(G: LMGame, prev: number)
 	G.LOADING_CONTEXT = prev
 end
 
-local function can_init(mod_name)
+local function can_init(mod_name: string)
 	if Initialized[mod_name] then
 		warn("Module " .. mod_name .. " already initialized (??)")
 		return false
 	end
 
 	return true
-end
-
-
--- Convenience function
-local depth = 0
-local function indent()
-	local _indent = ""
-	for i = 1, depth, 1 do
-		_indent = _indent .. " | "
-	end
-
-	return _indent
-end
-
-local function warn_load_err(name: string)
-	warn("Module \"" .. name .. "\" wasn't found by LazyModules. Use `ModuleCollectionFolders` & `ModuleCollectionBlacklist` to control what LazyModules sees")
 end
 
 function mod.format_lazymodules_traceback()
@@ -86,6 +75,8 @@ function mod.format_lazymodules_traceback()
 	return traceback
 end
 
+
+
 local LMGame = { }
 LMGame.__index = LMGame
 
@@ -102,62 +93,63 @@ function mod.newGame()
 
 	setmetatable(newGame, LMGame)
 
-	return newGame
+	return (newGame :: any) :: LMGame
 end
 
-local function add_module<O, S, T>(obj: O, name: S, module: T): ItemWith<O, S, T>
+local function add_module<O, S, T>(obj: O, name: S, module: T)
 	obj[name] = module
-	return obj :: ItemWith<O, S, T>
+	return obj
 end
 
-function LMGame:_require<M>(script: ModuleScript, name: string)
-	local prior_context = set_context(self, LOAD_CONTEXTS.PRE_LOAD)
+local function _require<M>(self: LMGame, script: ModuleScript, name: string)
+	local prior_context = set_context(self, LOAD_CONTEXTS.REQUIRE)
 
 	local module_value = safe_require(script)
+
+	reset_context(self, prior_context)
 
 	if typeof(module_value) ~= "table" then
 		return
 	end
-
-	reset_context(self, prior_context)
 
 	-- Guard against multiple inits on one module
 	if self._Initialized[name] ~= nil then
 		return module_value
 	end
 
-	self._CollectedModules = add_module(self._CollectedModules, name, module_value)
+	self._CollectedModules = add_module(self._CollectedModules, name, module_value) :: (typeof(self._CollectedModules) & LMTypes.CollectModule<typeof(name), typeof(module_value)>)
 	self._ModuleNames[module_value] = name
 	self._Initialized[name] = false
 
 	return module_value
 end
 
-local function preload(self, script: ModuleScript, opt_name: string?)
+local function collect(self: LMGame, module: ModuleScript, opt_name: string?)
 	-- This check was discovered because referencing string.Name doesn't error, but returns nil for some reason
 	-- It is common to mistakenly pass a string into thie function
-	if typeof(script.Name) ~= "string" then
+	if typeof(module.Name) ~= "string" then
 		error("Value passed into LazyModules.PreLoad must be a script")
 	end
 
-	opt_name = (opt_name or script.Name) :: string
+	if self._CollectedModules[module.Name] ~= nil then
+		warn("Error durring module collection:\nModule name already used: " .. module.Name)
+	end
 
-	local module = self._CollectedModules[opt_name]
-	if not module then
+	local opt_name = (opt_name or module.Name) :: string
+
+	local existing_module = self._CollectedModules[opt_name]
+	if not existing_module then
 		if Config.LogLMRequires then
 			print("LM Require", opt_name)
 		end
 
-		module = self:_require(script, opt_name)
+		existing_module = _require(self, module, opt_name)
 	end
 
-	return module
+	return existing_module
 end
 
-local CollectionBlacklist: {Instance} = Config.ModuleCollectionBlacklist
-local ContextCollectionBlacklist: {Instance} = if CONTEXT == "SERVER" then Config.ModuleCollectionBlacklist.Server else Config.ModuleCollectionBlacklist.Client
-
-function LMGame:_recursive_collect(instance: Folder | ModuleScript)
+local function _recursive_collect(self: LMGame, instance: Folder | ModuleScript)
 	for _,v: Instance in instance:GetChildren() do
 		if table.find(CollectionBlacklist, v) or table.find(ContextCollectionBlacklist, v) then
 			continue
@@ -168,7 +160,7 @@ function LMGame:_recursive_collect(instance: Folder | ModuleScript)
 		end
 
 		if v:IsA("Folder") then
-			self:_recursive_collect(v)
+			_recursive_collect(self, v)
 			continue
 		end
 
@@ -176,115 +168,107 @@ function LMGame:_recursive_collect(instance: Folder | ModuleScript)
 			continue
 		end
 
-		-- This is kind of flimsy since PreLoad can do this on its own
-		-- TODO: A Call to PreLoad before we collect can cause false positives
-		if self._CollectedModules[v.Name] ~= nil then
-			warn("Error durring module collection:\nModule name already used: " .. v.Name)
-		end
+		collect(self, v)
 
-		preload(self, v)
-
-		self:_recursive_collect(v)
+		_recursive_collect(self, v)
 	end
 end
 
+function LMGame.CollectModules(self: LMGame)
+	set_context(self, LOAD_CONTEXTS.COLLECTION)
 
-function LMGame:CollectModules()
 	for _, dir: Folder in Config.ModuleCollectionFolders do
-		self:_recursive_collect(dir)
+		_recursive_collect(self, dir)
 	end
+
+	set_context(self, LOAD_CONTEXTS.COLLECTED)
 
 	return self
 end
 
 
-local function try_init(G: Game, module, name)
+
+local function try_init(self: LMGame, module: LazyModule, name: string)
 	if Config.LogLoads then
 		print("LM init: " .. name)
+	end
+	
+	if CONTEXT == "CLIENT" and name == "ConfigTest" then
+		print()
 	end
 
 	local s, r = pcall(function() return module.__init end)
 	if s and r then
-		if typeof(module.__init) ~= "function" then
-			return
+		if typeof(module.__init) == "function" then
+			local prior_context = set_context(self, LOAD_CONTEXTS.LOAD_INIT)
+			module:__init(self)
+			reset_context(self, prior_context)
 		end
-	
-		local prior_context = set_context(G, LOAD_CONTEXTS.LOAD_INIT)
-		module:__init(G)
-		reset_context(G, prior_context)
 	end
 end
 
-local function try_signals(G: Game, module, name)
+local function try_signals(self: LMGame, module: LazyModule, name: string)
 	if Config.LogLoads then
 		print("LM signals: " .. name)
 	end
 
 	local s, r = pcall(function() return module.__build_signals end)
 	if s and r then
-		if typeof(module.__build_signals) ~= "function" then
-			return
+		if typeof(module.__build_signals) == "function" then
+			Signals.SignalAPI:SetModule(name)
+		
+			local prior_context = set_context(self, LOAD_CONTEXTS.SIGNAL_BUILDING)
+			module:__build_signals(self, Signals.SignalAPI)
+			reset_context(self, prior_context)
 		end
-
-		Signals.SetModule(name)
-	
-		local prior_context = set_context(G, LOAD_CONTEXTS.SIGNAL_BUILDING)
-		module:__build_signals(G, Signals)
-		reset_context(G, prior_context)
 	end
 end
 
-local function try_ui(G: Game, module, name)
+local function try_ui(self: LMGame, module: LazyModule, name: string)
 	if Config.LogLoads then
 		print("LM ui: " .. name)
 	end
 
 	local s, r = pcall(function() return module.__ui end)
 	if s and r then
-		if typeof(module.__ui) ~= "function" then
-			return
+		if typeof(module.__ui) == "function" then
+			local prior_context = set_context(self, LOAD_CONTEXTS.UI)
+			module:__ui(self, Pumpkin, Pumpkin.P, Pumpkin.Roact)
+			reset_context(self, prior_context)
 		end
-	
-		local prior_context = set_context(G, LOAD_CONTEXTS.AWAITING_SERVER_DATA)
-		module:__ui(G, Pumpkin, Pumpkin.P, Pumpkin.Roact)
-		reset_context(G, prior_context)
 	end
 end
 
-local function try_run(G: Game, module, name)
+local function try_run(self: LMGame, module: LazyModule, name: string)
 	if Config.LogLoads then
 		print("LM run: " .. name)
 	end
 
 	local s, r = pcall(function() return module.__run end)
 	if s and r then
-		if typeof(module.__run) ~= "function" then
-			return
+		if typeof(module.__run) == "function" then
+			local prior_context = set_context(self, LOAD_CONTEXTS.LOAD_INIT)
+			module:__run(self)
+			reset_context(self, prior_context)
 		end
-	
-		local prior_context = set_context(G, LOAD_CONTEXTS.LOAD_INIT)
-		module:__run(G)
-		reset_context(G, prior_context)
 	end
 end
 
-local function try_tests(G: Game, module, name)
+local function try_tests(self: LMGame, module: LazyModule, name: string)
 	if Config.LogLoads then
 		print("LM TESTING: " .. name)
 	end
 
 	local s, r = pcall(function() return module.__tests end)
 	if s and r then
-		if typeof(module.__tests) ~= "function" then
-			return
-		end
+		if typeof(module.__tests) == "function" then
+			local tester = Tests.Tester(name)
 		
-		local tester = Tests.Tester(name)
-	
-		local prior_context = set_context(G, LOAD_CONTEXTS.TESTING)
-		task.spawn(module.__tests, module, G, tester)
-		tester:Finished()
-		reset_context(G, prior_context)
+			task.spawn(function()
+				module:__tests(self, tester)
+				Tests.Finished(tester)
+			end)
+		end
 	end
 end
 
@@ -306,21 +290,19 @@ local function load_gamestate_wrapper(module, module_name, data, loaded_list)
 	end
 end
 
-local function wait_for_server_game_state(G: Game)
+local function wait_for_server_game_state(self: LMGame)
 	local modules_loaded_list = AsyncList.new(1)
 	local CanContinue = Instance.new("BindableEvent")
 
 	local ClientReadyEvent = game.ReplicatedStorage:WaitForChild("ClientReadyEvent") :: RemoteEvent
 	ClientReadyEvent.OnClientEvent:Connect(function(game_state)
 		-- Wait for the server to send us our datastore value, at which point we get inserted into the Game object
-		while not G[game.Players.LocalPlayer] do
+		while not self[game.Players.LocalPlayer] do
 			task.wait()
 		end
-
-		local prior_context = set_context(G, LOAD_CONTEXTS.LOAD_GAMESTATE)
 		
 		for module_name, data in game_state do
-			local module_value = G._CollectedModules[module_name]
+			local module_value = self._CollectedModules[module_name]
 			load_gamestate_wrapper(module_value, module_name, data, modules_loaded_list)
 		end
 		
@@ -329,15 +311,11 @@ local function wait_for_server_game_state(G: Game)
 			task.wait()
 		end
 
-		reset_context(G, prior_context)
-
 		CanContinue:Fire()
 	end)
 
-	local prior_context = set_context(G, LOAD_CONTEXTS.AWAITING_SERVER_DATA)
 	ClientReadyEvent:FireServer()
 	CanContinue.Event:Wait()
-	set_context(G, prior_context)
 end
 
 local function try_get_game_state(module_value, plr)
@@ -347,24 +325,20 @@ local function try_get_game_state(module_value, plr)
 	end
 end
 
-function LMGame.GetClientData(self: Game, plr: Player)
-
-end
-
-local function setup_data_collectors(G: Game)
+local function setup_data_collectors(self: LMGame)
 	local ClientReadyEvent = Instance.new("RemoteEvent")
 	ClientReadyEvent.Name = "ClientReadyEvent"
 	ClientReadyEvent.Parent = game.ReplicatedStorage
 
 	-- This connection exists for the lifetime of the game
 	ClientReadyEvent.OnServerEvent:Connect(function(plr)
-		while (not G[plr]) or not (G[plr].ServerLoaded) do
+		while (not self[plr]) or not (self[plr].ServerLoaded) do
 			task.wait()
 		end
 
 		local game_state = { }
 		
-		for module_name, module_value in G._CollectedModules do
+		for module_name, module_value in self._CollectedModules do
 			game_state[module_name] = try_get_game_state(module_value, plr)
 		end
 
@@ -372,7 +346,53 @@ local function setup_data_collectors(G: Game)
 	end)
 end
 
-function LMGame.Begin(self: Game, Main, name: string)
+function LMGame.Get(self: LMGame, name: string, opt_specific_context: ("CLIENT" | "SERVER")?)
+	if self.LOADING_CONTEXT < LOAD_CONTEXTS.COLLECTED then
+		error("Game:Get before collection stage makes no sense")
+	end
+
+	assert(typeof(name) == "string")
+
+	local mod = self._CollectedModules[name]
+
+	if not mod then
+		if opt_specific_context and self.CONTEXT == opt_specific_context then
+			warn(`Attempt to get unfound module {name}. Provide a context to silence if this is context related`)
+		end
+	end
+
+	return mod
+end
+
+function LMGame.Load(self: LMGame, module: ModuleScript)
+	if self.LOADING_CONTEXT < LOAD_CONTEXTS.LOAD_INIT then
+		error("Game:Load is not intended for use before init stage. Could work but could be dangerous, here be dragons..")
+	end
+
+	assert(module:IsA("ModuleScript"))
+
+	local name = module.Name
+	local mod_which_shouldnt_exist = self._CollectedModules[name]
+
+	if mod_which_shouldnt_exist then
+		error(`Won't load already-collected module {name}!\nGame:Load is intended for uncollected modules.\nTypically you will add a folder of modules to Config.CollectionBlacklist and load them manually`)
+	end
+
+	local module_val = safe_require(module)
+	try_init(self, module_val, name)
+	-- Signals may not resolve until the tick after which this is called
+	-- Potentially more but generally contrived situtations are what causes waits of additional ticks
+	try_signals(self, module_val, name)
+	try_ui(self, module_val, name)
+	try_run(self, module_val, name)
+	try_tests(self, module_val, name)
+
+	return module_val
+end
+
+function LMGame.Begin(self: LMGame)
+	set_context(self, LOAD_CONTEXTS.GAME_BEGIN)
+
 	for mod_name, module_val in self._CollectedModules do
 		if not can_init(mod_name) then
 			warn("Module " .. mod_name .. " already initialized (this is probably a huge bug)")
@@ -415,61 +435,5 @@ function LMGame.Begin(self: Game, Main, name: string)
 		end
 	end
 end
-
-function LMGame.Get(self: Game, name: string, opt_specific_context: ("CLIENT" | "SERVER")?)
-	if self.LOADING_CONTEXT < LOAD_CONTEXTS.LOAD_INIT then
-		error("Game:Get before init stage is undefined and non-determinisitic")
-	end
-
-	local mod = self._CollectedModules[name]
-
-	if not mod then
-		if opt_specific_context and self.CONTEXT == opt_specific_context then
-			warn(`Attempt to get unfound module {name}. Provide a context to silence if this is context related`)
-		end
-	end
-
-	return mod
-end
-
-function LMGame.Load(self: Game, module: ModuleScript)
-	if self.LOADING_CONTEXT < LOAD_CONTEXTS.LOAD_INIT then
-		error("Game:Get before init stage is undefined and non-determinisitic")
-	end
-
-	assert(module:IsA("ModuleScript"))
-
-	local name = module.Name
-	local mod_which_shouldnt_exist = self._CollectedModules[name]
-
-	if mod_which_shouldnt_exist then
-		error(`Won't load already-collected module {name}!\nGame:Load is intended for uncollected modules.\nTypically you will add a folder of modules to Config.CollectionBlacklist and load them manually`)
-	end
-
-	local module_val = safe_require(module)
-	try_init(self, module_val, name)
-	-- Signals may not resolve until the tick after which this is called
-	-- Potentially more but generally contrived situtations are what causes waits of additional ticks
-	try_signals(self, module_val, name)
-	try_ui(self, module_val, name)
-	try_run(self, module_val, name)
-	try_tests(self, module_val, name)
-
-	return module_val
-end
-
-
-
-export type ServerContext = "SERVER"
-export type ClientContext = "CLIENT"
-
-type ItemWith<O, S, T> = O & { [S]: T }
-
-export type Game = typeof(mod.newGame())
-
---[[ type API = {
-	newGame: () -> Game
-} ]]
-
 
 return mod

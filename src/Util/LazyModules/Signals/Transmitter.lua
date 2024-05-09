@@ -83,7 +83,7 @@ local mt_TransmitterBuilder = { __index = TransmitterBuilder }
 mod.client_mt = { __index = ClientTransmitter }
 mod.server_mt = { __index = ServerTransmitter }
 
-function mod.NewTransmitter(signals_module, identifier: string)
+function mod.NewTransmitter(signals_module, identifier: string): Transmitter
 	local transmitter = remote_wrapper(identifier, mt_TransmitterBuilder)
 
 --[[ 	local Modules = Transmitters.Modules
@@ -99,5 +99,7 @@ function mod.NewTransmitter(signals_module, identifier: string)
 
 	return transmitter
 end
+
+export type Transmitter = typeof(mod.NewTransmitter({CurrentModule=""}, "Ex"))
 
 return mod

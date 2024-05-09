@@ -6,7 +6,7 @@ local mod = {
 	Nouns = { },
 }
 
-local Config = require(game.ReplicatedFirst.Util.Config)
+local Config = require(game.ReplicatedFirst.Util.Config.Config)
 
 local USAGE_EXAMPLE = [[
 	function mod:__tests(G, T)
@@ -59,7 +59,7 @@ function mod.Tester( module_name: string )
 	return setmetatable(t, mt_Tester)
 end
 
-function Tester:Finished()
+function mod.Finished( self: Tester )
 	if Config.FocusTestOn and Config.FocusTestOn ~= self.ModuleName then
 		return
 	end
@@ -83,7 +83,9 @@ function Tester:Finished()
 	end
 end
 
-function Tester:__try_new_output_buf(name)
+export type Tester = typeof(mod.Tester(""))
+
+local function try_new_output_buf(self: Tester, name: string)
 	if self.TestOutputs[name] then
 		error("Reused test name: " .. name .. "in " .. self.ModuleName)
 	end
@@ -98,7 +100,7 @@ function Tester:__try_new_output_buf(name)
 end
 
 function Tester:Test(name, test_func)
-	self:__try_new_output_buf(name)
+	try_new_output_buf(self, name)
 	self.CurrentTestName = name
 
 	-- test_func uses the `self` object to pass the results of tests into `self`s internal state
@@ -176,7 +178,7 @@ function Tester:ExpectError(description: string, f, ...)
 	assert(typeof(f) == "function")
 
 	local success, ret = pcall(f, ...)
-	local output_buf = self:__try_new_output_buf("Expect errors")
+	local output_buf = try_new_output_buf(self, "Expect errors")
 
 	if success then
 		output_buf.HasFailures = true

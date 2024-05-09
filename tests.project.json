@@ -8,16 +8,18 @@
     "$ignoreUnknownInstances": true,
     "ReplicatedFirst": {
       "$className": "ReplicatedFirst",
-      "$path": "src/replicated_first",
       "$ignoreUnknownInstances": true,
       "Modules": {
-        "$path": "src/shared"
+        "$path": "src/shared",
+        "Tests": {
+          "$path": "tests/shared"
+        }
       },
       "Util": {
-        "$path": "src/util"
-      },
-      "TestModules": {
-        "$path": "tests/shared"
+        "$path": "src/util",
+        "Config": {
+          "$path": "tests/config"
+        }
       }
     },
     "ServerScriptService": {

@@ -71,7 +71,7 @@ mod.client_mt = { __index = EventWrapper }
 mod.server_mt = { __index = EventWrapper }
 
 
-function mod.NewEvent(signals_module, identifier: string)
+function mod.NewEvent(signals_module, identifier: string): Event
 	if Events.Identifiers:inspect(identifier) ~= nil then
 		error("Re-declared Event identifier `" .. identifier .. "`\nFirst declared in `" .. Events.Identifiers[identifier] .. "`")
 	end
@@ -91,5 +91,7 @@ function mod.NewEvent(signals_module, identifier: string)
 
 	return event
 end
+
+export type Event = typeof(mod.NewEvent({CurrentModule=""}, "Ex"))
 
 return mod

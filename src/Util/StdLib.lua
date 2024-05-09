@@ -3,7 +3,7 @@
 	Loads a set of modules, places their API exports in the Game object on __init
 ]]
 
-local Config = require(game.ReplicatedFirst.Util.Config)
+local Config = require(game.ReplicatedFirst.Util.Config.Config)
 
 local mod = { }
 local Libs = {
@@ -12,7 +12,7 @@ local Libs = {
 	Debug = require(game.ReplicatedFirst.Util.Debug),
 	DebugMenu = require(game.ReplicatedFirst.Util.Debug.DebugMenu),
 	Maskables = require(game.ReplicatedFirst.Util.Maskables),
-	Config = require(game.ReplicatedFirst.Util.Config),
+	Config = require(game.ReplicatedFirst.Util.Config.Config),
 }
 
 local Game

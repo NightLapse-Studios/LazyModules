@@ -130,7 +130,7 @@ local function default_should_accept()
 end
 
 -- Broadcasters use a client->server?->all-clients model
-function mod.NewBroadcaster(current_module: string, identifier: string)
+function mod.NewBroadcaster(signals_module, identifier: string): Broadcaster
 	local broadcaster = remote_wrapper(identifier, mt_BroadcastBuilder)
 	broadcaster[2] = ClassicSignal.new()
 	broadcaster.Connections = 0
@@ -138,13 +138,15 @@ function mod.NewBroadcaster(current_module: string, identifier: string)
 	setmetatable(broadcaster, mt_BroadcastBuilder)
 
 	if Broadcasters.Identifiers:inspect(identifier) ~= nil then
-		error("Re-declared broadcaster `" .. identifier .. "` in `" .. current_module .. "`")
+		error("Re-declared broadcaster `" .. identifier .. "` in `" .. signals_module.CurrentModule .. "`")
 	end
 
 	Broadcasters.Identifiers:provide(broadcaster, identifier)
-	Broadcasters.Modules:provide(broadcaster, current_module, identifier)
+	Broadcasters.Modules:provide(broadcaster, signals_module.CurrentModule, identifier)
 
 	return broadcaster
 end
+
+export type Broadcaster = typeof(mod.NewBroadcaster({CurrentModule=""}, "Ex"))
 
 return mod

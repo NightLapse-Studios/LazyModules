@@ -26,7 +26,7 @@ else
 	-- Data synced this way will be available by _G.Game[plr][<module_name>]
 
 	local Players = require(game.ReplicatedFirst.Modules.Players)
-	--Players.RegisterPlayerDataModule(PathToModule)
+	Players.RegisterPlayerDataModule("PlayerClass")
 end
 
 return Game

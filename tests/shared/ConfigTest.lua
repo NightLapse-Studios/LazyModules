@@ -1,8 +1,12 @@
-local Config = require(game.ReplicatedFirst.Util.Config)
+local LMT = require(game.ReplicatedFirst.Util.LMTypes)
+local Config = require(game.ReplicatedFirst.Util.Config.Config)
 
-local mod = { }
+local mod = { } :: LMT.LazyModule
 
-function mod:__test(G, T)
+assert(Config.TESTING == true, "Didn't even turn testing on you silly goose")
+
+function mod:__test(G: LMT.LMGame, T: LMT.Tester)
+	warn("123123123123")
 	T:Test("Have proper values", function()
 		T:ForContext("LM Testing project",
 			T.Equal, Config.TESTING, true,
@@ -11,10 +15,6 @@ function mod:__test(G, T)
 			T.Equal, Config.PlaceId, game.PlaceId
 		)
 	end)
-end
-
-function mod:__init(G)
-	assert(Config.TESTING == true, "Didn't even turn testing on you silly goose")
 end
 
 return mod

@@ -1,12 +1,14 @@
+--!strict
 -- Extends the player service, but Better, ahahah!
 -- handles players that join before server
 
 local PlayerService = game:GetService("Players")
 
-local Game
+local Game = _G.Game
 local AssociativeList = require(game.ReplicatedFirst.Util.AssociativeList)
-local DataStore3 = nil :: typeof(require(game.ServerScriptService.Lib.DataStore3))
+local DataStore3 = require(game.ReplicatedFirst.Modules.DataStore3)
 local PlayerClass = require(game.ReplicatedFirst.Modules.Players.PlayerClass)
+local Enums = require(game.ReplicatedFirst.Util.Enums)
 
 local IDAssociations = AssociativeList.new()
 local NameAssociations = AssociativeList.new()
@@ -19,11 +21,6 @@ local PlayerDataModulesOrder = { }
 
 local mod = { }
 local ActualList = { }
-
-function mod:__init(G)
-	Game = G
-	DataStore3 = G:Get("DataStore3")
-end
 
 -- A better PlayerAdded event
 local PlayerAddedBindable = Instance.new("BindableEvent")
@@ -75,7 +72,7 @@ local function OnPlayerLoadFinished( binding, plrClass )
 	plrClass.ServerLoaded = true
 end
 
-local function LoadClientData(plrClass)
+local function LoadClientData(plrClass: PlayerClass.PlayerClass)
 	local plr = plrClass.Player
 	
 	local storeName = DataStore3.GetStoreName()
@@ -95,12 +92,11 @@ local function LoadClientData(plrClass)
 end
 
 -- Data modules will be serialized and deserialized in the order they are registered by this function
-function mod.RegisterPlayerDataModule(file, ctor_args)
+function mod.RegisterPlayerDataModule(name, ctor_args)
 	local Game = _G.Game
-	assert(Game.LOADING_CONTEXT < Game.Enums.LOAD_CONTEXTS.LOAD_INIT, "RegisterPlayerDataModule must be called before Game.Begin")
+	assert(Game.LOADING_CONTEXT < Enums.LOAD_CONTEXTS.LOAD_INIT, "RegisterPlayerDataModule must be called before Game.Begin")
 
-	local name = file.Name
-	local mod = Game.PreLoad(file)
+	local mod = Game:Get(name)
 	assert(typeof(mod.new) == "function", string.format(ERR_DATA_MODULE_INVALID, name))
 
 	ctor_args = ctor_args or { }
@@ -123,7 +119,7 @@ local function AddRemotePlayer(plr_id, data)
 	local plrClass = PlayerClass.new(plr)
 
 	for i,v in data do
-		local mod = Game.Load(i)
+		local mod = Game:Get(i)
 		local obj = mod.new(plr)
 		obj:Deserialize(v)
 		plrClass[i] = obj
@@ -154,11 +150,13 @@ function mod:__build_signals(G, B)
 
 	if Game.CONTEXT == "SERVER" then
 		PlayerService.PlayerAdded:Connect(function(plr)
-			while not (Game.LOADING_CONTEXT > Game.Enums.LOAD_CONTEXTS.FINALIZE) do
+			while (not (Game.LOADING_CONTEXT > Enums.LOAD_CONTEXTS.RUN)) and not (plr:IsDescendantOf(game)) do
 				task.wait()
+				print("!")
 			end
 			
 			if not plr:IsDescendantOf(game) then
+				print("Player added, but not in game")
 				return
 			end
 			
@@ -167,7 +165,7 @@ function mod:__build_signals(G, B)
 		end)
 		
 		PlayerService.PlayerRemoving:Connect(function(plr)
-			while not (Game.LOADING_CONTEXT > Game.Enums.LOAD_CONTEXTS.FINALIZE) do
+			while not (Game.LOADING_CONTEXT > Enums.LOAD_CONTEXTS.RUN) do
 				task.wait()
 			end
 			

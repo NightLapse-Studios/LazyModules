@@ -5,7 +5,9 @@ local mod = { }
 
 
 function mod.require<M>(_s: M)
-	assert(_s, "No script passed to require")
+	if not _s then
+		error("No script passed to require")
+	end
 
 	local co = coroutine.create(require)
 
