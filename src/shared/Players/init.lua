@@ -63,8 +63,7 @@ local function OnPlayerLoadFinished( binding: PlayerDataBinding, plrClass )
 	local serial_data, private_serial_data = {}, {}
 	for mod_name,v in PlayerDataModules do
 		local ds_obj = plrClass[mod_name] :: DataStore3.DSObject<unknown>
-		local latest = DataStore3.GetLatestVersion(ds_obj)
-		serial_data[mod_name] = latest.Serialize(ds_obj)
+		serial_data[mod_name] = DataStore3.SerializeObject(ds_obj)
 	end
 
 	for i, other_plr in mod.GetPlayers() do
@@ -160,7 +159,7 @@ local function RemoveRemotePlayer( plr )
 	plrClass:Destroy()
 end
 
-function mod:__build_signals(G, B)
+function mod.__build_signals(G, B)
 	AddRemotePlayerTransmitter = B:NewTransmitter("AddRemotePlayerTransmitter")
 		:ClientConnection(AddRemotePlayer)
 
@@ -217,7 +216,7 @@ function mod:__build_signals(G, B)
 	end
 end
 
-function mod:__load_gamestate(serial, loaded, after)
+function mod.__load_gamestate(serial, loaded, after)
 	for plr_id, stats in serial do
 		AddRemotePlayer(tonumber(plr_id), stats)
 	end
@@ -225,7 +224,7 @@ function mod:__load_gamestate(serial, loaded, after)
 	loaded()
 end
 
-function mod:__get_gamestate(plr)
+function mod.__get_gamestate(plr)
 	local t = {}
 
 	for i, other_plr in mod.GetPlayers() do
@@ -234,7 +233,7 @@ function mod:__get_gamestate(plr)
 			
 			local serial_data = { }
 			for k,v in PlayerDataModules do
-				serial_data[k] = plrClass[k]:Serialize()
+				serial_data[k] = DataStore3.SerializeObject(plrClass[k])
 			end
 			
 			t[tostring(other_plr.UserId)] = serial_data

@@ -80,18 +80,20 @@ local EnableAutosaves = true
 local Autosave_Interval = 360.0
 local IsStudio = RunService:IsStudio()
 
-function DS3:__init(G)
+function DS3.__init(G)
 	Globals = G
 end
 
-function DS3:__run(G)
+function DS3.__run(G)
 	if (IsStudio and not SaveInStudio) then
 		return
 	end
 
-	game:BindToClose(function()
-		DS3.FinalizeAll()
-	end)
+	if G.CONTEXT == "SERVER" then
+		game:BindToClose(function()
+			DS3.FinalizeAll()
+		end)
+	end
 end
 
 local Stores = { }
@@ -113,7 +115,7 @@ local ERR_INVALID_TBL = "DATA LOST!!! Keys to table were not exclusively strings
 local USER_MASTER_KEY_PREFIX = "P_"
 
 export type DSSavable = { [string]: (string | number | boolean) | DSSavable}
-export type DSSerializer<T> = (DSObject<T>) -> { DSSavable }
+export type DSSerializer<T> = (DSObject<T>) -> DSSavable
 export type DSDeserializer<T> = (DSObject<T>, DSSavable) -> boolean
 export type DSSerializationVersion<T> = {
 	Serialize: DSSerializer<T>,
@@ -238,6 +240,12 @@ export type DSBinding<T> = typeof(DS3.NewDataBinding("", "", { }, nil, noop, { "
 function DS3.GetLatestVersion(obj: DSObject<unknown>)
 	local versions = obj.DSConfig.SerializationVersions
 	return versions[versions.Latest]	
+end
+
+function DS3.SerializeObject(obj: DSObject<unknown>)
+	local versions = obj.DSConfig.SerializationVersions
+	local latest = versions[versions.Latest]
+	return latest.Serialize(obj)
 end
 
 
