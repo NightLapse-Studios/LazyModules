@@ -200,7 +200,7 @@ local function try_init(self: LMGame, module: LazyModule, name: string)
 	local s, r = pcall(function() return module.__init end)
 	if s and r then
 		if typeof(module.__init) == "function" then
-			local prior_context = set_context(self, LOAD_CONTEXTS.LOAD_INIT)
+			local prior_context = set_context(self, LOAD_CONTEXTS.INIT)
 			module:__init(self)
 			reset_context(self, prior_context)
 		end
@@ -217,7 +217,7 @@ local function try_signals(self: LMGame, module: LazyModule, name: string)
 		if typeof(module.__build_signals) == "function" then
 			Signals.SignalAPI:SetModule(name)
 		
-			local prior_context = set_context(self, LOAD_CONTEXTS.SIGNAL_BUILDING)
+			local prior_context = set_context(self, LOAD_CONTEXTS.SIGNALS)
 			module:__build_signals(self, Signals.SignalAPI)
 			reset_context(self, prior_context)
 		end
@@ -247,7 +247,7 @@ local function try_run(self: LMGame, module: LazyModule, name: string)
 	local s, r = pcall(function() return module.__run end)
 	if s and r then
 		if typeof(module.__run) == "function" then
-			local prior_context = set_context(self, LOAD_CONTEXTS.LOAD_INIT)
+			local prior_context = set_context(self, LOAD_CONTEXTS.RUN)
 			module:__run(self)
 			reset_context(self, prior_context)
 		end
@@ -300,12 +300,12 @@ local function wait_for_server_game_state(self: LMGame)
 		while not self[game.Players.LocalPlayer] do
 			task.wait()
 		end
-		
+
 		for module_name, data in game_state do
 			local module_value = self._CollectedModules[module_name]
 			load_gamestate_wrapper(module_value, module_name, data, modules_loaded_list)
 		end
-		
+
 		while modules_loaded_list:is_awaiting() do
 			print(modules_loaded_list.awaiting.Contents)
 			task.wait()
@@ -365,7 +365,7 @@ function LMGame.Get(self: LMGame, name: string, opt_specific_context: ("CLIENT" 
 end
 
 function LMGame.Load(self: LMGame, module: ModuleScript)
-	if self.LOADING_CONTEXT < LOAD_CONTEXTS.LOAD_INIT then
+	if self.LOADING_CONTEXT < LOAD_CONTEXTS.INIT then
 		error("Game:Load is not intended for use before init stage. Could work but could be dangerous, here be dragons..")
 	end
 
@@ -391,8 +391,8 @@ function LMGame.Load(self: LMGame, module: ModuleScript)
 end
 
 function LMGame.Begin(self: LMGame)
-	set_context(self, LOAD_CONTEXTS.GAME_BEGIN)
-
+	-- Set context 
+	set_context(self, LOAD_CONTEXTS.BEGIN_INIT)
 	for mod_name, module_val in self._CollectedModules do
 		if not can_init(mod_name) then
 			warn("Module " .. mod_name .. " already initialized (this is probably a huge bug)")
@@ -402,10 +402,7 @@ function LMGame.Begin(self: LMGame)
 		try_init(self, module_val, mod_name)
 	end
 
-	if CONTEXT == "CLIENT" then
-		wait_for_server_game_state(self)
-	end
-
+	set_context(self, LOAD_CONTEXTS.BEGIN_SIGNALS)
 	for mod_name, module_val in self._CollectedModules do
 		if not can_init(mod_name) then continue end
 		try_signals(self, module_val, mod_name)
@@ -413,11 +410,17 @@ function LMGame.Begin(self: LMGame)
 
 	Signals.BuildSignals(self)
 
+	if CONTEXT == "CLIENT" then
+		wait_for_server_game_state(self)
+	end
+
+	set_context(self, LOAD_CONTEXTS.BEGIN_UI)
 	for mod_name, module_val in self._CollectedModules do
 		if not can_init(mod_name) then continue end
 		try_ui(self, module_val, mod_name)
 	end
 
+	set_context(self, LOAD_CONTEXTS.BEGIN_RUN)
 	for mod_name, module_val in self._CollectedModules do
 		if not can_init(mod_name) then continue end
 		try_run(self, module_val, mod_name)
@@ -428,7 +431,8 @@ function LMGame.Begin(self: LMGame)
 	if CONTEXT == "SERVER" then
 		setup_data_collectors(self)
 	end
-
+	
+	set_context(self, LOAD_CONTEXTS.FINISHED)
 	if Config.TESTING then
 		for mod_name, module_val in self._CollectedModules do
 			try_tests(self, module_val, mod_name)

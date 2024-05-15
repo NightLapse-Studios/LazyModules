@@ -40,11 +40,16 @@ mod.PlayerAdded = {
 	end
 }
 
-local function OnPlayerLoadFinished( binding, plrClass )
+-- @Context SERVER
+local function OnPlayerLoadFinished( binding: PlayerDataBinding, plrClass )
 	local plr: Player = plrClass.Player
 
 	if not plr:IsDescendantOf(game) then
 		return
+	end
+
+	while not (Game.LOADING_CONTEXT > Enums.LOAD_CONTEXTS.SIGNALS) do
+		task.wait()
 	end
 
 	Game[plr] = plrClass
@@ -54,15 +59,17 @@ local function OnPlayerLoadFinished( binding, plrClass )
 	NameAssociations:add(plr.Name, plr)
 	table.insert(ActualList, plr)
 	
+	-- Reserialize everything with the latest version, then send it to clients
 	local serial_data, private_serial_data = {}, {}
-	for i,v in PlayerDataModules do
-		serial_data[i] = plrClass[i]:Serialize(false, true, true)
-		private_serial_data[i] = plrClass[i]:Serialize(false, true, false)
+	for mod_name,v in PlayerDataModules do
+		local ds_obj = plrClass[mod_name] :: DataStore3.DSObject<unknown>
+		local latest = DataStore3.GetLatestVersion(ds_obj)
+		serial_data[mod_name] = latest.Serialize(ds_obj)
 	end
 
 	for i, other_plr in mod.GetPlayers() do
 		if other_plr == plr then
-			AddRemotePlayerTransmitter:Transmit(other_plr, plr.UserId, private_serial_data)
+			AddRemotePlayerTransmitter:Transmit(other_plr, plr.UserId, serial_data)
 		else
 			AddRemotePlayerTransmitter:Transmit(other_plr, plr.UserId, serial_data)
 		end
@@ -72,6 +79,7 @@ local function OnPlayerLoadFinished( binding, plrClass )
 	plrClass.ServerLoaded = true
 end
 
+-- @Context SERVER
 local function LoadClientData(plrClass: PlayerClass.PlayerClass)
 	local plr = plrClass.Player
 	
@@ -88,13 +96,19 @@ local function LoadClientData(plrClass: PlayerClass.PlayerClass)
 		data_bindings[i] = obj
 	end
 
-	plrClass.DataBinding = DataStore3.NewDataBinding(storeName, DSkey, data_bindings, plrClass, OnPlayerLoadFinished, PlayerDataModulesOrder)
+	local binding = DataStore3.NewDataBinding(storeName, DSkey, data_bindings, plrClass, OnPlayerLoadFinished, PlayerDataModulesOrder)
+	plrClass.DataBinding = binding
+
+	return binding
 end
 
+type PlayerDataBinding = typeof(LoadClientData(game.Players.LocalPlayer))
+
+-- @Context SERVER
 -- Data modules will be serialized and deserialized in the order they are registered by this function
 function mod.RegisterPlayerDataModule(name, ctor_args)
 	local Game = _G.Game
-	assert(Game.LOADING_CONTEXT < Enums.LOAD_CONTEXTS.LOAD_INIT, "RegisterPlayerDataModule must be called before Game.Begin")
+	assert(Game.LOADING_CONTEXT < Enums.LOAD_CONTEXTS.BEGIN_INIT, "RegisterPlayerDataModule must be called before Game.Begin")
 
 	local mod = Game:Get(name)
 	assert(typeof(mod.new) == "function", string.format(ERR_DATA_MODULE_INVALID, name))
@@ -104,6 +118,7 @@ function mod.RegisterPlayerDataModule(name, ctor_args)
 	table.insert(PlayerDataModulesOrder, name)
 end
 
+-- @Context CLIENT
 local function AddRemotePlayer(plr_id, data)
 	local plr = PlayerService:GetPlayerByUserId(plr_id)
 
@@ -118,11 +133,12 @@ local function AddRemotePlayer(plr_id, data)
 
 	local plrClass = PlayerClass.new(plr)
 
-	for i,v in data do
-		local mod = Game:Get(i)
-		local obj = mod.new(plr)
-		obj:Deserialize(v)
-		plrClass[i] = obj
+	for mod_name, data in data do
+		local mod = Game:Get(mod_name)
+		local obj = mod.new(plr) :: DataStore3.DSObject<unknown>
+		local latest = DataStore3.GetLatestVersion(obj)
+		latest.Deserialize(obj, data)
+		plrClass[mod_name] = obj
 	end
 
 	Game[plr] = plrClass

@@ -234,6 +234,13 @@ end
 local noop = function() end
 export type DSBinding<T> = typeof(DS3.NewDataBinding("", "", { }, nil, noop, { ""}))
 
+
+function DS3.GetLatestVersion(obj: DSObject<unknown>)
+	local versions = obj.DSConfig.SerializationVersions
+	return versions[versions.Latest]	
+end
+
+
 function DS3.Connect_OnGet<T>(self: DSBinding<T>, fn: (DSBinding<T>) -> nil)
 	self._onGetList[#self._onGetList + 1] = fn
 end
@@ -309,12 +316,14 @@ local function _SaveAsync<T>(self: DSBinding<T>, callback: (DSBinding<T>,boolean
 
 	local masterKey = self.masterKey
 	for key, DS3Obj in pairs(self.bindings) do
-		local serial_data = DS3Obj.Serialize( DS3Obj, IsFinalSize )
-
 		local ObjVersions = DS3Obj.DSConfig.SerializationVersions
 		if not ObjVersions.Latest or not ObjVersions[ObjVersions.Latest] then
 			warn(string.format("SubStore %s has no valid latest version", key))
 		end
+
+		local latest = ObjVersions[ObjVersions.Latest]
+
+		local serial_data = latest.Serialize( DS3Obj, IsFinalSize )
 
 		serial_data["__VERSION"] = ObjVersions.Latest
 
@@ -380,7 +389,7 @@ local function _getIndividualBinding(self, key, DS3Obj, data)
 	--If a version is somehow missing, fallback to the latest.
 	version = version or DS3Obj.DSConfig.SerializationVersions.Latest
 
-	local successA, successB = pcall(DS3Obj.DSConfig.SerializationVersions[version],  DS3Obj, sub_store, self )
+	local successA, successB = pcall(DS3Obj.DSConfig.SerializationVersions[version].Deserialize,  DS3Obj, sub_store, self )
 	if successA and successB then
 		DS3Obj.StoreRetrieved = true
 	else
@@ -425,7 +434,7 @@ end
 function DSBinding.GetAsync<T>(self: DSBinding<T>, bypass_cache: boolean)
 	-- TODO: Make this an enum
 	print("About to get DS3")
-	while Globals.LOADING_CONTEXT ~= Enums.LOAD_CONTEXTS.FINISHED do
+	while Globals.LOADING_CONTEXT < Enums.LOAD_CONTEXTS.FINISHED do
 		-- In case the client sends this before we're even ready
 		task.wait()
 	end
