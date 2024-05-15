@@ -201,7 +201,7 @@ local function try_init(self: LMGame, module: LazyModule, name: string)
 	if s and r then
 		if typeof(module.__init) == "function" then
 			local prior_context = set_context(self, LOAD_CONTEXTS.INIT)
-			module:__init(self)
+			module.__init(self)
 			reset_context(self, prior_context)
 		end
 	end
@@ -218,7 +218,7 @@ local function try_signals(self: LMGame, module: LazyModule, name: string)
 			Signals.SignalAPI:SetModule(name)
 		
 			local prior_context = set_context(self, LOAD_CONTEXTS.SIGNALS)
-			module:__build_signals(self, Signals.SignalAPI)
+			module.__build_signals(self, Signals.SignalAPI)
 			reset_context(self, prior_context)
 		end
 	end
@@ -233,7 +233,7 @@ local function try_ui(self: LMGame, module: LazyModule, name: string)
 	if s and r then
 		if typeof(module.__ui) == "function" then
 			local prior_context = set_context(self, LOAD_CONTEXTS.UI)
-			module:__ui(self, Pumpkin, Pumpkin.P, Pumpkin.Roact)
+			module.__ui(self, Pumpkin, Pumpkin.P, Pumpkin.Roact)
 			reset_context(self, prior_context)
 		end
 	end
@@ -248,7 +248,7 @@ local function try_run(self: LMGame, module: LazyModule, name: string)
 	if s and r then
 		if typeof(module.__run) == "function" then
 			local prior_context = set_context(self, LOAD_CONTEXTS.RUN)
-			module:__run(self)
+			module.__run(self)
 			reset_context(self, prior_context)
 		end
 	end
@@ -261,11 +261,10 @@ local function try_tests(self: LMGame, module: LazyModule, name: string)
 
 	local s, r = pcall(function() return module.__tests end)
 	if s and r then
-		if typeof(module.__tests) == "function" then
-			local tester = Tests.Tester(name)
-		
+		if typeof(module.__tests) == "function" then		
 			task.spawn(function()
-				module:__tests(self, tester)
+				local tester = Tests.Tester(name)
+				module.__tests(self, tester)
 				Tests.Finished(tester)
 			end)
 		end
@@ -286,7 +285,7 @@ local function load_gamestate_wrapper(module, module_name, data, loaded_list)
 		-- @param1, the state returned by __get_gamestate
 		-- @param2, a function that you MUST call when you have finished loading, see Gamemodes.lua for a good example.
 		-- @param3, a function that you can pass another module name into to ensure its state loades before your callback is called.
-		module:__load_gamestate(data, loaded_func, after_func)
+		module.__load_gamestate(data, loaded_func, after_func)
 	end
 end
 

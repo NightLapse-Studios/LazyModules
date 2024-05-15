@@ -31,7 +31,7 @@ end
 mod.add = mod.push
 mod.remove = mod.pop
 
-function mod:__tests(G, T)
+function mod.__tests(G, T)
 	-- TODO: Tests
 --[[ 	T("Simply work", function()
 		local t = mod.new()

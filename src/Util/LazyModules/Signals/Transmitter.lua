@@ -37,7 +37,7 @@ local TransmitterBuilder = {
 		if not func then return self end
 		if IsServer then return self end
 
-		self[1].OnClientEvent:Connect(func)
+		self[1].Event.OnClientEvent:Connect(func)
 
 		return self
 	end,
@@ -45,7 +45,7 @@ local TransmitterBuilder = {
 		if not func then return self end
 		if not IsServer then return self end
 
-		self[1].OnServerEvent:Connect(func)
+		self[1].Event.OnServerEvent:Connect(func)
 
 		return self
 	end
@@ -56,7 +56,7 @@ local ClientTransmitter = {
 			self.monitor(self, ...)
 		end
 
-		self[1]:FireServer(...)
+		self[1].Event:FireServer(...)
 	end,
 }
 local ServerTransmitter = {
@@ -65,14 +65,14 @@ local ServerTransmitter = {
 			self.monitor(self, ...)
 		end
 
-		self[1]:FireClient(...)
+		self[1].Event:FireClient(...)
 	end,
 	TransmitAll = function(self, ...)
 		if self.monitor then
 			self.monitor(self, ...)
 		end
 
-		self[1]:FireAllClients(...)
+		self[1].Event:FireAllClients(...)
 	end,
 }
 

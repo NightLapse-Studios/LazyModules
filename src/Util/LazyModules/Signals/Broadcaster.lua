@@ -70,10 +70,11 @@ local BroadcastBuilder = {
 
 	Build = function(self)
 		if IsServer then
-			self[1].OnServerEvent:Connect(function(plr, ...)
+			self[1].Event.OnServerEvent:Connect(function(plr, ...)
 				local should_accept = self.__ShouldAccept(plr, ...)
 
 				if should_accept then
+					print(debug.traceback())
 					self[2]:Fire(plr, ...)
 
 					for i,v in game.Players:GetPlayers() do
@@ -83,7 +84,7 @@ local BroadcastBuilder = {
 				end
 			end)
 		else
-			self[1].OnClientEvent:Connect(function(plr, ...)
+			self[1].Event.OnClientEvent:Connect(function(plr, ...)
 				self[2]:Fire(plr, ...)
 			end)
 		end
@@ -96,7 +97,7 @@ local BroadcasterClient = {
 			self.monitor(self, ...)
 		end
 
-		self[1]:FireServer(...)
+		self[1].Event:FireServer(...)
 	end
 }
 local BroadcasterServer = {
@@ -106,7 +107,7 @@ local BroadcasterServer = {
 		end
 
 		self[2]:Fire(nil, ...)
-		self[1]:FireAllClients(nil, ...)
+		self[1].Event:FireAllClients(nil, ...)
 	end,
 	BroadcastLikePlayer = function(self, plr, ...)
 		if self.monitor then
@@ -114,7 +115,7 @@ local BroadcasterServer = {
 		end
 
 		self[2]:Fire(plr, ...)
-		self[1]:FireAllClients(plr, ...)
+		self[1].Event:FireAllClients(plr, ...)
 	end,
 }
 

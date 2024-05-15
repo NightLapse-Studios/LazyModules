@@ -80,7 +80,7 @@ function mod.Stack()
 	return t
 end
 
-function mod:__tests(G, T)
+function mod.__tests(G, T)
 	local top_according_to_callback = nil
 
 	local stack = mod.Stack()

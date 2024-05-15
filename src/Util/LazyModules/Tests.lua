@@ -9,7 +9,7 @@ local mod = {
 local Config = require(game.ReplicatedFirst.Util.Config.Config)
 
 local USAGE_EXAMPLE = [[
-	function mod:__tests(G, T)
+	function mod.__tests(G, T)
 		T:Test("Do this thing", function()
 			local val = mod.ReturnsTrue()
 			T:WhileSituation("the world is on fire",

@@ -109,7 +109,7 @@ end
 
 
 
-function mod:__init(G)
+function mod.__init(G)
 	Globals = G
 end
 

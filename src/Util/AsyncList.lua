@@ -212,7 +212,7 @@ function AsyncList:remove(...)
 	end
 end
 
-function mod:__tests(G, T)
+function mod.__tests(G, T)
 	local async_list = mod.new(1)
 	T:Test("Basically work", function()
 		async_list:provide(1, "asdf")

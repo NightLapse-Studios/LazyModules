@@ -170,7 +170,7 @@ function CONFIGURATOR:FINISH()
 end
 
 
-function mod:__tests(G, T)
+function mod.__tests(G, T)
 	local UNINIT_VALUE = -1
 
 	local obj = {}

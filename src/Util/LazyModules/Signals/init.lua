@@ -111,7 +111,7 @@ function SignalAPI.SetModule(self: SignalAPI, module_name: string )
 end
 
 local function monitor_func(signal, ...)
-	print(signal[1].Name)
+	print(signal.Name)
 end
 
 local function __monitor(signal)
@@ -152,6 +152,10 @@ end
 
 -- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
 function mod.BuildSignals(G: any)
+	-- The exact form of dependency injection we want to eradicate
+	local remote_wrapper = require(script.__remote_wrapper)
+	remote_wrapper.GiveGame(G)
+
 	local wait_dur = 0
 	wait_dur += wait_for(Event.Events.Identifiers)
 	wait_dur += wait_for(Transmitter.Transmitters.Identifiers)

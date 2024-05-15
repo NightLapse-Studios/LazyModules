@@ -46,12 +46,12 @@ function mod.new(ctor)
 	return t
 end
 
-function mod:__build_signals(G, B)
+function mod.__build_signals(G, B)
 	Players.PlayerAdded:Connect(PlayerJoined)
 	Players.PlayerRemoving:Connect(PlayerLeaved)
 end
 
-function mod:__init(G)
+function mod.__init(G)
 	Registry = G:Get("Registry")
 end
 

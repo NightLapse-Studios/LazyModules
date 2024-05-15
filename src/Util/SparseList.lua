@@ -107,7 +107,7 @@ function mod.newFromList( list: { any } ): SparseList
 	return (n :: any) :: SparseList
 end
 
-function mod:__tests(G, T)
+function mod.__tests(G, T)
 	local a,s,d,f,g = 1,2,3,4,5
 	local function generic_psa()
 		local psa = mod.new(16)

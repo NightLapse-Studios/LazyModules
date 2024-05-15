@@ -94,7 +94,7 @@ function CircleBuffer:readFromFront(n)
 	return ret
 end
 
-function module:__tests(G, T)
+function module.__tests(G, T)
 	local a,s,d,f,g = 1,2,3,4,5
 	local cbuf = module.new(5)
 

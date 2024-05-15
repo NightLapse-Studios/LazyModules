@@ -122,7 +122,7 @@ local function detect_gestures(mag_sig, angle_sig)
 	return last_dir, total_mag
 end
 
-function mod:__init(G)
+function mod.__init(G)
 	UserInput = G:Get("UserInput")
 end
 
@@ -194,12 +194,12 @@ function mod.ConsumeDelta(dt: Vector3)
 	push_new_dt(dt)
 end
 
-function mod:__run()
+function mod.__run()
 	mod.IsReady = true
 end
 
 
-function mod:__tests(G, T)
+function mod.__tests(G, T)
 	T:Test("Turn coordinates into directions", function()
 		T:WhileSituation("moving Right",
 			T.Equal, get_dir(math.atan2(1, 0)), Enums.InputGestures.Right

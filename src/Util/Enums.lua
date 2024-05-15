@@ -20,11 +20,14 @@ local Enums = {
 		REQUIRE = 11,
 		COLLECTED = 12,
 
-		GAME_BEGIN = 20,
-		LOAD_INIT = 21,
-		SIGNAL_BUILDING = 22,
-		UI = 23,
-		RUN = 24,
+		BEGIN_INIT = 20,
+		INIT = 21,
+		BEGIN_SIGNALS = 22,
+		SIGNALS = 23,
+		BEGIN_UI = 24,
+		UI = 25,
+		BEGIN_RUN = 26,
+		RUN = 27,
 
 		FINISHED = 1000
 	},

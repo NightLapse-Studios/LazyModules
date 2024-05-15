@@ -317,7 +317,7 @@ function mod.GetLastGesture()
 	return GestureDetector.Last
 end
 
-function mod:__init(G)
+function mod.__init(G)
 	Game = G
 	local Stack = G:Get("Stack")
 	Config = G:Get("Config")
@@ -338,7 +338,7 @@ end
 
 
 local empty_table = { }
-function mod:__build_signals(G, B)
+function mod.__build_signals(G, B)
 	local a = 1
 	game:GetService("RunService").Stepped:Connect(function()
 		a += 1

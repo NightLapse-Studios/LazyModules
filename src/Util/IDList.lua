@@ -38,7 +38,7 @@ function mod.new()
 	return setmetatable(t, mt_IDList)
 end
 
-function mod:__tests(G, T)
+function mod.__tests(G, T)
 	T:Test("Simply work", function()
 		local t = mod.new()
 

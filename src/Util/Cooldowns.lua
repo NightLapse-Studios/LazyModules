@@ -85,7 +85,7 @@ function Cooldowns.StartCooldown(t, n1, n2, n3)
 	end
 end
 
-function Cooldowns:__run()
+function Cooldowns.__run()
 	local lastScan = tick()
 
 	RunService.Stepped:Connect(function()
