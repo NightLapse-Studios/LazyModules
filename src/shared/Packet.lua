@@ -7,6 +7,166 @@ local Config = require(game.ReplicatedFirst.Util.Config.Config)
 local mod = { }
 
 --[[
+    Setup and helper funcitons
+]]
+
+local literal_sizes = {
+    i8 = 1,
+    i16 = 2,
+    i32 = 4,
+    u8 = 1,
+    u16 = 2,
+    u32 = 4,
+    f32 = 4,
+    f64 = 8,
+}
+
+local index_to_type = {
+    "i8",
+    "i16",
+    "i32",
+    "u8",
+    "u16",
+    "u32",
+    "f32",
+    "f64",
+    "table",
+    "vector3",
+    "specific_index"
+}
+
+local type_to_index = table.create(#index_to_type)
+
+for i,v in index_to_type do
+    type_to_index[v] = i
+end
+
+local writers, readers
+local function w_i8(v: number, b: buffer, idx: number)
+    buffer.writei8(b, idx, v)
+    return 1, 0
+end
+local function w_i16(v: number, b: buffer, idx: number)
+    buffer.writei16(b, idx, v)
+    return 2, 0
+end
+local function w_i32(v: number, b: buffer, idx: number)
+    buffer.writei32(b, idx, v)
+    return 4, 0
+end
+local function w_u8(v: number, b: buffer, idx: number)
+    buffer.writeu8(b, idx, v)
+    return 1, 0
+end
+local function w_u16(v: number, b: buffer, idx: number)
+    buffer.writeu16(b, idx, v)
+    return 2, 0
+end
+local function w_u32(v: number, b: buffer, idx: number)
+    buffer.writeu32(b, idx, v)
+    return 4, 0
+end
+local function w_f32(v: number, b: buffer, idx: number)
+    buffer.writef32(b, idx, v)
+    return 4, 0
+end
+local function w_f64(v: number, b: buffer, idx: number)
+    buffer.writef64(b, idx, v)
+    return 8, 0
+end
+local function w_str(v: string, b: buffer, idx: number, len: number)
+    buffer.writestring(b, idx, v)
+    return len, 0
+end
+
+local function w_vector3(v: Vector3, b: buffer, idx: number, _, fn_orders: { number }, fn_idx: number)
+    local s = 0
+    s += writers[fn_orders[fn_idx + 1]](v.X, b, idx)
+    s += writers[fn_orders[fn_idx + 2]](v.Y, b, idx + s)
+    s += writers[fn_orders[fn_idx + 3]](v.Z, b, idx + s)
+
+    return s, 3
+end
+local function w_table(t: {}, b: buffer, idx: number, len: number, fn_orders: { number }, fn_idx: number)
+    local s = 0
+    for i = 1, len, 1 do
+        s += writers[fn_orders[fn_idx + i]](t[i], b, idx + s)
+    end
+
+    return s, len
+end
+
+local function r_i8(b: buffer, idx: number)
+    return buffer.readi8(b, idx), 1, 0
+end
+local function r_i16(b: buffer, idx: number)
+    return buffer.readi16(b, idx), 2, 0
+end
+local function r_i32(b: buffer, idx: number)
+    return buffer.readi32(b, idx), 4, 0
+end
+local function r_u8(b: buffer, idx: number)
+    return buffer.readu8(b, idx), 1, 0
+end
+local function r_u16(b: buffer, idx: number)
+    return buffer.readu16(b, idx), 2, 0
+end
+local function r_u32(b: buffer, idx: number)
+    return buffer.readu32(b, idx), 4, 0
+end
+local function r_f32(b: buffer, idx: number)
+    return buffer.readf32(b, idx), 4, 0
+end
+local function r_f64(b: buffer, idx: number)
+    return buffer.readf64(b, idx), 8, 0
+end
+
+local function r_vector3(b: buffer, idx: number, _, fn_orders: { number }, fn_idx: number)
+    local s = 0
+    local x, s1 = readers[fn_orders[fn_idx + 1]](b, idx)
+    s += s1
+    local y, s2 = readers[fn_orders[fn_idx + 2]](b, idx + s)
+    s += s2
+    local z, s3 = readers[fn_orders[fn_idx + 3]](b, idx + s)
+
+    return Vector3.new(x, y, z), s + s3, 3
+end
+local function r_table(b: buffer, idx: number, len: number, fn_orders: { number }, fn_idx: number)
+    local s = 0
+    local fn_consumed = 0
+    local t = table.create(len)
+    for i = 1, len, 1 do
+        local val, read, _fn_consumed = readers[fn_orders[fn_idx + i]](b, idx + s, false, fn_orders, fn_idx)
+        s += read
+        fn_consumed += _fn_consumed
+        table.insert(t, val)
+    end
+
+    return t, s, fn_consumed
+end
+
+writers = {
+    w_i8, w_i16, w_i32, w_u8, w_u16, w_u32, w_f32, w_f64,
+    w_table, w_vector3, false
+}
+
+readers = {
+    r_i8, r_i16, r_i32, r_u8, r_u16, r_u32, r_f32, r_f64,
+    r_table, r_vector3, false
+}
+
+local function sum(t: { number })
+    local s = 0
+    for i,v in t do
+        s += v
+    end
+
+    return s
+end
+
+
+
+--[[
     Tokenizer
 ]]
 
@@ -84,6 +244,8 @@ local function tokenize(str: string)
     return tokens
 end
 
+
+
 --[[
     AST from token stream
 ]]
@@ -155,6 +317,22 @@ end
 local ASTNode = { }
 ASTNode.__index = ASTNode
 
+local function new_node(type: string, value: unknown, index: number, size: number, extra: string?)
+    local node = {
+        Type = type,
+        Value = value,
+        Index = index,
+        TokenSize = size,
+        Extra = extra or false,
+    }
+
+    setmetatable(node, ASTNode)
+
+    return node
+end
+
+type ASTNode = typeof(new_node("" :: string, "" :: unknown, 1 :: number, 1 :: number))
+
 function ASTNode:IsLiteral()
     return typeof(self.Value) == "string"
 end
@@ -193,22 +371,6 @@ function ASTNode:Print(depth: number?)
         end
     end
 end
-
-local function new_node(type: string, value: unknown, index: number, size: number, extra: string?)
-    local node = {
-        Type = type,
-        Value = value,
-        Index = index,
-        TokenSize = size,
-        Extra = extra or false,
-    }
-
-    setmetatable(node, ASTNode)
-
-    return node
-end
-
-type ASTNode = typeof(new_node("" :: string, "" :: unknown, 1 :: number, 1 :: number))
 
 local _NodeConstructors: { ({ string }, idx: number, ...any) -> (ASTNode, number)} = {
     root = function(tokens: { string }, idx)
@@ -293,7 +455,9 @@ NodeConstructors = _NodeConstructors
 
 
 
-
+--[[
+    Visitors
+]]
 
 local Visitor = { }
 Visitor.__index = Visitor
@@ -349,6 +513,7 @@ function Visitor:CollectChildren(node: ASTNode)
     return vals
 end
 
+-- Mirrors the functionality of ASTNode:Print
 local PrintVisitor = new_visitor()
 do
     PrintVisitor.indent = 0
@@ -398,50 +563,10 @@ do
     end
 end
 
-local literal_sizes = {
-    i8 = 1,
-    i16 = 2,
-    i32 = 4,
-    u8 = 1,
-    u16 = 2,
-    u32 = 4,
-    f32 = 4,
-    f64 = 8,
-}
-
-local index_to_type = {
-    "i8",
-    "i16",
-    "i32",
-    "u8",
-    "u16",
-    "u32",
-    "f32",
-    "f64",
-    "table",
-    "vector3",
-    "specific_index"
-}
-
-local type_to_index = table.create(#index_to_type)
-
-for i,v in index_to_type do
-    type_to_index[v] = i
-end
-
-local function sum(t: { number })
-    local s = 0
-    for i,v in t do
-        s += v
-    end
-
-    return s
-end
-
+-- Calculates the byte size each argument to the serializer will take up
 local ArgSizeVisitor = new_visitor()
 do 
     ArgSizeVisitor.root = function(self, node: ASTNode)
-        print("Calculating sizes")
         local sizes = self:CollectChildren(node)
 
         local arg_sizes = { }
@@ -474,10 +599,39 @@ do
     end
 end
 
+-- Counts the number of literal descendants of a node
+local CountLiteralVisitor = new_visitor()
+do 
+    CountLiteralVisitor.root = function(self, node: ASTNode)
+        return { self:CollectChildren(node) }
+    end
+    CountLiteralVisitor.error = function(self, node: ASTNode)
+        return math.huge
+    end
+    CountLiteralVisitor.error_with_children = function(self, node: ASTNode)
+        return math.huge
+    end
+    CountLiteralVisitor.comment = function(self, node: ASTNode)
+        return 0
+    end
+    CountLiteralVisitor.literal = function(self, node: ASTNode)
+        return 1
+    end
+    CountLiteralVisitor.specific_index = function(self, node: ASTNode)
+        return 1
+    end
+    CountLiteralVisitor.table = function(self, node: ASTNode)
+        return sum(self:CollectChildren(node))
+    end
+    CountLiteralVisitor.vector3 = function(self, node: ASTNode)
+        return sum(self:CollectChildren(node))
+    end
+end
+
+-- Calculates a linear list of sizes of each node. The sum of this will equal the sum of the ArgSizeVisitor
 local NodeSizeVisitor = new_visitor()
 do 
     NodeSizeVisitor.root = function(self, node: ASTNode)
-        print("Calculating sizes")
         local sizes = self:CollectChildren(node)
 
         return table.clone(sizes)
@@ -492,9 +646,6 @@ do
         return nil
     end
     NodeSizeVisitor.literal = function(self, node: ASTNode)
-        if node.Value == "vector3" then
-            print()
-            end
         return literal_sizes[node.Value]
     end
     NodeSizeVisitor.specific_index = function(self, node: ASTNode)
@@ -508,93 +659,76 @@ do
     end
 end
 
+-- Calculates a linear list of args each node may need to deserialize
+local NodeArgsVisitor = new_visitor()
+do 
+    NodeArgsVisitor.root = function(self, node: ASTNode)
+        return self:CollectChildren(node)
+    end
+    NodeArgsVisitor.error = function(self, node: ASTNode)
+        return false
+    end
+    NodeArgsVisitor.error_with_children = function(self, node: ASTNode)
+        return false
+    end
+    NodeArgsVisitor.comment = function(self, node: ASTNode)
+        return false
+    end
+    NodeArgsVisitor.literal = function(self, node: ASTNode)
+        return false
+    end
+    NodeArgsVisitor.specific_index = function(self, node: ASTNode)
+        return string.len(node.Value)
+    end
+    NodeArgsVisitor.table = function(self, node: ASTNode)
+        local child_args = CountLiteralVisitor:CollectChildren(node)
+        return sum(child_args), table.unpack(self:CollectChildren(node))
+    end
+    NodeArgsVisitor.vector3 = function(self, node: ASTNode)
+        return false, table.unpack(self:CollectChildren(node))
+    end
+end
+
 local SerializeVisitor = new_visitor()
 do
-    SerializeVisitor.fn_order = { }
     SerializeVisitor.root = function(self, node: ASTNode)
-        print("Beginning serializer")
-        
-        SerializeVisitor.fn_order = { }
-        local children_sers = self:TraverseChildren(node)
-
         local sizes = node:Accept(NodeSizeVisitor)
         local fn_orders = self:CollectChildren(node)
+        local fn_args = node:Accept(NodeArgsVisitor)
 
-        local function i8(v: number, b: buffer, idx: number)
-            buffer.writei8(b, idx, v)
-            return 1, 0
-        end
-        local function i16(v: number, b: buffer, idx: number)
-            buffer.writei16(b, idx, v)
-            return 2, 0
-        end
-        local function i32(v: number, b: buffer, idx: number)
-            buffer.writei32(b, idx, v)
-            return 4, 0
-        end
-        local function u8(v: number, b: buffer, idx: number)
-            buffer.writeu8(b, idx, v)
-            return 1, 0
-        end
-        local function u16(v: number, b: buffer, idx: number)
-            buffer.writeu16(b, idx, v)
-            return 2, 0
-        end
-        local function u32(v: number, b: buffer, idx: number)
-            buffer.writeu32(b, idx, v)
-            return 4, 0
-        end
-        local function f32(v: number, b: buffer, idx: number)
-            buffer.writef32(b, idx, v)
-            return 4, 0
-        end
-        local function f64(v: number, b: buffer, idx: number)
-            buffer.writef64(b, idx, v)
-            return 8, 0
-        end
+        local buffer_size = sum(sizes)
 
-
-        local writers
-
-        local function vector3(v: Vector3, b: buffer, idx: number, fn_idx: number)
-            local s = 0
-            s += writers[fn_idx + 1](v.X, b, idx)
-            s += writers[fn_idx + 2](v.Y, b, idx + s)
-            s += writers[fn_idx + 3](v.Z, b, idx + s)
-
-            return s, 3
+        if buffer_size == math.huge then
+            error("Serialization structure has errors")
         end
-
-        writers = {
-            i8, i16, i32, u8, u16, u32, f32, f64, --[[table]] false, vector3, false
-        }
 
         local function serialize_args(...)
             local args = { ... }
             local cursor = 0
             local fn_cursor = 1
-            local b = buffer.create(sum(sizes))
+            local b = buffer.create(buffer_size)
+
             for i = 1, #args, 1 do
                 local val = args[i]
-                local fn_order = fn_orders[i]
-                local written, fn_orders_consumed = writers[fn_order](val, b, cursor, fn_cursor)
+                local fn_order = fn_orders[fn_cursor]
+                local arg = fn_args[fn_cursor]
+                local written, fn_orders_consumed = writers[fn_order](val, b, cursor, arg, fn_orders, fn_cursor)
 
-                if fn_orders_consumed then
-                    fn_cursor += fn_orders_consumed
-                end
-                
+                fn_cursor += fn_orders_consumed
                 fn_cursor += 1
                 cursor += written
             end
+
+            return b
         end
         
         return serialize_args
     end
     SerializeVisitor.error = function(self, node: ASTNode)
-        return nil
+        return math.huge
     end
     SerializeVisitor.error_with_children = function(self, node: ASTNode)
-        return table.unpack(self:CollectChildren(node))
+        return math.huge
     end
     SerializeVisitor.comment = function(self, node: ASTNode)
         return nil
@@ -606,10 +740,73 @@ do
         return type_to_index.specific_index
     end
     SerializeVisitor.table = function(self, node: ASTNode)
-        return table.unpack(self:CollectChildren(node))
+        return type_to_index.table, table.unpack(self:CollectChildren(node))
     end
     SerializeVisitor.vector3 = function(self, node: ASTNode)
-        return table.unpack(self:CollectChildren(node))
+        return type_to_index.vector3, table.unpack(self:CollectChildren(node))
+    end
+end
+
+local DeserializeVisitor = new_visitor()
+do
+    DeserializeVisitor.root = function(self, node: ASTNode)
+        local node_sizes = node:Accept(NodeSizeVisitor)
+        local arg_sizes = node:Accept(ArgSizeVisitor)
+        local fn_args = node:Accept(NodeArgsVisitor)
+        local fn_orders = self:CollectChildren(node)
+
+        local buffer_size = sum(node_sizes)
+        local arg_ct = #arg_sizes
+
+        if buffer_size == math.huge then
+            error("Serialization structure has errors")
+        end
+
+        local function deserialize_buf(b: buffer)
+            local ret = table.create(arg_ct)
+            local cursor = 0
+            local fn_cursor = 1
+            local size = buffer.len(b)
+
+            while cursor < size do
+                if fn_cursor == 13 then
+                    print()
+                end
+                local fn_order = fn_orders[fn_cursor]
+                local arg = fn_args[fn_cursor]
+                local val, read, fn_orders_consumed = readers[fn_order](b, cursor, arg, fn_orders, fn_cursor)
+                table.insert(ret, val)
+
+                fn_cursor += fn_orders_consumed
+                fn_cursor += 1
+                cursor += read
+            end
+
+            return table.unpack(ret)
+        end
+        
+        return deserialize_buf
+    end
+    DeserializeVisitor.error = function(self, node: ASTNode)
+        return math.huge
+    end
+    DeserializeVisitor.error_with_children = function(self, node: ASTNode)
+        return math.huge
+    end
+    DeserializeVisitor.comment = function(self, node: ASTNode)
+        return nil
+    end
+    DeserializeVisitor.literal = function(self, node: ASTNode)
+        return type_to_index[node.Value]
+    end
+    DeserializeVisitor.specific_index = function(self, node: ASTNode)
+        return type_to_index.specific_index
+    end
+    DeserializeVisitor.table = function(self, node: ASTNode)
+        return type_to_index.table, table.unpack(self:CollectChildren(node))
+    end
+    DeserializeVisitor.vector3 = function(self, node: ASTNode)
+        return type_to_index.vector3, table.unpack(self:CollectChildren(node))
     end
 end
 
@@ -626,6 +823,14 @@ local function str_to_ast(str)
     local tokens = tokenize(str)
     local ast = parse_token_stream(tokens)
     return ast
+end
+
+local function compile_serdes_str(str)
+    local ast = str_to_ast(str)
+    local serializer = ast:Accept(SerializeVisitor)
+    local deserializer = ast:Accept(DeserializeVisitor)
+
+    return serializer, deserializer, ast
 end
 
 function mod.__init(G)
@@ -685,21 +890,24 @@ function mod.__init(G)
             f32,
             f64,
             vector3(i8, i16, u32),
-            f64
+            table(
+                i8, f64,
+                [thing]: i8
+            )
     ]]
 
-    --serialize
-    local function a()
+    local serializer, deserializer, ast = compile_serdes_str(basic_test)
+    ast:Accept(PrintVisitor)
 
-    end
+    local serial = serializer(1, 2, 3, 4, 5, 6, 7, 8, Vector3.new(9, 10, 11), {12, 13})
     
-    warn("DOING IT")
-    local ast1 = str_to_ast(basic_test)
-    ast1:Accept(PrintVisitor)
-    -- ast1:Accept(NodeSizeVisitor)
-    local serializer = ast1:Accept(SerializeVisitor)
-    local serial = serializer(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
-    print()
+    print("Results:")
+    print(serial)
+    print(deserializer(serial))
+
+
+    print("\n\n")
+    local a, b, c, d, e, f, g, h, i, j = deserializer(serial)
     -- local sizes = ast1:Accept(SizeVisitor)
     -- str_to_ast(trialing_comma_test):Accept(PrintVisitor)
     -- str_to_ast(test_2):Accept(PrintVisitor)
