@@ -1,8 +1,42 @@
 --!strict
 
+--[[
+    An embedded DSL for generating a pair of SerDes functions targeting buffers.
+    The functions are suitable as middlewere for networking data to save on bandwidth or storage
+
+    `
+        "i8, vector3(f32, f64, f64), array(u8, u8, u8)"
+            ->
+        serializer function(a1: number a2: Vector3, a3: { number }) -> buffer
+        deserialier function(b: buffer) -> tupple<number, Vector3, { number }>
+    `
+
+    Type literals:
+        Corresponds to all the data types that buffers support
+        i8, i16, i32, u8, u16, u32, f32, f64
+
+    Table types:
+        array:
+            Fixed-size list of types
+            array(u8, f32, f32) -> 9 bytes of storage + 1 byte of padding to specify the size
+        list:
+            Periodic list of types
+            list(u8, f32, f32, max_size: 511) -> 9 bytes per period + 2 bytes to store the size
+                byte storage size is based on the max_size
+        id_list:
+            List of strings that correspond to their index in the list
+            id_list("abc", "def") -> 1 byte per string * number of strings supplied + 1 byte to specify size
+                byte storage is based on the maximum index of id_list. 255 ids = 1 bytes; 256 = 2, etc...
+
+    Constructor types:
+        Can be used in place of a type literal, but will contain type literals
+        vector3:
+            vector3(u8, f32, f32) -> 9 bytes
+]]
 
 local LMT = require(game.ReplicatedFirst.Util.LMTypes)
 local Config = require(game.ReplicatedFirst.Util.Config.Config)
+local is_separator = require(script.Parent.is_separator)
 
 local mod = { }
 
@@ -79,10 +113,9 @@ local function w_f64(v: number, b: buffer, idx: number)
     buffer.writef64(b, idx, v)
     return 8
 end
-local function w_str(v: string, b: buffer, idx: number, fn_idx: number, args: { any })
+local function w_str(v: string, b: buffer, idx: number)
     buffer.writestring(b, idx, v)
-    local len = args[fn_idx]
-    return len
+    return string.len(v)
 end
 
 
@@ -154,131 +187,19 @@ end
 
 
 --[[
-    Tokenizer
-]]
-
-local function is_separator(c: string)
-    if c == "(" or c == ")" or c == "," or c == ":" or c == "[" or c == "]" or c == "\"" then
-        return true
-    end
-
-    return false
-end
-
-local function is_whitespace(c: string)
-    if c == " " or c == "\t" or c == "\n" then
-        return true
-    end
-
-    return false
-end
-
-local function get_str_token(str: string, idx: number)
-    local end_idx = idx
-    local c = string.sub(str, idx, idx)
-    if c == "\"" or c == "" then
-        return "", idx
-    end
-
-    repeat
-        end_idx += 1
-        c = string.sub(str, end_idx, end_idx)
-    until c == "\"" or c == ""
-
-    end_idx -= 1
-    
-    return string.sub(str, idx, end_idx), end_idx
-end
-
-local function get_token(str: string, idx: number)
-    -- Find the first non-white-space character
-    local start_idx = idx
-    while true do
-        local c = string.sub(str, start_idx, start_idx)
-        if is_whitespace(c) then
-            start_idx += 1
-        elseif is_separator(c) then
-            -- if it's a separator, the beginning is the end
-            return c, start_idx
-        else
-            break
-        end
-    end
-
-    local end_idx = start_idx
-
-    if string.sub(str, end_idx, end_idx) == "#" then
-        -- Handle comments
-        local c
-        repeat
-            end_idx += 1
-            c = string.sub(str, end_idx, end_idx) 
-        until c == "\n" or c == ""
-    else
-        -- if we get here, we have a word-ey thing
-        while true do
-            local c = string.sub(str, end_idx, end_idx)
-            if c == "" then
-                break
-            elseif is_separator(c) or is_whitespace(c) then
-                break
-            end
-
-            end_idx += 1
-        end
-    end
-
-    end_idx -= 1
-
-    local word = string.sub(str, start_idx, end_idx)
-    return word, end_idx
-end
-
-local function tokenize(str: string)
-    local tokens = { }
-    local idx = 1
-    while true do
-        local token, end_idx = get_token(str, idx)
-        idx = end_idx + 1
-        if token == "" then
-            break
-        end
-
-        table.insert(tokens, token)
-
-        -- Strings are special
-        if token == "\"" then
-            token, end_idx = get_str_token(str, idx)
-            idx = end_idx + 1
-            table.insert(tokens, token)
-
-            local str_end = string.sub(str, idx, idx)
-            table.insert(tokens, str_end)
-            idx += 1
-        end
-    end
-
-    return tokens
-end
-
-
-
---[[
     AST from token stream
 ]]
 
 local NodeConstructors
-local parse_chunk
 
 local function node_from_token(tokens, idx)
     local token = tokens[idx]
-    local prev = tokens[idx - 1]
 
     if string.sub(token, 1, 1) == "#" then
         return NodeConstructors.comment(tokens, idx)
     end
 
-    if prev == "\"" then
+    if token == "\"" then
         return NodeConstructors.string_literal(tokens, idx)
     end
 
@@ -295,7 +216,61 @@ local function node_from_token(tokens, idx)
     return node_ctor(tokens, idx)
 end
 
-function parse_chunk(tokens: { string }, idx)
+local function parse_binding(tokens: { string }, idx)
+    local lhs, rhs, consumed
+    local consumed_total = 0
+    lhs, consumed = node_from_token(tokens, idx)
+    consumed_total += consumed
+    idx += consumed
+
+    if tokens[idx] == ":" then
+        idx += 1
+        rhs, consumed = node_from_token(tokens, idx)
+        consumed_total += (consumed + 1)
+        idx += consumed
+
+        return NodeConstructors.binding(tokens, idx, {lhs, rhs}, consumed_total)
+    else
+        rhs, consumed = node_from_token(tokens, idx)
+        consumed_total += consumed
+        idx += consumed
+
+        return NodeConstructors.error_with_children(tokens, idx, `Type binding missing assignment separator`, consumed_total, {lhs, rhs})
+    end
+end
+
+local function parse_binding_list(tokens: { string }, idx)
+    if tokens[idx] ~= "(" then
+        return NodeConstructors.error(tokens, idx, `Unexpected token {tokens[idx]}: missing ( to open binding list`, 0)
+    end
+
+    local children, consumed_total = { }, 1
+    idx += 1
+
+    while true do
+        if tokens[idx] == ")" then
+            break            
+        end
+
+        local child, consumed = parse_binding(tokens, idx)
+        table.insert(children, child)
+        idx += consumed
+
+        if tokens[idx] == "," then
+            consumed += 1
+            idx += 1
+        end
+
+        consumed_total += consumed
+    end
+
+    consumed_total += 1
+
+    return children, consumed_total
+end
+
+-- Parses a list of type literals or parent type nodes such as vector3/list
+local function parse_chunk(tokens: { string }, idx)
     local token_ct = #tokens
     local consumed = 0
     local nodes = { }
@@ -392,7 +367,7 @@ local _NodeConstructors: { ({ string }, idx: number, ...any) -> (ASTNode, number
         return node, 1
     end,
     string_literal = function(tokens: { string }, idx: number)
-        return new_node("string_literal", tokens[idx], idx, 1), 1
+        return new_node("string_literal", tokens[idx + 1], idx, 3), 3
     end,
     id_list = function(tokens: { string }, idx: number)
         local children, consumed = parse_chunk(tokens, idx + 1)
@@ -408,6 +383,12 @@ local _NodeConstructors: { ({ string }, idx: number, ...any) -> (ASTNode, number
         table.insert(children, new_node("size_specifier", #children, -1, 0))
 
         return new_node("id_list", children, idx, consumed_total), consumed_total
+    end,
+    id_map = function(tokens: { string }, idx: number)
+        local children, consumed = parse_binding_list(tokens, idx + 1)
+        local consumed_total = consumed + 1
+
+        return new_node("id_map", children, idx, consumed_total), consumed_total
     end,
     array = function(tokens: { string }, idx: number)
         local children, consumed = parse_chunk(tokens, idx + 1)
@@ -487,6 +468,9 @@ local _NodeConstructors: { ({ string }, idx: number, ...any) -> (ASTNode, number
     end,
     max_size = function(tokens: { string }, idx: number)
         return NodeConstructors.size_specifier(tokens, idx)
+    end,
+    binding = function(tokens: { string }, idx: number, children: { ASTNode }, token_size: number)
+        return new_node("binding", children, idx, token_size), token_size
     end,
     i8= function(tokens: { string }, idx: number)
         return NodeConstructors.type_literal(tokens, idx)
@@ -630,6 +614,18 @@ do
     PrintVisitor.indexer = function(self, node: ASTNode)
         print_desc(self, "indexer literal: " .. node.Value)
     end
+    PrintVisitor.binding = function(self, node: ASTNode)
+        print_desc(self, `binding`)
+        self.indent += 1
+        self:TraverseChildren(node)
+        self.indent -= 1
+    end
+    PrintVisitor.id_map = function(self, node: ASTNode)
+        print_desc(self, `id_map`)
+        self.indent += 1
+        self:TraverseChildren(node)
+        self.indent -= 1
+    end
     PrintVisitor.id_list = function(self, node: ASTNode)
         local size = node.Value[#node.Value].Value
         local byte_size = bytes_to_store_value(size)
@@ -713,23 +709,83 @@ do
     end
 end
 
+local SizeCalcVisitor = new_visitor()
+do
+    SizeCalcVisitor.root = function(self, node: ASTNode)
+        return self:CollectChildren(node)
+    end
+    SizeCalcVisitor.error = function(self, node: ASTNode)
+        return math.huge
+    end
+    SizeCalcVisitor.error_with_children = function(self, node: ASTNode)
+        return sum(self:CollectChildren(node))
+    end
+    SizeCalcVisitor.comment = function(self, node: ASTNode)
+        return nil
+    end
+    SizeCalcVisitor.type_literal = function(self, node: ASTNode)
+        return type_literal_sizes[node.Value]
+    end
+    SizeCalcVisitor.string_literal = function(self, node: ASTNode)
+        return string.len(node.Value)
+    end
+    SizeCalcVisitor.size_specifier = function(self, node: ASTNode)
+        return bytes_to_store_value(node.Value)
+    end
+    SizeCalcVisitor.indexer = function(self, node: ASTNode)
+        return string.len(node.Value)
+    end
+    SizeCalcVisitor.id_list = function(self, node: ASTNode)
+        local children = self:CollectChildren(node)
+        local byte_size = children[#children]
+        return function(t: { string })
+            return #t * byte_size + byte_size
+        end
+    end
+    SizeCalcVisitor.string_literal = function(self, node: ASTNode)
+        return string.len(node.Value)
+    end
+    SizeCalcVisitor.array = function(self, node: ASTNode)
+        return sum(self:CollectChildren(node))
+    end
+    SizeCalcVisitor.list = function(self, node: ASTNode)
+        local child_sizes = self:CollectChildren(node)
+        local size_padding = table.remove(child_sizes)
+        local len_per_period = #child_sizes
+        local size_per_period = sum(child_sizes)
+        return function(t: { })
+            -- TODO: this breaks if a child is not a type literal
+            local periods = #t / len_per_period
+            assert(periods %1 == 0)
+            return periods * size_per_period + size_padding
+        end
+    end
+    SizeCalcVisitor.vector3 = function(self, node: ASTNode)
+        return sum(self:CollectChildren(node))
+    end
+end
 
 local SerializeVisitor = new_visitor()
 do
     SerializeVisitor.root = function(self, node: ASTNode)
-        local sizes = node:Accept(ArgSizeVisitor)
-        local buffer_size = sum(sizes)
-
-        if buffer_size == math.huge then
-            warn("Serialization structure has errors")
-            return
-        end
+        local sizes = node:Accept(SizeCalcVisitor)
         
         local procedures = self:CollectChildren(node)
 
         local function serialize_args(...)
             local args = { ... }
             local cursor = 0
+
+            local buffer_size = 0
+            for i,v in args do
+                local size = sizes[i]
+                if typeof(size) == "number" then
+                    buffer_size += size
+                else
+                    buffer_size += size(v)
+                end
+            end
+
             local b = buffer.create(buffer_size)
 
             for i = 1, #args, 1 do
@@ -806,13 +862,14 @@ do
     SerializeVisitor.list = function(self, node: ASTNode)
         local fns = self:CollectChildren(node)
         local write_size = table.remove(fns)
-        local len = #fns
+        local period = #fns
 
         local function f(t: { }, b: buffer, idx: number)
+            local len = #t
             local s = write_size(len, b, idx)
 
-            for i = 0, #t - 1, len do
-                for j = 1, len, 1 do
+            for i = 0, len / period, period do
+                for j = 1, period, 1 do
                     s += fns[j](t[i + j], b, idx + s)
                 end
             end
@@ -896,7 +953,7 @@ do
             local ret = table.create(len)
             local byte_size = s
 
-            for i = 1, len + 1, 1 do
+            for i = 1, len, 1 do
                 local v, read = byte_reader(b, idx + (i * byte_size))
                 table.insert(ret, str_array[v])
                 s += read
@@ -1054,23 +1111,6 @@ function mod.__init(G: LMT.LMGame, T: LMT.Tester)
         )
     ]]
 
-    local basic_test = [[
-            vector3(i8, i16, u32),
-            list(
-                max_size: 32,
-                i8, f64,
-            ),
-            array(
-                u8, u8, u8
-            ),
-            id_list(
-                "",
-                "a a",
-                "b",
-                "c"
-            )
-    ]]
-
     local id_list = [[
         array(u8, u8, u8)
         id_list(
@@ -1081,8 +1121,39 @@ function mod.__init(G: LMT.LMGame, T: LMT.Tester)
         )
     ]]
 
-    local serializer, deserializer, ast2 = compile_serdes_str(id_list)
-    local ser2 = serializer({99, 98, 97},{ "a a", "c", "c" })
+    local basic_test = [[
+            vector3(i8, i16, u32),
+            array(
+                @periodic(max=32),
+                i8, f32
+            ),
+            array(
+                f32, i8
+            ),
+            id_list(
+                # May c
+                @sparse,
+                "",
+                "a a",
+                "b",
+                "c"
+            ),
+            id_map(
+                # May not be missing fields
+                @dense,
+                "stat1": u8,
+                "stat2": "asdf",
+                "stat3": f32
+            )
+    ]]
+
+    local serializer, deserializer, ast2 = compile_serdes_str(basic_test)
+    local ser2 = serializer(
+        Vector3.new(1, 2, 3),
+        { 2, 2.35, 9, 9.2 },
+        { 1, 1, 1 },
+        { "a a", "b" }
+    )
     print(deserializer(ser2))
 
     -- local s1, d1, ast1 = compile_serdes_str(nesteds_test)
