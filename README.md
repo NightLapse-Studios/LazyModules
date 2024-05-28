@@ -8,9 +8,8 @@ What has become the LM environment started as a need to report errors from `requ
 
 LM first searches for all module scripts and `require`s them. It then makes these modules available to other modules by passing them in to standardized callbacks that can be defined in any module script. These standardized callbacks are the bread and butter of LM; they are the foundation of the structure of LM games.
 
-LM is the only system which should use `require`; as such it can be fully deprecated in LM games, and its usage is discouraged. As a result of *that*, it is discouraged to make modules which return values other than tables, because they cannot be managed by LM. Other libraries which still use `require` can still work, e.g. Roact and Flipper are included in LM, you just sometimes have to tinker with them to get them to work 100% properly.
-
 The standardized callbacks are executed across all scripts on a per-callback basis I.E. every `__init` function will be called in every module, and then the next callback, `__build_signals` is called in every module, up to the `__run` step. The order of module execution is undefined.
+As a result of this process, each stage sets up an "async fence" where code which runs during each stage can only depend on functionality implemented in previous stages, making race conditions easy to resolve by looking at what stages functionality is defined in.
 
 [LMProtocol.md](LMProtocol.md) describes the callback and startup process more specifically
 
@@ -20,10 +19,10 @@ local mod = { }
 -- This function will be called by LM
 function mod:__init(G)
 	-- This will work as long as MyModule.lua is visible to LM
-	local MyModule = G.Load("MyModule")
+	local MyModule = G.Get("MyModule")
 
 	-- The UserInput library is a standard feature of LM
-	G.Load("UserInput"):Handler(Enums.KeyCode.M,
+	G.Get("UserInput"):Handler(Enums.KeyCode.M,
 		function(input: InputObject)
 			print("M pressed")
 
@@ -44,13 +43,18 @@ return mod
 
 1) Defined startup routine
 
-	About those callbacks... they follow the rule that they can rely on previously executed callback steps, but code which is run by the same callback step cannot be relied on. So when a module is `require`d (by LM), the module-scope code is, of course, executed, but it cannot rely on any other module-level code from any other modules. `__init`-level code can rely on all module-level code, but not on other `__init`-level code, and so on. The goal here is to address any moments when we are wondering "When does this run? When is it ready to use and when is it not?"
+	As mentioned above, the LM callbacks follow the rule that they can rely on previously executed callback steps, but code which is run by the same callback step cannot be relied on. So when a module is `require`d (by LM),
+	the module-scope code is, of course, executed, but it cannot rely on any other module-level code from any other modules. `__init`-level code can rely on all module-level code, but not on other `__init`-level code, and so on.
+	The goal here is to address any moments when we are wondering "When does this run? When is it ready to use and when is it not?"
 
 	It is best to think of module-level code as the "definitions and declarations" stage of startup, somewhat similar to compiling in traditional languages.
 
 2) Any module can depend on any module
 
-	Since LM `require`s all modules, the only time it is possible to enter a `require` loop is if a module attempts to rely on LM core files. That should never happen, as a result, modules cannot enter a `require` loop if they depend on eachother via `G.Load`.
+	Since LM `require`s all modules, the only time it is possible to enter a `require` loop is if a module attempts to rely on LM core files. That should never happen, as a result, modules cannot enter a `require` loop if they
+	depend on eachother via `G.Load`.
+	
+	**It is still recommended to use `require`** for type safety, but `G.Get` can be used as a generic dependency injector, trivializing complex problems of code/data visibility/dependency
 
 3) Standard library
 
@@ -61,7 +65,7 @@ return mod
 	The standard library isn't tremendously accessible if we have to require each lib 1 by 1. So instead we have [StdLib.lua](src/Util/StdLib.lua), which is loaded alongside LM. Its API values are stored in the Game object, and the Game object is readily accessible.
 
 ```lua
--- Modules managed by LM will have access to _G.Game for the stdlib
+-- Modules managed by LM will have access to _G.Game for the stdlib, even at require time
 _G.Game.print_c("This will only print on the client")
 
 -- The Game object is abbreviated to G. Think of it as a better _G.
@@ -85,9 +89,11 @@ end
 
 5) Signals & single-file all-context paradigm
 
-	Signals are an abstraction on top of remote events which classifies their usage based on communication patterns. Even though there are only two main use cases currently, they have proven helpful in preventing networking spaghetti. Transmitters indicate simple client->server or server->client communication. Broadcasters are used for client->server->all-clients communication, and feature "ShouldAccept" functionality that inspects data from the client to give it the go-ahead to continue on to server processing and replication.
+	Signals are an abstraction on top of remote events which classifies their usage based on communication patterns. Even though there are only two main use cases currently, they have proven helpful in preventing networking
+	spaghetti. Transmitters indicate simple client->server or server->client communication. Broadcasters are used for client->server->all-clients communication, and feature "ShouldAccept" functionality that inspects data from the client to give it the go-ahead to continue on to server processing and replication.
 
-	When necessary, all libraries are designed to be configured from one file on how to run on any context. Signals are the primary example. This is probably a controversial decision but it has turned out well in my experience so far. This rule is enforced in no way, it is simply a convention
+	When necessary, all libraries are designed to be configured from one file on how to run on any context. Signals are the primary example. This is probably a controversial decision but it has turned out well in my experience
+	so far. This rule is enforced in no way, it is simply a convention
 
 ```lua 
 function mod:__build_signals(G, B)
@@ -118,11 +124,12 @@ function mod:__run(G)
 end
 ```
 
-7) Roact++
+7) Pumpkin
 
-	Perhaps the craziest thing we did was make a wrapper and expansion for Roact. Check [DebugMenu.lua](src/Util/Debug/DebugMenu.lua) for a practical stateful UI example, and [UI.lua](src/Util/LazyModules/UI.lua) for most implementation.
+	A wrapper we made for Roact, called Pumpkin (available on its own [here](https://github.com/NightLapse-Studios/Pumpkin)).
+	Check [DebugMenu.lua](src/Util/Debug/DebugMenu.lua) for a practical stateful UI example, and [UI.lua](src/Util/Pumpkin/init.lua) for most implementation.
 
-	UI has its own build step which runs just before `__run` (`__ui` is second to last). UI has its own step because it is nice ergonomically and, in theory, would encourage deep UI integration with systems.
+	Pumpkin has its own build step which runs just before `__run` (`__ui` is second to last). UI has its own step because it is nice ergonomically and, in theory, would encourage deep UI integration with systems.
 ```lua
 -- I for IFrame or UI
 -- P for Props
@@ -207,6 +214,8 @@ end
 
 
 ## Status
+
+**Note:** This list hasn't been updated in a long time. It is much more mature than when this list was made.
 
 LazyModules is WIP, with some portions of it being more tested than others. Many files are built-to-a-point. Here I give my estimation on which files are most well-formed
 
