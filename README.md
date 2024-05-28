@@ -92,7 +92,7 @@ end
 	Signals are an abstraction on top of remote events which classifies their usage based on communication patterns. Even though there are only two main use cases currently, they have proven helpful in preventing networking
 	spaghetti. Transmitters indicate simple client->server or server->client communication. Broadcasters are used for client->server->all-clients communication, and feature "ShouldAccept" functionality that inspects data from the client to give it the go-ahead to continue on to server processing and replication.
 
-	When necessary, all libraries are designed to be configured from one file on how to run on any context. Signals are the primary example. This is probably a controversial decision but it has turned out well in my experience
+	Generally, all libraries are designed to be configured from one file on how to run on any context. We favor locality of behavior over breaking things down into their most general modules. Signals are the primary example. This is probably a controversial decision but it has turned out well in my experience
 	so far. This rule is enforced in no way, it is simply a convention
 
 ```lua 
