@@ -10,28 +10,42 @@
     "ReplicatedFirst": {
       "$className": "ReplicatedFirst",
       "$ignoreUnknownInstances": true,
-      "Shared": {
+      "Shared" : {
         "$path": "minimal/shared"
       },
-      "Lib": {
-        "$path": "base/lib"
+      "Lib" : {
+        "$path": "minimal/lib",
+        "SafeRequire": {
+          "$path": "base/lib/SafeRequire.lua"
+        },
+        "Config": {
+          "$path": "base/lib/Config.lua"
+        },
+        "AsyncList": {
+          "$path": "base/lib/AsyncList.lua"
+        },
+        "SparseList": {
+          "$path": "base/lib/SparseList.lua"
+        },
+        "Enums": {
+          "$path": "base/lib/Enums.lua"
+        }
       },
       "Modules": {
-        "$path": "tests/modules"
+        "$path": "minimal/modules"
       }
     },
     "ServerScriptService": {
-      "$className": "ServerScriptService",
       "$ignoreUnknownInstances": true,
+      "$className": "ServerScriptService",
       "$path": "minimal/server"
     },
     "StarterPlayer": {
       "$className": "StarterPlayer",
-      "$ignoreUnknownInstances": true,
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
-        "$ignoreUnknownInstances": true
         "$path": "minimal/client",
+        "$ignoreUnknownInstances": true
       }
     },
     "ReplicatedStorage": {
