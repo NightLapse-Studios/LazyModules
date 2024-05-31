@@ -17,12 +17,12 @@
         "$path": "base/lib"
       },
       "Modules": {
-        "$path": "tests/modules"
+        "$path": "minimal/modules"
       }
     },
     "ServerScriptService": {
-      "$className": "ServerScriptService",
       "$ignoreUnknownInstances": true,
+      "$className": "ServerScriptService",
       "$path": "minimal/server"
     },
     "StarterPlayer": {
@@ -30,8 +30,8 @@
       "$ignoreUnknownInstances": true,
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
-        "$ignoreUnknownInstances": true
         "$path": "minimal/client",
+        "$ignoreUnknownInstances": true
       }
     },
     "ReplicatedStorage": {
