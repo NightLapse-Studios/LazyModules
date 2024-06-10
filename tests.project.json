@@ -30,8 +30,8 @@
       "$ignoreUnknownInstances": true,
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
-        "$ignoreUnknownInstances": true
-        "$path": "minimal/client",
+        "$ignoreUnknownInstances": true,
+        "$path": "minimal/client"
       }
     },
     "ReplicatedStorage": {

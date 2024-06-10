@@ -3,13 +3,13 @@
 
 -- Just a little sanity file to make sure tests are on and config is as needed for other tests.
 
-local LMT = require(game.ReplicatedFirst.Lib.LMTypes)
+assert(Config.TESTING == true, "Didn't even turn testing on you silly goose")
 local Config = require(game.ReplicatedFirst.Lib.Config)
 
 local mod = { } :: LMT.LazyModule
 
-assert(Config.TESTING == true, "Didn't even turn testing on you silly goose")
 
+local LMT = require(game.ReplicatedFirst.Lib.LMTypes)
 function mod.__tests(G: LMT.LMGame, T: LMT.Tester)
 	T:Test("Have proper values", function()
 		T:ForContext("LM Testing project",

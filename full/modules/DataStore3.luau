@@ -408,10 +408,8 @@ local function _getIndividualBinding(self, key, DS3Obj, data)
 end
 
 local function _GetAsync<T>(self: DSBinding<T>)
-	print("Getting DS3")
 	local store = Stores[self.storeName]
 	local success, ret = pcall( store.GetAsync, store, self.masterKey )
-	print("Got? DS3")
 	if success == false then
 		warn(string.format(ERR_NO_GET, ret))
 		self._dontSave = true
@@ -441,13 +439,11 @@ end
 
 function DSBinding.GetAsync<T>(self: DSBinding<T>, bypass_cache: boolean)
 	-- TODO: Make this an enum
-	print("About to get DS3")
 	while Globals.LOADING_CONTEXT < Enums.LOAD_CONTEXTS.FINISHED do
 		-- In case the client sends this before we're even ready
 		task.wait()
 	end
 
-	print("Whole shebang")
 	if self._retrieved and not bypass_cache then
 		warn("Attempt to retrieve store multiple times")
 		return

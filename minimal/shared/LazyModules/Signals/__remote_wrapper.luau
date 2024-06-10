@@ -4,6 +4,12 @@ local IsServer = game:GetService("RunService"):IsServer()
 local mod = { }
 
 local Game
+<<<<<<< Updated upstream:minimal/shared/LazyModules/Signals/__remote_wrapper.lua
+=======
+function mod.GiveGame(G)
+	Game = G
+end
+>>>>>>> Stashed changes:src/Util/LazyModules/Signals/__remote_wrapper.lua
 
 local RemoteEventClass = {}
 RemoteEventClass.__index = RemoteEventClass
@@ -17,57 +23,45 @@ function RemoteEventClass.new(event)
 end
 
 function RemoteEventClass:FireClient(plr, ...)
-	if Game[plr] and Game[plr].ServerLoaded then
-		self.Event:FireClient(plr, ...)
-	end
+	self.Event:FireClient(plr, ...)
 end
 
 function RemoteEventClass:FireAllClients(...)
 	for _, plr in Players:GetPlayers() do
-		self:FireClient(plr, ...)
+		self.Event:FireClient(plr, ...)
 	end
 end
 
 
-function mod.wrapper<T>(identifier: string, builder_mt: T)
+function mod.wrapper<T>(identifier: string, signal_mt: T)
 	-- TODO: check that all events made on the server are also made on the client
 	local transmitter
+	local event
 	if IsServer then
-		local remoteEvent = Instance.new("RemoteEvent")
-		remoteEvent.Name = identifier
-		remoteEvent.Parent = game.ReplicatedStorage
-		
-		transmitter = setmetatable(
-			{
-				RemoteEventClass.new(remoteEvent),
-				Configured = {
-					Server = false,
-					Client = false,
-				},
-				Name = identifier
-			},
-			builder_mt
-		)
+		event = Instance.new("RemoteEvent")
+		event.Name = identifier
+		event.Parent = game.ReplicatedStorage
 	else
-		local event = game.ReplicatedStorage:WaitForChild(identifier, 4)
+		event = game.ReplicatedStorage:WaitForChild(identifier, 4)
 		
 		if not event then
 			-- By this point LM should exist
 			warn("Waiting for event timed out! - " .. identifier .. "\n" .. _G.Game.LazyModules.format_lazymodules_traceback())
 		end
 		
-		transmitter = setmetatable(
-			{
-				event,
-				Configured = {
-					Server = false,
-					Client = false,
-				},
-				Name = identifier
-			},
-			builder_mt
-		)
 	end
+	
+	transmitter = setmetatable(
+		{
+			RemoteEventClass.new(event),
+			Configured = {
+				Server = false,
+				Client = false,
+			},
+			Name = identifier
+		},
+		signal_mt
+	)
 
 	return transmitter
 end
