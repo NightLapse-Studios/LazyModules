@@ -3,7 +3,7 @@
 
 # To add a new tool, add an entry to this table.
 [tools]
-rojo = "rojo-rbx/rojo@7.4.1"
+rojo = "Nolan-O/rojo@7.4.2"
 lune = "filiptibell/lune@0.8.4"
 luau-lsp = "JohnnyMorganz/luau-lsp@1.29.0"
 # rojo = "rojo-rbx/rojo@6.2.0"
