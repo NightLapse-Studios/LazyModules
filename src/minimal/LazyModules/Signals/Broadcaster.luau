@@ -27,7 +27,7 @@ local Broadcasters = mod.Broadcasters
 
 --local INIT_CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 
-local ClassicSignal = require(game.ReplicatedFirst.Lib.LazyModules.Signals.ClassicSignal)
+local ClassicSignal = require(game.ReplicatedFirst.Lib.ClassicSignal)
 
 local IsServer = game:GetService("RunService"):IsServer()
 

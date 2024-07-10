@@ -59,7 +59,7 @@ local ASYNC_WAIT_TIME = 0.2
 
 local Roact = require(script.lib.Roact)
 local RoactRbx = require(script.lib.Roact._Index.ReactRoblox.ReactRoblox)
-local ClassicSignal = require(script.lib.ClassicSignal)
+local ClassicSignal = require(game.ReplicatedFirst.Lib.ClassicSignal)
 
 local RunService = game:GetService("RunService")
 local TextService = game:GetService("TextService")

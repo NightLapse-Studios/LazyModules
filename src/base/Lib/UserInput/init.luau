@@ -43,10 +43,11 @@
 	Hooks cannot be blocked by handlers or intercepts
 ]]
 
-local Config
+local Config = require(game.ReplicatedFirst.Config)
 local GestureDetector = require(script.GestureDetector)
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
 local AssociativeList = require(game.ReplicatedFirst.Lib.AssociativeList)
+local Stack = require(game.ReplicatedFirst.Lib.Stack)
 
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -91,6 +92,21 @@ local CustomKeycodes = {
 	[Enums.AuxiliaryInputCodes.KeyCodes.Any] = true,
 	[Enums.UserInputType.DPad] = true,
 }
+
+
+
+for i,v in Enum.KeyCode:GetEnumItems() do
+	mod.Handlers[v] = Stack.new()
+	mod.Hooks[v] = Stack.new()
+	mod.Intercepts[v] = Stack.new()
+end
+for i,_ in CustomKeycodes do
+	mod.Handlers[i] = Stack.new()
+	mod.Hooks[i] = Stack.new()
+	mod.Intercepts[i] = Stack.new()
+end
+
+
 
 local EnumAssociations = AssociativeList.new()
 do
@@ -318,21 +334,6 @@ function mod.GetLastGesture()
 end
 
 function mod.__init(G)
-	Game = G
-	local Stack = G:Get("Stack")
-	Config = G:Get("Config")
-	GestureDetector = G:Get("GestureDetector")
-
-	for i,v in Enum.KeyCode:GetEnumItems() do
-		mod.Handlers[v] = Stack.new()
-		mod.Hooks[v] = Stack.new()
-		mod.Intercepts[v] = Stack.new()
-	end
-	for i,_ in CustomKeycodes do
-		mod.Handlers[i] = Stack.new()
-		mod.Hooks[i] = Stack.new()
-		mod.Intercepts[i] = Stack.new()
-	end
 end
 
 
