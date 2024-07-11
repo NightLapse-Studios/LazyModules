@@ -45,7 +45,7 @@ local ContextVar = Config.ContextVar
 
 -- This won't work unless you are also doing device test in studio
 -- However some things rely on this flag alone, so the game will be in an undefined-ish state if set true and not doing device emulation
-Config.EmulateMobile = ContextVar(false, false, false, false)
+Config.EmulateMobile = ContextVar(false, true, false, false)
 
 do
     local function return_mobile_value(_, mobile)

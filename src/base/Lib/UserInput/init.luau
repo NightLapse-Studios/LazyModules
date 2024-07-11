@@ -48,6 +48,9 @@ local GestureDetector = require(script.GestureDetector)
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
 local AssociativeList = require(game.ReplicatedFirst.Lib.AssociativeList)
 local Stack = require(game.ReplicatedFirst.Lib.Stack)
+local Mobile = require(script.Mobile)
+local ClassicSignal = require(game.ReplicatedFirst.Lib.ClassicSignal)
+local Game
 
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -183,17 +186,17 @@ end
 mod.EnumAssociations = EnumAssociations
 
 local ListenerCreatedCallbacks = {
-	
+	[Enums.UserInputType.DPad] = Mobile.PushDPadUser
 }
 
 local ListenerDestroyedCallbacks = {
-	
+	[Enums.UserInputType.DPad] = Mobile.RemoveDPadUser
 }
+
 
 
 local ListenerType = { }
 ListenerType.__index = ListenerType
-
 
 function ListenerType:Disconnect()
 	if self.disconnected_callback then
@@ -333,18 +336,68 @@ function mod.GetLastGesture()
 	return GestureDetector.Last
 end
 
-function mod.__init(G)
+local Mouse = game.Players.LocalPlayer:GetMouse()
+local function desktop_mouse_pos()
+	return Vector2.new(Mouse.X, Mouse.Y)
+end
+
+-- we must enforce lockcenter on mobile, because roblox does some weird thing
+local TouchResponsibleForMouse: InputObject|false = false
+local function mobile_mouse_pos()
+	local inset = GuiService:GetGuiInset()
+	return Camera.ViewportSize/2 - inset
+end
+
+function mod.GetMousePos()
+	return Game.PlatformVar(desktop_mouse_pos, mobile_mouse_pos)()
+end
+
+
+-- Fires either Enum.UserInputType. Keyboard, Touch, Gamepad1, but only to differentiate between Desktop, Mobile, Gamepad, given any input.
+mod.LastInputTypeChanged = ClassicSignal.new()
+
+local inputTypeMaps = {
+	[Enum.UserInputType.MouseButton1] = Enum.UserInputType.Keyboard,
+	[Enum.UserInputType.MouseButton2] = Enum.UserInputType.Keyboard,
+	[Enum.UserInputType.MouseButton3] = Enum.UserInputType.Keyboard,
+	[Enum.UserInputType.MouseWheel] = Enum.UserInputType.Keyboard,
+	[Enum.UserInputType.MouseMovement] = Enum.UserInputType.Keyboard,
+	[Enum.UserInputType.Touch] = Enum.UserInputType.Touch,
+	[Enum.UserInputType.Keyboard] = Enum.UserInputType.Keyboard,
+	[Enum.UserInputType.Gamepad1] = Enum.UserInputType.Gamepad1,
+	[Enum.UserInputType.Gamepad2] = Enum.UserInputType.Gamepad1,
+	[Enum.UserInputType.Gamepad3] = Enum.UserInputType.Gamepad1,
+	[Enum.UserInputType.Gamepad4] = Enum.UserInputType.Gamepad1,
+	[Enum.UserInputType.Gamepad5] = Enum.UserInputType.Gamepad1,
+	[Enum.UserInputType.Gamepad6] = Enum.UserInputType.Gamepad1,
+	[Enum.UserInputType.Gamepad7] = Enum.UserInputType.Gamepad1,
+	[Enum.UserInputType.Gamepad8] = Enum.UserInputType.Gamepad1,
+}
+
+local lastInputType = inputTypeMaps[UserInputService:GetLastInputType()] or Enum.UserInputType.Keyboard
+
+UserInputService.LastInputTypeChanged:Connect(function(inputType)
+	local simplified = inputTypeMaps[inputType]
+	
+	if simplified and simplified ~= lastInputType then
+		lastInputType = simplified
+		
+		mod.LastInputTypeChanged:Fire(lastInputType)
+	end
+end)
+
+function mod.GetLastInputType()
+	return lastInputType
 end
 
 
 
+function mod.__init(G)
+	Game = G
+end
+
 local empty_table = { }
 function mod.__build_signals(G, B)
-	local a = 1
-	game:GetService("RunService").Stepped:Connect(function()
-		a += 1
-	end)
-
 	local function TransformTriggers(original_input, new_input)
 		if original_input.KeyCode == Enum.KeyCode.ButtonR2 and original_input.UserInputState ~= Enum.UserInputState.Change then
 			new_input.KeyCode = Enum.KeyCode.Unknown
@@ -352,6 +405,31 @@ function mod.__build_signals(G, B)
 		elseif original_input.KeyCode == Enum.KeyCode.ButtonL2 and original_input.UserInputState ~= Enum.UserInputState.Change then
 			new_input.KeyCode = Enum.KeyCode.Unknown
 			new_input.UserInputType = Enum.UserInputType.MouseButton2
+		end
+	end
+	
+	local function TransformTouch(original_input, new_input)
+		-- @2.0 test if MouseMovement ends on mobile
+		if original_input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+
+		if Mobile.IsInputBoundToDetector("MovementDetector", original_input) then
+			return
+		end
+
+		if original_input.UserInputState == Enum.UserInputState.Begin then
+			if TouchResponsibleForMouse == false then
+				new_input.UserInputType = Enum.UserInputType.MouseButton1
+				TouchResponsibleForMouse = original_input
+			end
+		elseif TouchResponsibleForMouse == original_input then
+			if original_input.UserInputState == Enum.UserInputState.Change then
+				new_input.UserInputType = Enum.UserInputType.MouseMovement
+			elseif original_input.UserInputState == Enum.UserInputState.End then
+				new_input.UserInputType = Enum.UserInputType.MouseButton1
+				TouchResponsibleForMouse = false
+			end
 		end
 	end
 
@@ -392,6 +470,8 @@ function mod.__build_signals(G, B)
 			UserInputType = original_input.UserInputType
 		}
 
+		-- Anyway here's how mobile touches are converted into more generic inputs
+		TransformTouch(original_input, new_input)
 		DetectGestures(original_input, new_input)
 		
 		TransformTriggers(original_input, new_input)
@@ -632,7 +712,7 @@ function mod.__build_signals(G, B)
 
 		table.clear(PendingCustomInputs)
 
-		if UserInputService:GetFocusedTextBox(self) ~= nil then
+		if UserInputService:GetFocusedTextBox() ~= nil then
 			if FocussedOnTextBox == false then
 				release_all_inputs()
 				FocussedOnTextBox = true

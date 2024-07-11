@@ -10,7 +10,7 @@ A [template file](src/full/Modules/BaseLazyModule.luau) that uses all stages sup
 
 LM does Module-globbing, i.e. it requires all modules (specified by directory whitelist/blacklists in [Config.luau](src/base/Config.luau)). However, you are **never** intended to require LM in your modules, so your game itself still uses `require` trees to form is structure.
 
-Similar to Knit, LM supports an "execution model" which we refer to as startup stages, but they are available everywhere. Through these stages, LM is passed into your modules as long as you define e.g. a `mod.__init(G)` function. The `Game` object, abbreviated as `G`, can be used to solve file-dependency issues with `G.Get("<ModuleName>")`. However this should only be done when necessary to promote type safety in your project.
+Similar to Knit, LM supports an "execution model" which we refer to as startup stages, but they are available everywhere. Through these stages, LM is passed into your modules as long as you define e.g. a `mod.__init(G)` function. The `Game` object, abbreviated as `G`, can be used to solve file-dependency issues with `G:Get("<ModuleName>")`. However this should only be done when necessary to promote type safety in your project.
 
 Some startup stages are used to remove the need for boilerplate when doing common things like networking. The `__build_signals(G, B)` stage provides `B` which can be used to create remote events with context-agnostic usage.
 
@@ -82,6 +82,7 @@ LM has "tiers" of releases which correspond to different levels of invasiveness 
 	* The barebones of just startup stages, including a tests stage
 * [Base](src/base/README.md)
 	* Adds UserInput, a nearly finished replacement for ContextActionService including gesture detection on mobile or desktop, and input regions for mobile
+	* Adds __ui stage and Pumpkin/Roact
 * [Full](src/full/README.md)
     * Specifies DataStore loading in regards to player data, delays some client stages until it receives player data, adds gamestate stages to handle joining mid-game, and provides runtime debugging utilities
 
@@ -92,6 +93,7 @@ LM has "tiers" of releases which correspond to different levels of invasiveness 
 * Add types to dependencies that are missing them
 * Investigate the quality of all packaged dependencies
 * BIG: Optimize networking library (buffer packing, single remote)
+* Re-examine the usage of Pumpkin in place of lighter weight frameworks
 
 # Games built with LazyModules
 
