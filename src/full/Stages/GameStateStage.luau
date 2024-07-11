@@ -22,11 +22,9 @@ if IsServer then
 
 		-- This connection exists for the lifetime of the game
 		ClientReadyEvent.OnServerEvent:Connect(function(plr)
-			print(1)
 			while (not Game[plr]) or not (Game[plr].ServerLoaded) do
 				task.wait()
 			end
-			print(2)
 
 			local game_state = { }
 			
@@ -64,7 +62,6 @@ else
 		local modules_loaded_list = AsyncList.new(1)
 		local CanContinue = Instance.new("BindableEvent")
 	
-		print(333)
 		local ClientReadyEvent = game.ReplicatedStorage:WaitForChild("ClientReadyEvent") :: RemoteEvent
 		ClientReadyEvent.OnClientEvent:Connect(function(game_state)
 			-- Wait for the server to send us our datastore value, at which point we get inserted into the Game object
@@ -78,18 +75,15 @@ else
 			end
 	
 			while modules_loaded_list:is_awaiting() do
-				print(modules_loaded_list.awaiting.Contents)
+				-- print(modules_loaded_list.awaiting.Contents)
 				task.wait()
 			end
 	
 			CanContinue:Fire()
 		end)
 
-		print(debug.traceback())
-		
 		ClientReadyEvent:FireServer()
 		CanContinue.Event:Wait()
-		print(222)
 	end
 
 	function mod.GiveLM(lm)

@@ -4,7 +4,7 @@ local IsStudio = RunService:IsStudio()
 
 local Config = { }
 
-Config.PlaceId = 8256020164
+Config.PlaceId = 17373496574
 Config.TestPlaceId = 13489727259
 
 -- Set up ContextVar for StdLib
@@ -128,10 +128,12 @@ Config.ModuleCollectionFolders = {
 Config.ModuleCollectionBlacklist = {
     game.ReplicatedFirst.Lib.LazyModules,
     Server = {
-		game.ReplicatedFirst.Lib.UserInput
-	},
+		game.ReplicatedFirst.Lib.UserInput,
+		game.ReplicatedFirst.Lib.Pumpkin
+    },
     Client = {
-		game.StarterPlayer.StarterPlayerScripts:WaitForChild("PlayerModule")
+		game.StarterPlayer.StarterPlayerScripts:WaitForChild("PlayerModule"),
+		game.ReplicatedFirst.Lib.Pumpkin
     }
 }
 
@@ -148,6 +150,6 @@ Config.ReleaseType = "base"
 -- Debug hooks features for adjusting values at runtime from DebugMenu
 Config.VolumeOverrides = ContextVar(false, true, false, false)
 
-Config.SaveDatastoresInStudio = false
+Config.SaveDatastoresInStudio = true
 
 return Config

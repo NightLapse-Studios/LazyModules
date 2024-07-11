@@ -14,24 +14,28 @@
 				"LazyModules": {
 					"$paths": [
 						"src/minimal/LazyModules",
-						"src/base/LazyModules"
+						"src/base/LazyModules",
+						"src/full/LazyModules"
 					],
 					"Stages": {
 						"$paths": [
 							"src/minimal/Stages",
-							"src/base/Stages"
+							"src/base/Stages",
+							"src/full/Stages"
 						]
 					}
 				},
 				"$paths": [
 					"src/minimal/Lib",
-					"src/base/Lib"
+					"src/base/Lib",
+					"src/full/Lib"
 				]
 			},
 			"Modules": {
 				"$paths": [
 					"src/minimal/Modules",
 					"src/base/Modules",
+					"src/full/Modules",
 					"tests/Modules"
 				]
 			},
