@@ -12,7 +12,7 @@ assert(Config.TESTING == true, "Didn't even turn testing on you silly goose")
 
 function mod.__tests(G: LMT.LMGame, T: LMT.Tester)
 	T:Test("Have proper values", function()
-		T:ForContext("LM Testing project",
+		T:ForContext("for LM Testing project",
 			T.Equal, Config.TESTING, true,
 			T.Equal, typeof(Config.FocusTestOn), "boolean",
 			T.Equal, Config.SaveDatastoresInStudio, true,
