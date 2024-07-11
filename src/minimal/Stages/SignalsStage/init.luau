@@ -36,8 +36,11 @@ local ReplicatedFirst = game:GetService("ReplicatedFirst")
 local IsServer = game:GetService("RunService"):IsServer()
 
 local CONTEXT = IsServer and "SERVER" or "CLIENT"
+local STAGE_NAME = "__build_signals"
+local STAGE_PRIORITY = 1000
 
 local SparseList = require(ReplicatedFirst.Lib.SparseList)
+local Config = require(game.ReplicatedFirst.Config)
 
 --event abstraction modules
 local Transmitter = require(script.Transmitter)
@@ -101,6 +104,21 @@ function SignalAPI:GetBroadcaster(identifier, cb, force_context: string)
 end
 
 export type SignalAPI = typeof(SignalAPI)
+
+
+
+local function run_module_stage(game, fn, mod_name: string)
+	SignalAPI:SetModule(mod_name)
+	fn(game, SignalAPI)
+end
+
+local function stage_finished_callback(game)
+	mod.BuildSignals(game)
+end
+
+function mod.GiveLM(lm)
+	lm.RegisterModuleStage(STAGE_NAME, STAGE_PRIORITY, run_module_stage, stage_finished_callback)
+end
 
 
 
@@ -221,7 +239,7 @@ function mod.BuildSignals(G: any)
 		end
 	end
 
-	if G.Config.MonitorAllSignals then
+	if Config.MonitorAllSignals then
 		for module, identifers in Transmitters.Modules.provided do
 			for _, event in identifers do
 				__monitor(event)

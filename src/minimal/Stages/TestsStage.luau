@@ -1,12 +1,13 @@
 --!strict
---[[
-	Search for `__tests(G, T)` for an example
-]]
+local Config = require(game.ReplicatedFirst.Config)
+
+local STAGE_NAME = "__tests"
+local STAGE_PRIORITY = 10000
+
 local mod = {
 	Nouns = { },
 }
 
-local Config = require(game.ReplicatedFirst.Config)
 
 local USAGE_EXAMPLE = [[
 	function mod.__tests(G, T)
@@ -47,7 +48,7 @@ local Tester = { }
 local mt_Tester = { __index = Tester }
 
 
-function mod.Tester( module_name: string )
+local function NewTester( module_name: string )
 	assert(typeof(module_name) == "string")
 
 	local t = {
@@ -59,7 +60,7 @@ function mod.Tester( module_name: string )
 	return setmetatable(t, mt_Tester)
 end
 
-function mod.Finished( self: Tester )
+local function Finished( self: Tester )
 	if Config.FocusTestOn and Config.FocusTestOn ~= self.ModuleName then
 		return
 	end
@@ -82,6 +83,20 @@ function mod.Finished( self: Tester )
 		end
 	end
 end
+
+
+local function run_module_stage(game, fn, mod_name: string)
+	task.spawn(function()
+		local tester = NewTester(mod_name)
+		fn(game, tester)
+		Finished(tester)
+	end)
+end
+
+function mod.GiveLM(lm)
+	lm.RegisterModuleStage(STAGE_NAME, STAGE_PRIORITY, run_module_stage)
+end
+
 
 export type Tester = typeof(mod.Tester(""))
 

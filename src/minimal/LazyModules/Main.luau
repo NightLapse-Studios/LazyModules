@@ -8,14 +8,27 @@ local Enums = require(game.ReplicatedFirst.Lib.Enums)
 
 local LMTypes = require(game.ReplicatedFirst.Lib.LMTypes)
 
-local Signals = require(script.Parent.Signals)
-local Tests = require(script.Parent.Tests)
 -- local Pumpkin = require(game.ReplicatedFirst.Lib.Pumpkin)
 
-type LMGame = LMTypes.LMGame
-type LazyModule = LMTypes.LazyModule
+export type LMGame = LMTypes.LMGame
+export type LazyModule = LMTypes.LazyModule
+export type LMCallback = (LMGame, (LMGame, ...any) -> ()) -> ()
+export type ModuleStage = {
+	Priority: number,
+	Callback: (LMGame, (LMGame, ...any) -> (), module_name: string) -> (),
+	FinishedCallback: false | ((LMGame) -> ()),
+	StageName: string
+}
+export type GlobalStage = {
+	Priority: number,
+	Callback: (LMGame) -> (),
+	StageName: string
+}
 
 local mod = { }
+
+local Stages: { ModuleStage } = { }
+local StageModules: { ModuleScript } = { }
 
 local LOAD_CONTEXTS = Enums.LOAD_CONTEXTS
 local CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
@@ -23,6 +36,26 @@ local SOURCE_NAME = debug.info(function() return end, "s")
 
 local CollectionBlacklist: {Instance} = Config.ModuleCollectionBlacklist
 local ContextCollectionBlacklist: {Instance} = if CONTEXT == "SERVER" then Config.ModuleCollectionBlacklist.Server else Config.ModuleCollectionBlacklist.Client
+
+
+
+function mod.RegisterModuleStage(name: string, priority: number, callback, finished_callback)
+	finished_callback = finished_callback or false
+	table.insert(Stages, {
+		Priority = priority,
+		Callback = callback,
+		FinishedCallback = finished_callback,
+		StageName = name
+	})
+end
+
+function mod.RegisterGlobalStage(name: string, priority: number, callback)
+	table.insert(Stages, {
+		Priority = priority,
+		Callback = callback,
+		StageName = name
+	})
+end
 
 
 
@@ -193,10 +226,6 @@ local function try_init(self: LMGame, module: LazyModule, name: string)
 		print("LM init: " .. name)
 	end
 	
-	if CONTEXT == "CLIENT" and name == "ConfigTest" then
-		print()
-	end
-
 	local s, r = pcall(function() return module.__init end)
 	if s and r then
 		if typeof(module.__init) == "function" then
@@ -267,6 +296,20 @@ local function try_tests(self: LMGame, module: LazyModule, name: string)
 				module.__tests(self, tester)
 				Tests.Finished(tester)
 			end)
+		end
+	end
+end
+
+local function try_stage(self: LMGame, module: LazyModule, module_name: string, stage: ModuleStage)
+	local stage_name = stage.StageName
+	if Config.LogLoads then
+		print("LM " .. stage.StageName .. ": " .. stage_name)
+	end
+
+	local s, r = pcall(function() return module[stage_name] end)
+	if s and r then
+		if typeof(r) == "function" then
+			stage.Callback(self, r, module_name)
 		end
 	end
 end
@@ -390,8 +433,27 @@ function LMGame.Load(self: LMGame, module: ModuleScript)
 end
 
 function LMGame.Begin(self: LMGame)
+	for i,v in script.Parent.Stages:GetChildren() do
+		local stage_mode = require(v)
+		stage_mode.GiveLM(mod)
+	end
+
+	table.sort(Stages, function(a, b) return a.Priority < b.Priority end)
+
+	for i = 1, #Stages, 1 do
+		local stage = Stages[i]
+		-- set_context(self, stage.Priority)
+
+		for i,v in self._CollectedModules do
+			try_stage(self, v, i, stage)
+		end
+
+		if stage.FinishedCallback then
+			stage.FinishedCallback()
+		end
+	end
 	-- Set context 
-	set_context(self, LOAD_CONTEXTS.BEGIN_INIT)
+--[[ 	set_context(self, LOAD_CONTEXTS.BEGIN_INIT)
 	for mod_name, module_val in self._CollectedModules do
 		if not can_init(mod_name) then
 			warn("Module " .. mod_name .. " already initialized (this is probably a huge bug)")
@@ -436,7 +498,7 @@ function LMGame.Begin(self: LMGame)
 		for mod_name, module_val in self._CollectedModules do
 			try_tests(self, module_val, mod_name)
 		end
-	end
+	end ]]
 end
 
 return mod

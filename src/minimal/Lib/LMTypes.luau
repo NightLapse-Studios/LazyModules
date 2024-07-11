@@ -1,5 +1,5 @@
-local Tests = require(game.ReplicatedFirst.Lib.LazyModules.Tests)
-local Signals = require(game.ReplicatedFirst.Lib.LazyModules.Signals)
+-- local Tests = require(game.ReplicatedFirst.Lib.LazyModules.TestsStage)
+-- local Signals = require(game.ReplicatedFirst.Lib.LazyModules.Signals)
 
 export type Tester = Tests.Tester
 export type Signals = Signals.SignalAPI

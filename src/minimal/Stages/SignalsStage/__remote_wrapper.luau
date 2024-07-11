@@ -62,7 +62,7 @@ function mod.wrapper<T>(identifier: string, builder_mt: T)
 		
 		transmitter = setmetatable(
 			{
-				Event = event,
+				Event = { Event = event },
 				Configured = {
 					Server = false,
 					Client = false,

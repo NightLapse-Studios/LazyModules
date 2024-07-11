@@ -15,7 +15,13 @@
 					"$paths": [
 						"src/minimal/LazyModules",
 						"src/base/LazyModules"
-					]
+					],
+					"Stages": {
+						"$paths": [
+							"src/minimal/Stages",
+							"src/base/Stages"
+						]
+					}
 				},
 				"$paths": [
 					"src/minimal/Lib",
