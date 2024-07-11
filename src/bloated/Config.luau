@@ -128,10 +128,12 @@ Config.ModuleCollectionFolders = {
 Config.ModuleCollectionBlacklist = {
     game.ReplicatedFirst.Lib.LazyModules,
     Server = {
-		game.ReplicatedFirst.Lib.UserInput
+		game.ReplicatedFirst.Lib.UserInput,
+		game.ReplicatedFirst.Lib.Pumpkin
     },
     Client = {
-		game.StarterPlayer.StarterPlayerScripts:WaitForChild("PlayerModule")
+		game.StarterPlayer.StarterPlayerScripts:WaitForChild("PlayerModule"),
+		game.ReplicatedFirst.Lib.Pumpkin
     }
 }
 

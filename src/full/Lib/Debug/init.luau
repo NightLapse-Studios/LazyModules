@@ -10,7 +10,7 @@ local mod = { }
 local spots = {}
 local spotID = 0
 
-function mod.MarkSpotDbg(pos, color, size, extra_data, singular_name, __t)
+function mod.MarkSpot(pos, color, size, extra_data, singular_name, __t)
 	local p = Instance.new("Part")
 	p.Color = color or Color3.new(1,1,1)
 	p.Material = Enum.Material.SmoothPlastic
@@ -47,8 +47,8 @@ function mod.MarkSpotDbg(pos, color, size, extra_data, singular_name, __t)
 	return p
 end
 
-function mod.TempMarkSpotDbg(pos, t, size, color, extra_data, singular_name)
-	local p = mod.MarkSpotDbg(pos, size, color, extra_data, singular_name, t)
+function mod.TempMarkSpot(pos, t, size, color, extra_data, singular_name)
+	local p = mod.MarkSpot(pos, size, color, extra_data, singular_name, t)
 
 	Debris:AddItem(p, t)
 
@@ -59,9 +59,9 @@ function mod.DebugCFAxis(cf, wait, dist)
 	-- RightVector (+X), UpVector (+Y), LookVector (-Z)
 	
 	local x, y, z = Vector3.new(dist, 0, 0), Vector3.new(0, dist, 0), Vector3.new(0, 0, -dist)
-	x = mod.TempMarkSpotDbg(cf * CFrame.new(x), wait, Color3.new(1, 0, 0), Vector3.new(0.5, 0.5, 0.5))
-	y = mod.TempMarkSpotDbg(cf * CFrame.new(y), wait, Color3.new(0, 1, 0), Vector3.new(0.5, 0.5, 0.5))
-	z = mod.TempMarkSpotDbg(cf * CFrame.new(z), wait, Color3.new(0, 0, 1), Vector3.new(0.5, 0.5, 0.5))
+	x = mod.TempMarkSpot(cf * CFrame.new(x), wait, Color3.new(1, 0, 0), Vector3.new(0.5, 0.5, 0.5))
+	y = mod.TempMarkSpot(cf * CFrame.new(y), wait, Color3.new(0, 1, 0), Vector3.new(0.5, 0.5, 0.5))
+	z = mod.TempMarkSpot(cf * CFrame.new(z), wait, Color3.new(0, 0, 1), Vector3.new(0.5, 0.5, 0.5))
 end
 
 function mod.DebugModelAxis(model: Model|BasePart, wait, dist)
@@ -85,7 +85,7 @@ function mod.VisualizeLine(pos1, pos2, color, thickness, extra_data, singular_na
 	local cf = CFrame.lookAt(midPoint, midPoint + vector)
 	local size = Vector3.new(thickness, thickness, length)
 	
-	return mod.MarkSpotDbg(cf, color, size, extra_data, singular_name)
+	return mod.MarkSpot(cf, color, size, extra_data, singular_name)
 end
 
 function mod.VisualizePlane(p1, p2, p3, opt_p)
@@ -308,8 +308,8 @@ end
 -- Make listed functions available for export
 local APIUtils = require(game.ReplicatedFirst.Lib.APIUtils)
 APIUtils.EXPORT_LIST(mod)
-	:ADD("MarkSpotDbg")
-	:ADD("TempMarkSpotDbg")
+	:ADD("MarkSpot")
+	:ADD("TempMarkSpot")
 	:ADD("DebugCFAxis")
 	:ADD("DebugModelAxis")
 	:ADD("DebugGlobalAxis")
