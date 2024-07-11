@@ -25,7 +25,7 @@ else
 	-- Register modules which have player-based data that will be fed into datastores as well as transmitted to clients
 	-- Data synced this way will be available by _G.Game[plr][<module_name>]
 
-	if Game.Config.Release == "full" then
+	if Game.Config.ReleaseType == "full" then
 		local Players = require(game.ReplicatedFirst.Modules.Players)
 		Players.RegisterPlayerDataModule("Stats")
 	end

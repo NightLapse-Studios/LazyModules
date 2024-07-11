@@ -1,10 +1,12 @@
-local STAGE_NAME = "__run"
-local STAGE_PRIORITY = 4000
+local STAGE_NAME = "__ui"
+local STAGE_PRIORITY = 3000
+
+local Pumpkin = require(game.ReplicatedFirst.Lib.Pumpkin)
 
 local mod = { }
 
 local function run_module_stage(game, fn, mod_name: string)
-	fn(game)
+	fn(game, Pumpkin, Pumpkin.P, Pumpkin.Roact)
 end
 
 function mod.GiveLM(lm)

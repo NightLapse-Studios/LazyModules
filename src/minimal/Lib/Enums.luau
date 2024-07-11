@@ -16,18 +16,11 @@ local Enums = {
 	--
 	-- This enum must be numerically sorted acording to the order the steps are executed
 	LOAD_CONTEXTS = {
-		COLLECTION = 10,
-		REQUIRE = 11,
-		COLLECTED = 12,
+		COLLECTION = 1,
+		REQUIRE = 2,
+		COLLECTED = 3,
 
-		BEGIN_INIT = 20,
-		INIT = 21,
-		BEGIN_SIGNALS = 22,
-		SIGNALS = 23,
-		BEGIN_UI = 24,
-		UI = 25,
-		BEGIN_RUN = 26,
-		RUN = 27,
+		RUNNING_STAGES = 4,
 
 		FINISHED = 1000
 	},

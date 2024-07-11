@@ -440,10 +440,9 @@ local function _GetAsync<T>(self: DSBinding<T>)
 end
 
 function DSBinding.GetAsync<T>(self: DSBinding<T>, bypass_cache: boolean)
-	-- TODO: Make this an enum
 	print("About to get DS3")
+	-- In case the client sends this before we're even ready
 	while Globals.LOADING_CONTEXT < Enums.LOAD_CONTEXTS.FINISHED do
-		-- In case the client sends this before we're even ready
 		task.wait()
 	end
 

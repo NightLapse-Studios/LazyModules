@@ -48,7 +48,7 @@ local function OnPlayerLoadFinished( binding: PlayerDataBinding, plrClass )
 		return
 	end
 
-	while not (Game.LOADING_CONTEXT > Enums.LOAD_CONTEXTS.SIGNALS) do
+	while Game.LOADING_CONTEXT < Enums.LOAD_CONTEXTS.FINISHED do
 		task.wait()
 	end
 
@@ -107,7 +107,7 @@ type PlayerDataBinding = typeof(LoadClientData(game.Players.LocalPlayer))
 -- Data modules will be serialized and deserialized in the order they are registered by this function
 function mod.RegisterPlayerDataModule(name, ctor_args)
 	local Game = _G.Game
-	assert(Game.LOADING_CONTEXT < Enums.LOAD_CONTEXTS.BEGIN_INIT, "RegisterPlayerDataModule must be called before Game.Begin")
+	assert(Game.LOADING_CONTEXT < Enums.LOAD_CONTEXTS.RUNNING_STAGES, "RegisterPlayerDataModule must be called before Game.Begin")
 
 	local mod = Game:Get(name)
 	assert(typeof(mod.new) == "function", string.format(ERR_DATA_MODULE_INVALID, name))
@@ -159,13 +159,18 @@ local function RemoveRemotePlayer( plr )
 	plrClass:Destroy()
 end
 
+local RunStageHasPassed = false
+function mod.__run(G)
+	RunStageHasPassed = true
+end
+
 function mod.__build_signals(G, B)
 	AddRemotePlayerTransmitter = B:NewTransmitter("AddRemotePlayerTransmitter")
 		:ClientConnection(AddRemotePlayer)
 
 	if Game.CONTEXT == "SERVER" then
 		PlayerService.PlayerAdded:Connect(function(plr)
-			while (not (Game.LOADING_CONTEXT > Enums.LOAD_CONTEXTS.RUN)) and not (plr:IsDescendantOf(game)) do
+			while not (RunStageHasPassed and plr:IsDescendantOf(game)) do
 				task.wait()
 				print("!")
 			end
@@ -180,7 +185,7 @@ function mod.__build_signals(G, B)
 		end)
 		
 		PlayerService.PlayerRemoving:Connect(function(plr)
-			while not (Game.LOADING_CONTEXT > Enums.LOAD_CONTEXTS.RUN) do
+			while not (Game.LOADING_CONTEXT >= Enums.LOAD_CONTEXTS.FINISHED) do
 				task.wait()
 			end
 			

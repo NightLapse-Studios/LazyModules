@@ -1,0 +1,62 @@
+{
+	"name": "Minimal LazyModules Project",
+	"servePlaceIds": [
+		17373496574,
+		0
+	],
+	"tree": {
+		"$className": "DataModel",
+		"$ignoreUnknownInstances": true,
+		"ReplicatedFirst": {
+			"$className": "ReplicatedFirst",
+			"$ignoreUnknownInstances": true,
+			"Lib": {
+				"LazyModules": {
+					"$paths": [
+						"src/minimal/LazyModules",
+						"src/base/LazyModules",
+						"src/full/LazyModules"
+					],
+					"Stages": {
+						"$paths": [
+							"src/minimal/Stages",
+							"src/base/Stages",
+							"src/full/Stages"
+						]
+					}
+				},
+				"$paths": [
+					"src/minimal/Lib",
+					"src/base/Lib",
+					"src/full/Lib"
+				]
+			},
+			"Modules": {
+				"$paths": [
+					"src/minimal/Modules",
+					"src/base/Modules",
+					"src/full/Modules"
+				]
+			},
+			"Config": {
+				"$path": "src/full/Config.luau"
+			}
+		},
+		"ServerScriptService": {
+			"$className": "ServerScriptService",
+			"$path": "src/minimal/ServerScriptService"
+		},
+		"StarterPlayer": {
+			"$className": "StarterPlayer",
+			"StarterPlayerScripts": {
+				"$className": "StarterPlayerScripts",
+				"$path": "src/minimal/StarterPlayerScripts",
+				"$ignoreUnknownInstances": true
+			}
+		},
+		"Players": {
+			"$className": "Players",
+			"$ignoreUnknownInstances": true
+		}
+	}
+}

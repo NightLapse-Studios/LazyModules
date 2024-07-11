@@ -93,8 +93,12 @@ local function run_module_stage(game, fn, mod_name: string)
 	end)
 end
 
+local function should_run_stage()
+	return Config.TESTING == true
+end
+
 function mod.GiveLM(lm)
-	lm.RegisterModuleStage(STAGE_NAME, STAGE_PRIORITY, run_module_stage)
+	lm.RegisterModuleStage(STAGE_NAME, STAGE_PRIORITY, run_module_stage, nil, should_run_stage)
 end
 
 

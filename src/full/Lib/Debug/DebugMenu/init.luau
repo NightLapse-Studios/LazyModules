@@ -224,7 +224,7 @@ local function init(self)
 	self.ColorPickingColor = I:Binding(Color3.new())
 
 	self.Position = I:Binding(UDim2.new(0.5, 0, 0, 50))
-	self.Enabled = true
+	self.Enabled = false
 
 	print("Press B to toggle debug menu example")
 	local UserInputService = game:GetService("UserInputService")

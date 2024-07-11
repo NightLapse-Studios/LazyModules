@@ -3,7 +3,6 @@
 
 local safe_require = require(game.ReplicatedFirst.Lib.SafeRequire).require
 local Config = require(game.ReplicatedFirst.Config)
-local AsyncList = require(game.ReplicatedFirst.Lib.AsyncList)
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
 
 local LMTypes = require(game.ReplicatedFirst.Lib.LMTypes)
@@ -14,21 +13,25 @@ export type LMGame = LMTypes.LMGame
 export type LazyModule = LMTypes.LazyModule
 export type LMCallback = (LMGame, (LMGame, ...any) -> ()) -> ()
 export type ModuleStage = {
+	Type: "Module",
 	Priority: number,
+	ShouldRunStage: boolean | (() -> boolean),
 	Callback: (LMGame, (LMGame, ...any) -> (), module_name: string) -> (),
-	FinishedCallback: false | ((LMGame) -> ()),
+	FinishedCallback: boolean | (() -> ()),
 	StageName: string
 }
 export type GlobalStage = {
+	Type: "Global",
 	Priority: number,
+	ShouldRunStage: boolean | (() -> boolean),
 	Callback: (LMGame) -> (),
+	FinishedCallback: boolean | (() -> ()),
 	StageName: string
 }
 
 local mod = { }
 
-local Stages: { ModuleStage } = { }
-local StageModules: { ModuleScript } = { }
+local Stages: { ModuleStage | GlobalStage } = { }
 
 local LOAD_CONTEXTS = Enums.LOAD_CONTEXTS
 local CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
@@ -39,20 +42,28 @@ local ContextCollectionBlacklist: {Instance} = if CONTEXT == "SERVER" then Confi
 
 
 
-function mod.RegisterModuleStage(name: string, priority: number, callback, finished_callback)
+function mod.RegisterModuleStage(name: string, priority: number, callback, finished_callback, should_run_callback)
 	finished_callback = finished_callback or false
+	should_run_callback = should_run_callback or false
 	table.insert(Stages, {
+		Type = "Module",
 		Priority = priority,
+		ShouldRunStage = should_run_callback,
 		Callback = callback,
 		FinishedCallback = finished_callback,
 		StageName = name
 	})
 end
 
-function mod.RegisterGlobalStage(name: string, priority: number, callback)
+function mod.RegisterGlobalStage(name: string, priority: number, callback, finished_callback, should_run_callback)
+	finished_callback = finished_callback or false
+	should_run_callback = should_run_callback or false
 	table.insert(Stages, {
+		Type = "Global",
 		Priority = priority,
+		ShouldRunStage = should_run_callback,
 		Callback = callback,
+		FinishedCallback = finished_callback,
 		StageName = name
 	})
 end
@@ -221,85 +232,6 @@ end
 
 
 
-local function try_init(self: LMGame, module: LazyModule, name: string)
-	if Config.LogLoads then
-		print("LM init: " .. name)
-	end
-	
-	local s, r = pcall(function() return module.__init end)
-	if s and r then
-		if typeof(module.__init) == "function" then
-			local prior_context = set_context(self, LOAD_CONTEXTS.INIT)
-			module.__init(self)
-			reset_context(self, prior_context)
-		end
-	end
-end
-
-local function try_signals(self: LMGame, module: LazyModule, name: string)
-	if Config.LogLoads then
-		print("LM signals: " .. name)
-	end
-
-	local s, r = pcall(function() return module.__build_signals end)
-	if s and r then
-		if typeof(module.__build_signals) == "function" then
-			Signals.SignalAPI:SetModule(name)
-		
-			local prior_context = set_context(self, LOAD_CONTEXTS.SIGNALS)
-			module.__build_signals(self, Signals.SignalAPI)
-			reset_context(self, prior_context)
-		end
-	end
-end
-
-local function try_ui(self: LMGame, module: LazyModule, name: string)
-	if Config.LogLoads then
-		print("LM ui: " .. name)
-	end
-
-	local s, r = pcall(function() return module.__ui end)
-	if s and r then
-		if typeof(module.__ui) == "function" then
-			local prior_context = set_context(self, LOAD_CONTEXTS.UI)
-			module.__ui(self, Pumpkin, Pumpkin.P, Pumpkin.Roact)
-			reset_context(self, prior_context)
-		end
-	end
-end
-
-local function try_run(self: LMGame, module: LazyModule, name: string)
-	if Config.LogLoads then
-		print("LM run: " .. name)
-	end
-
-	local s, r = pcall(function() return module.__run end)
-	if s and r then
-		if typeof(module.__run) == "function" then
-			local prior_context = set_context(self, LOAD_CONTEXTS.RUN)
-			module.__run(self)
-			reset_context(self, prior_context)
-		end
-	end
-end
-
-local function try_tests(self: LMGame, module: LazyModule, name: string)
-	if Config.LogLoads then
-		print("LM TESTING: " .. name)
-	end
-
-	local s, r = pcall(function() return module.__tests end)
-	if s and r then
-		if typeof(module.__tests) == "function" then		
-			task.spawn(function()
-				local tester = Tests.Tester(name)
-				module.__tests(self, tester)
-				Tests.Finished(tester)
-			end)
-		end
-	end
-end
-
 local function try_stage(self: LMGame, module: LazyModule, module_name: string, stage: ModuleStage)
 	local stage_name = stage.StageName
 	if Config.LogLoads then
@@ -314,79 +246,7 @@ local function try_stage(self: LMGame, module: LazyModule, module_name: string, 
 	end
 end
 
-local function load_gamestate_wrapper(module, module_name, data, loaded_list)
-	local loaded_func = function()
-		loaded_list:provide(true, module_name)
-	end
-	local after_func = function(name, callback)
-		loaded_list:get(name, callback)
-	end
 
-	if not data then
-		loaded_func()
-	else
-		-- @param1, the state returned by __get_gamestate
-		-- @param2, a function that you MUST call when you have finished loading, see Gamemodes.lua for a good example.
-		-- @param3, a function that you can pass another module name into to ensure its state loades before your callback is called.
-		module.__load_gamestate(data, loaded_func, after_func)
-	end
-end
-
-local function wait_for_server_game_state(self: LMGame)
-	local modules_loaded_list = AsyncList.new(1)
-	local CanContinue = Instance.new("BindableEvent")
-
-	local ClientReadyEvent = game.ReplicatedStorage:WaitForChild("ClientReadyEvent") :: RemoteEvent
-	ClientReadyEvent.OnClientEvent:Connect(function(game_state)
-		-- Wait for the server to send us our datastore value, at which point we get inserted into the Game object
-		while not self[game.Players.LocalPlayer] do
-			task.wait()
-		end
-
-		for module_name, data in game_state do
-			local module_value = self._CollectedModules[module_name]
-			load_gamestate_wrapper(module_value, module_name, data, modules_loaded_list)
-		end
-
-		while modules_loaded_list:is_awaiting() do
-			print(modules_loaded_list.awaiting.Contents)
-			task.wait()
-		end
-
-		CanContinue:Fire()
-	end)
-
-	ClientReadyEvent:FireServer()
-	CanContinue.Event:Wait()
-end
-
-local function try_get_game_state(module_value, plr)
-	local s, r = pcall(function() return module_value.__get_gamestate end)
-	if s and r then
-		return module_value:__get_gamestate(plr)
-	end
-end
-
-local function setup_data_collectors(self: LMGame)
-	local ClientReadyEvent = Instance.new("RemoteEvent")
-	ClientReadyEvent.Name = "ClientReadyEvent"
-	ClientReadyEvent.Parent = game.ReplicatedStorage
-
-	-- This connection exists for the lifetime of the game
-	ClientReadyEvent.OnServerEvent:Connect(function(plr)
-		while (not self[plr]) or not (self[plr].ServerLoaded) do
-			task.wait()
-		end
-
-		local game_state = { }
-		
-		for module_name, module_value in self._CollectedModules do
-			game_state[module_name] = try_get_game_state(module_value, plr)
-		end
-
-		ClientReadyEvent:FireClient(plr, game_state)
-	end)
-end
 
 function LMGame.Get(self: LMGame, name: string, opt_specific_context: ("CLIENT" | "SERVER")?)
 	if self.LOADING_CONTEXT < LOAD_CONTEXTS.COLLECTED then
@@ -407,7 +267,7 @@ function LMGame.Get(self: LMGame, name: string, opt_specific_context: ("CLIENT" 
 end
 
 function LMGame.Load(self: LMGame, module: ModuleScript)
-	if self.LOADING_CONTEXT < LOAD_CONTEXTS.INIT then
+--[[ 	if self.LOADING_CONTEXT < LOAD_CONTEXTS.INIT then
 		error("Game:Load is not intended for use before init stage. Could work but could be dangerous, here be dragons..")
 	end
 
@@ -429,12 +289,14 @@ function LMGame.Load(self: LMGame, module: ModuleScript)
 	try_run(self, module_val, name)
 	try_tests(self, module_val, name)
 
-	return module_val
+	return module_val ]]
 end
 
 function LMGame.Begin(self: LMGame)
+	set_context(self, LOAD_CONTEXTS.RUNNING_STAGES)
+
 	for i,v in script.Parent.Stages:GetChildren() do
-		local stage_mode = require(v)
+		local stage_mode = safe_require(v)
 		stage_mode.GiveLM(mod)
 	end
 
@@ -442,18 +304,34 @@ function LMGame.Begin(self: LMGame)
 
 	for i = 1, #Stages, 1 do
 		local stage = Stages[i]
-		-- set_context(self, stage.Priority)
 
-		for i,v in self._CollectedModules do
-			try_stage(self, v, i, stage)
+		local should_run = true
+		if stage.ShouldRunStage then
+			should_run = stage.ShouldRunStage()
+		end
+
+		if not should_run then
+			continue
+		end
+
+		if stage.Type == "Module" then
+			for i,v in self._CollectedModules do
+				try_stage(self, v, i, stage)
+			end
+		elseif stage.Type == "Global" then
+			stage.Callback(self)
+		else
+			error("Unknown LM stage type: " .. stage.Type)
 		end
 
 		if stage.FinishedCallback then
 			stage.FinishedCallback()
 		end
 	end
+
+	set_context(self, LOAD_CONTEXTS.FINISHED)
 	-- Set context 
---[[ 	set_context(self, LOAD_CONTEXTS.BEGIN_INIT)
+	--[[
 	for mod_name, module_val in self._CollectedModules do
 		if not can_init(mod_name) then
 			warn("Module " .. mod_name .. " already initialized (this is probably a huge bug)")
@@ -463,7 +341,6 @@ function LMGame.Begin(self: LMGame)
 		try_init(self, module_val, mod_name)
 	end
 
-	set_context(self, LOAD_CONTEXTS.BEGIN_SIGNALS)
 	for mod_name, module_val in self._CollectedModules do
 		if not can_init(mod_name) then continue end
 		try_signals(self, module_val, mod_name)
@@ -475,13 +352,11 @@ function LMGame.Begin(self: LMGame)
 		wait_for_server_game_state(self)
 	end
 
-	set_context(self, LOAD_CONTEXTS.BEGIN_UI)
 	for mod_name, module_val in self._CollectedModules do
 		if not can_init(mod_name) then continue end
 		try_ui(self, module_val, mod_name)
 	end
 
-	set_context(self, LOAD_CONTEXTS.BEGIN_RUN)
 	for mod_name, module_val in self._CollectedModules do
 		if not can_init(mod_name) then continue end
 		try_run(self, module_val, mod_name)
@@ -493,7 +368,6 @@ function LMGame.Begin(self: LMGame)
 		setup_data_collectors(self)
 	end
 	
-	set_context(self, LOAD_CONTEXTS.FINISHED)
 	if Config.TESTING then
 		for mod_name, module_val in self._CollectedModules do
 			try_tests(self, module_val, mod_name)
