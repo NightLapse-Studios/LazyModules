@@ -91,6 +91,7 @@ LM has "tiers" of releases which correspond to different levels of invasiveness 
 * Improve types
 * Add types to dependencies that are missing them
 * Investigate the quality of all packaged dependencies
+* BIG: Optimize networking library (buffer packing, single remote)
 
 # Games built with LazyModules
 
