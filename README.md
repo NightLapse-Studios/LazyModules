@@ -81,10 +81,12 @@ LM has "tiers" of releases which correspond to different levels of invasiveness 
 * [Minimal](src/minimal/README.md)
 	* The barebones of just startup stages, including a tests stage
 * [Base](src/base/README.md)
-	* Adds UserInput, a nearly finished replacement for ContextActionService including gesture detection on mobile or desktop, and input regions for mobile
+	* Adds DebugMenu and Debug library
 	* Adds __ui stage and Pumpkin/Roact
 * [Full](src/full/README.md)
-    * Specifies DataStore loading in regards to player data, delays some client stages until it receives player data, adds gamestate stages to handle joining mid-game, and provides runtime debugging utilities
+	* Adds a Player class accessible from `Game[plr]` after DataStore for associated player is fetched
+	* Adds `PlayerDataModules` associated with the Player class
+	* Guarantees the player object, game state, and datastore data exists by the time `__run` is running on the client
 
 # Roadmap
 
