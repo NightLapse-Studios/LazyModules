@@ -96,6 +96,7 @@ LM has "tiers" of releases which correspond to different levels of invasiveness 
 * Investigate the quality of all packaged dependencies
 * BIG: Optimize networking library (buffer packing, single remote)
 * Re-examine the usage of Pumpkin in place of lighter weight frameworks
+* Integrate our replacement for ContextActionSerice and Controllers (requires the default PlayerModule to be overriden)
 
 # Games built with LazyModules
 
