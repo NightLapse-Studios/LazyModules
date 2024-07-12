@@ -358,10 +358,7 @@ local function push_gesture(code)
 	UserInput.TakeCustomInput(input)
 end
 
-function mod.__ui(G, i,a,d)
-	I, A, D = i, a, d
-
-	local Roact = G.Load("Roact")
+function mod.__ui(G, I, P, Roact)
 	local GestureDetector = G.Load("GestureDetector")
 
 	CameraAreaIsActive, updCameraAreaIsActive = I:Binding(true)
@@ -385,7 +382,7 @@ function mod.__ui(G, i,a,d)
 				:DominantAxis(Enum.DominantAxis.Height)
 
 		if state.DPadEnabled then
-			local modal = I:StdElement("ContainerFrame", D(A(), I
+			local modal = I:StdElement("ContainerFrame", P()
 				:Size(0, 0, 0.08, 0)
 				:AnchorPoint(0.5, 0.5)
 				:Active(false)
@@ -422,7 +419,6 @@ function mod.__ui(G, i,a,d)
 							return clamped
 						end))
 						:Active(false)
-					)
 				)
 			)
 
@@ -577,7 +573,7 @@ function mod.__ui(G, i,a,d)
 			end)
 
 		if #gesture_buttons > 0 then
-			local gesture_button_container = I:StdElement("ContainerFrame", D(A(), I
+			local gesture_button_container = I:StdElement("ContainerFrame", P()
 				:Size(1/3, 0, 1/2, 0)
 				:BackgroundTransparency(1)
 				:JustifyRight(0, 0)
@@ -590,23 +586,24 @@ function mod.__ui(G, i,a,d)
 					
 					I:Fragment(gesture_buttons)
 				)
-			))
+			)
 
 			gesture_container:Children(gesture_button_container)
 		end
 
 		table.insert(enabled_elements, gesture_container)
 
-		local container = I:StdElement("ContainerFrame", D(A(), I
+		local container = I:StdElement("ContainerFrame", P()
 			:Size(1, 0, 1, 0)
 			:BackgroundTransparency(1)
 			:Children(I:Fragment(enabled_elements))
-		))
+		)
 
 		return container
 	end
 
-	local CharacterInputElement = I:Stateful("MobileCharacterInput", I
+	local CharacterInputElement = I:Stateful(P()
+		:Name("CharacterInputElement")
 		:Init(function(self)
 			CharacterInputUI = self
 
@@ -623,7 +620,6 @@ function mod.__ui(G, i,a,d)
 		end)
 		:Render(RenderMobileUI)
 	)
-	Roact.mount(Roact.createElement(CharacterInputElement), game.Players.LocalPlayer.PlayerGui.BaseInterface)
 
 	local function RenderMobileButtonUI(self)
 		local state = self.state
@@ -641,7 +637,7 @@ function mod.__ui(G, i,a,d)
 			local y = 0.5 + dist * math.sin(angle)
 			local p = Vector2.new(x, y)
 
-			local b = I:StdElement("TextButton", D(A(), I
+			local b = I:StdElement("TextButton", P()
 				:Size(0.1, 0, 0.1, 0)
 				:Text(cfg.Label)
 				:AnchorPoint(0.5, 0.5)
@@ -664,7 +660,7 @@ function mod.__ui(G, i,a,d)
 						:AspectType(Enum.AspectType.ScaleWithParentSize)
 						:DominantAxis(Enum.DominantAxis.Height)
 				)
-			))
+			)
 
 			b:RoundCorners(1, 0)
 
@@ -686,7 +682,7 @@ function mod.__ui(G, i,a,d)
 			return false
 		end
 
-		local tree = I:StdElement("ContainerFrame", D(A(), I
+		local tree = I:StdElement("ContainerFrame", P()
 			:Size(0.5, 0, 1, 0)
 			:AnchorPoint(0, 0.5)
 			:Position(0, 0, 0.5, 0)
@@ -698,12 +694,21 @@ function mod.__ui(G, i,a,d)
 					:AspectType(Enum.AspectType.FitWithinMaxSize)
 					:DominantAxis(Enum.DominantAxis.Height)
 			)
-		))
+		)
 
 		return tree
 	end 
 
-	local MobileButtonElement = I:Stateful("MobileButtons", I
+
+	local input_container = Instance.new("ScreenGui", game.Players.LocalPlayer.PlayerGui)
+	input_container.Name = "MobileInput"
+	local button_container = Instance.new("ScreenGui", game.Players.LocalPlayer.PlayerGui)
+	button_container.Name = "MobileButtons"
+
+	I:Mount(I:CharacterInputElement(P()), input_container)
+
+	local MobileButtonElement = I:Stateful(P()
+		:Name("MobileButton")
 		:Init(function(self)
 			MobileButtonUI = self
 		
@@ -711,7 +716,7 @@ function mod.__ui(G, i,a,d)
 		end)
 		:Render(RenderMobileButtonUI)
 	)
-	Roact.mount(Roact.createElement(MobileButtonElement), game.Players.LocalPlayer.PlayerGui.BaseInterface)
+	I:Mount(I:MobileButton(P()), button_container)
 end
 
 function mod.AddButton(name, group_name, down_callback, up_callback)
