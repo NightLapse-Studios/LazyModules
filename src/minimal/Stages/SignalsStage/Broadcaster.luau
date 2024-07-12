@@ -74,7 +74,6 @@ local BroadcastBuilder = {
 				local should_accept = self.__ShouldAccept(plr, ...)
 
 				if should_accept then
-					print(debug.traceback())
 					self[2]:Fire(plr, ...)
 
 					for i,v in game.Players:GetPlayers() do
