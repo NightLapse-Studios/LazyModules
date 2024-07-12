@@ -96,10 +96,14 @@ function mod.__tests(G: LMT.LMGame, T: LMT.Tester)
 		)
 	end)
 
-	T:Test("Broadcast", function()
-        T:ForContext("always",
+	T:Test("Communicate with", function()
+        T:ForContext("Broadcasters",
             T.Equal, confirmations.TestBroadcaster, true
         )
+
+		T:ForContext("Transmitters",
+			T.Equal, confirmations.TestTransmitter, true
+		)
     end)
 end
 
