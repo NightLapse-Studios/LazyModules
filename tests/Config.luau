@@ -128,7 +128,6 @@ Config.ModuleCollectionFolders = {
 Config.ModuleCollectionBlacklist = {
     game.ReplicatedFirst.Lib.LazyModules,
     Server = {
-		game.ReplicatedFirst.Lib.UserInput,
 		game.ReplicatedFirst.Lib.Pumpkin
     },
     Client = {
