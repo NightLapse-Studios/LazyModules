@@ -60,7 +60,7 @@ Instead of firing signals or putting callbacks everywhere, we use startup stages
 
 ## Tests
 
-One of the startup stages available in all tiers is __tests. This allows in-file (or out of file) testing of the game as it is when it runs. In principal, your tests can move the player, use abilities, test datastores, etc. [Broader example](src/base/Lib/CircleBuffer.luau#97)
+One of the startup stages available is __tests. This allows in-file (or out of file) testing of the game as it is when it runs. In principal, your tests can move the player, use abilities, test datastores, etc.
 
 ```lua
 function mod.__tests(G, T)
