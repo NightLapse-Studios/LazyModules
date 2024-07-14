@@ -54,18 +54,25 @@ local function NewTester( module_name: string )
 	local t = {
 		CurrentTestName = false,
 		ModuleName = module_name,
-		TestOutputs = { }
+		TestOutputs = { },
 	}
 
 	return setmetatable(t, mt_Tester)
 end
 
-local function Finished( self: Tester )
+local function Finished( self: Tester, callback_scope_error: string? )
 	if Config.FocusTestOn and Config.FocusTestOn ~= self.ModuleName then
 		return
 	end
 
-	print("📃 " .. self.ModuleName .. " should:")
+	if callback_scope_error then
+		print("📃 " .. self.ModuleName .. " FAILED!")
+		print("\t❌Callback-scope error (tests skipped):")
+		print("\t" .. callback_scope_error)
+		return
+	else
+		print("📃 " .. self.ModuleName .. " should:")
+	end
 
 	for test_name, outputs in self.TestOutputs do
 		if outputs.HasFailures then
@@ -88,8 +95,12 @@ end
 local function run_module_stage(game, fn, mod_name: string)
 	task.spawn(function()
 		local tester = NewTester(mod_name)
-		fn(game, tester)
-		Finished(tester)
+		local success, err = pcall(fn, game, tester)
+		if not success then
+			Finished(tester, err)
+		else
+			Finished(tester)
+		end
 	end)
 end
 
@@ -119,11 +130,16 @@ local function try_new_output_buf(self: Tester, name: string)
 end
 
 function Tester:Test(name, test_func)
-	try_new_output_buf(self, name)
+	local output_buf = try_new_output_buf(self, name)
 	self.CurrentTestName = name
 
 	-- test_func uses the `self` object to pass the results of tests into `self`s internal state
-	test_func(self)
+	local success, err = pcall(test_func, self)
+	if not success then
+		output_buf.HasFailures = true
+		table.insert(output_buf, "\t\t✖ " .. name .. " has unexpected error:\n" .. err)
+	end
+
 	self.CurrentTestName = false
 end
 
