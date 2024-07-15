@@ -67,7 +67,7 @@ local function Finished( self: Tester, callback_scope_error: string? )
 
 	if callback_scope_error then
 		print("📃 " .. self.ModuleName .. " FAILED!")
-		print("\t❌Callback-scope error (tests skipped):")
+		print("\t❌ Callback-scope error (tests skipped):")
 		print("\t" .. callback_scope_error)
 		return
 	else
@@ -76,9 +76,9 @@ local function Finished( self: Tester, callback_scope_error: string? )
 
 	for test_name, outputs in self.TestOutputs do
 		if outputs.HasFailures then
-			print("\t❌" .. test_name)
+			print("\t❌ " .. test_name)
 		else
-			print("\t✅" .. test_name)
+			print("\t✅ " .. test_name)
 		end
 
 		for i, output in outputs do
@@ -137,10 +137,39 @@ function Tester:Test(name, test_func)
 	local success, err = pcall(test_func, self)
 	if not success then
 		output_buf.HasFailures = true
-		table.insert(output_buf, "\t\t✖ " .. name .. " has unexpected error:\n" .. err)
+		table.insert(output_buf, "\t\t❌ " .. name .. " has unexpected error:\n" .. err)
 	end
 
 	self.CurrentTestName = false
+end
+
+function Tester:Fuzz(name, count, generator, test_runner)
+	local output_buf = try_new_output_buf(self, name)
+	self.CurrentTestName = name
+
+	local cycle_start_time = os.clock()
+	print("📃 " .. self.ModuleName .. ": Running fuzz test " .. name)
+	for i = 1, count, 1 do
+		local success, ret = pcall(generator)
+		if not success then
+			output_buf.HasFailures = true
+			table.insert(output_buf, "\t\t❌ Unexpected error in generator\n\t\ton iteration " .. tostring(i)  .. "\n" .. ret)
+			self.CurrentTestName = false
+			return
+		end
+
+		local success, err = pcall(test_runner, ret)
+		if not success then
+			output_buf.HasFailures = true
+			print("\t\t❌ " .. err .. "\n\t\tWith input:", ret)
+		end
+
+		if os.clock() - cycle_start_time > 1 then
+			print(tostring(i) .. " out of " .. tostring(count) .. " iterations")
+			task.wait()
+			cycle_start_time = os.clock()
+		end
+	end
 end
 
 local ARGS_PER_CONDITION = 3
@@ -173,10 +202,10 @@ local function check_conditions(conditions, output_buf, description: string, pre
 
 	if failed > 0 then
 		output_buf.HasFailures = true
-		table.insert(output_buf,  "\t\t✖ " .. description)
+		table.insert(output_buf,  "\t\t❌ " .. description)
 		table.insert(output_buf, "\t\t\tDue to " .. failed .. " of " .. num_conditions .. " condition(s): " .. failures .. fail_reasons)
 	else
-		table.insert(output_buf,  "\t\t✔ " .. description)
+		table.insert(output_buf,  "\t\t✅ " .. description)
 	end
 end
 
@@ -217,12 +246,11 @@ function Tester:ExpectError(description: string, f, ...)
 
 	if success then
 		output_buf.HasFailures = true
-		table.insert(output_buf,  "\t\t✖ While " .. description)
+		table.insert(output_buf,  "\t\t❌ While " .. description)
 	else
-		table.insert(output_buf,  "\t\t✔ While " .. description)
+		table.insert(output_buf,  "\t\t✅ While " .. description)
 	end
 end
-
 
 function Tester:ForContext(description: string, ...)
 	local conditions = { ... }
