@@ -5,9 +5,8 @@ local STAGE_NAME = "__tests"
 local STAGE_PRIORITY = 10000
 
 local mod = {
-	Nouns = { },
+	Nouns = {},
 }
-
 
 local USAGE_EXAMPLE = [[
 	function mod.__tests(G, T)
@@ -43,27 +42,27 @@ local CUSTOM_TEST_FUNC_EXAMPLE = [[
 	)
 ]]
 
-
-local Tester = { }
+local Tester = {}
 local mt_Tester = { __index = Tester }
 
-
-local function NewTester( module_name: string )
+local function NewTester(module_name: string)
 	assert(typeof(module_name) == "string")
 
 	local t = {
 		CurrentTestName = false,
 		ModuleName = module_name,
-		TestOutputs = { },
+		TestOutputs = {},
 	}
 
 	return setmetatable(t, mt_Tester)
 end
 
-local function Finished( self: Tester, callback_scope_error: string? )
+local function Finished(self: Tester, callback_scope_error: string?)
 	if Config.FocusTestOn and Config.FocusTestOn ~= self.ModuleName then
 		return
 	end
+
+	local print_successes = Config.LogSuccessfulSubTests
 
 	if callback_scope_error then
 		print("📃 " .. self.ModuleName .. " FAILED!")
@@ -71,7 +70,7 @@ local function Finished( self: Tester, callback_scope_error: string? )
 		print("\t" .. callback_scope_error)
 		return
 	else
-		print("📃 " .. self.ModuleName .. " should:")
+		print("📃 " .. self.ModuleName .. ":")
 	end
 
 	for test_name, outputs in self.TestOutputs do
@@ -79,6 +78,10 @@ local function Finished( self: Tester, callback_scope_error: string? )
 			print("\t❌ " .. test_name)
 		else
 			print("\t✅ " .. test_name)
+
+			if not print_successes then
+				continue
+			end
 		end
 
 		for i, output in outputs do
@@ -90,7 +93,6 @@ local function Finished( self: Tester, callback_scope_error: string? )
 		end
 	end
 end
-
 
 local function run_module_stage(game, fn, mod_name: string)
 	task.spawn(function()
@@ -112,7 +114,6 @@ function mod.GiveLM(lm)
 	lm.RegisterModuleStage(STAGE_NAME, STAGE_PRIORITY, run_module_stage, nil, should_run_stage)
 end
 
-
 export type Tester = typeof(mod.Tester(""))
 
 local function try_new_output_buf(self: Tester, name: string)
@@ -122,7 +123,7 @@ local function try_new_output_buf(self: Tester, name: string)
 
 	-- This will be filled with strings stating success/fail conditions of tests
 	local output_buf = {
-		HasFailures = false
+		HasFailures = false,
 	}
 	self.TestOutputs[name] = output_buf
 
@@ -153,7 +154,10 @@ function Tester:Fuzz(name, count, generator, test_runner)
 		local success, ret = pcall(generator)
 		if not success then
 			output_buf.HasFailures = true
-			table.insert(output_buf, "\t\t❌ Unexpected error in generator\n\t\ton iteration " .. tostring(i)  .. "\n" .. ret)
+			table.insert(
+				output_buf,
+				"\t\t❌ Unexpected error in generator\n\t\ton iteration " .. tostring(i) .. "\n" .. ret
+			)
 			self.CurrentTestName = false
 			return
 		end
@@ -194,7 +198,13 @@ local function check_conditions(conditions, output_buf, description: string, pre
 
 			local cond = tostring((i + ARGS_PER_CONDITION - 1) / ARGS_PER_CONDITION)
 			failures = failures .. separator .. cond
-			fail_reasons = fail_reasons .. "\n\t\t\tCond. " .. cond .. " expects " .. tostring(expected) .. " got " .. tostring(actual)
+			fail_reasons = fail_reasons
+				.. "\n\t\t\tCond. "
+				.. cond
+				.. " expects "
+				.. tostring(expected)
+				.. " got "
+				.. tostring(actual)
 
 			failed += 1
 		end
@@ -202,10 +212,13 @@ local function check_conditions(conditions, output_buf, description: string, pre
 
 	if failed > 0 then
 		output_buf.HasFailures = true
-		table.insert(output_buf,  "\t\t❌ " .. description)
-		table.insert(output_buf, "\t\t\tDue to " .. failed .. " of " .. num_conditions .. " condition(s): " .. failures .. fail_reasons)
+		table.insert(output_buf, "\t\t❌ " .. description)
+		table.insert(
+			output_buf,
+			"\t\t\tDue to " .. failed .. " of " .. num_conditions .. " condition(s): " .. failures .. fail_reasons
+		)
 	else
-		table.insert(output_buf,  "\t\t✅ " .. description)
+		table.insert(output_buf, "\t\t✅ " .. description)
 	end
 end
 
@@ -215,7 +228,7 @@ local function check_situation_call(conditions, output_buf)
 	end
 
 	-- Can't do this check because lua sucks (trailing nil won't be an argument)
---[[ 	assert(#conditions % ARGS_PER_CONDITION == 0,
+	--[[ 	assert(#conditions % ARGS_PER_CONDITION == 0,
 		"Conditions must be a value, expectation pair. All values must have a corresponding expectation, even if `nil`"
 	) ]]
 end
@@ -246,9 +259,9 @@ function Tester:ExpectError(description: string, f, ...)
 
 	if success then
 		output_buf.HasFailures = true
-		table.insert(output_buf,  "\t\t❌ While " .. description)
+		table.insert(output_buf, "\t\t❌ While " .. description)
 	else
-		table.insert(output_buf,  "\t\t✅ While " .. description)
+		table.insert(output_buf, "\t\t✅ While " .. description)
 	end
 end
 
