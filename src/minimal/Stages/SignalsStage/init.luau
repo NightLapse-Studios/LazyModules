@@ -45,37 +45,17 @@ local Config = require(game.ReplicatedFirst.Config)
 --event abstraction modules
 local Transmitter = require(script.Transmitter)
 local Broadcaster = require(script.Broadcaster)
-local Event = require(script.Event)
 
 export type Transmitter = Transmitter.Transmitter
 export type Broadcaster = Broadcaster.Broadcaster
-export type Event = Event.Event
 
 local Transmitters = Transmitter.Transmitters
 local Broadcasters = Broadcaster.Broadcasters
-local Events = Event.Events
-
-local mt_ClientEvent = Event.client_mt
-local mt_ServerEvent = Event.server_mt
 
 local WaitingList = SparseList.new()
 
-type EventGetter = (Event) -> ()
-
-SignalAPI.NewEvent = Event.NewEvent
 SignalAPI.NewTransmitter = Transmitter.NewTransmitter
 SignalAPI.NewBroadcaster = Broadcaster.NewBroadcaster
-
-function SignalAPI:GetEvent(identifier: string, cb: EventGetter, force_context: string?)
-	if force_context and force_context ~= _G.Game.CONTEXT then
-		return
-	end
-
-	local success = Event.Events.Identifiers:get(identifier, cb)
-	if not success then
-		error("\nEvent: " .. self.CurrentModule .. " " .. identifier)
-	end
-end
 
 function SignalAPI:GetTransmitter(identifier, cb, force_context: string)
 	if force_context and force_context ~= _G.Game.CONTEXT then
@@ -167,22 +147,14 @@ end
 -- TODO: Many safety checks require some meta-communication with the server. eeeeghhh
 function mod.BuildSignals(G: any)
 	-- The exact form of dependency injection we want to eradicate
-	local remote_wrapper = require(script.__remote_wrapper)
+	local remote_wrapper = require(script.remote_wrapper)
 	remote_wrapper.GiveGame(G)
 
 	local wait_dur = 0
-	wait_dur += wait_for(Event.Events.Identifiers)
 	wait_dur += wait_for(Transmitter.Transmitters.Identifiers)
 	wait_dur += wait_for(Broadcaster.Broadcasters.Identifiers)
 
 	print("Waited " .. wait_dur .. " ticks")
-
-	for module, identifers in Transmitters.Modules.provided do
-		for ident, transmitter in identifers do
-			local transmitter_str = "Transmitter `" .. module .. "::" .. ident
-
-		end
-	end
 
 	for module, identifers in Broadcasters.Modules.provided do
 		for ident, broadcaster in identifers do
@@ -206,25 +178,6 @@ function mod.BuildSignals(G: any)
 		end
 	end
 
-	for module, identifers in Events.Modules.provided do
-		for ident, event in identifers do
-			if CONTEXT == "CLIENT" then
-				local event_str = "Event `" .. module .. "::" .. ident
-				if event.Type ~= "Builder" then
-					error(event_str .. "` is not a Builder (what did you do?)")
-				end
-
-				setmetatable(event, mt_ClientEvent)
-			elseif CONTEXT == "SERVER" then
-				local event_str = "Event `" .. module .. "::" .. ident
-				if event.Type ~= "Builder" then
-					error(event_str .. "` is not a Builder (what did you do?)")
-				end
-
-				setmetatable(event, mt_ServerEvent)
-			end
-		end
-	end
 
 	if Config.MonitorAllSignals then
 		for module, identifers in Transmitters.Modules.provided do
@@ -233,11 +186,6 @@ function mod.BuildSignals(G: any)
 			end
 		end
 		for module, identifers in Broadcasters.Modules.provided do
-			for _, event in identifers do
-				__monitor(event)
-			end
-		end
-		for module, identifers in Events.Modules.provided do
 			for _, event in identifers do
 				__monitor(event)
 			end

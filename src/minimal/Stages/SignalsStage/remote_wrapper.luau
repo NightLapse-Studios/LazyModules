@@ -1,6 +1,8 @@
 local Players = game:GetService("Players")
 local IsServer = game:GetService("RunService"):IsServer()
 
+local Config = require(game.ReplicatedFirst.Config)
+
 local mod = { }
 
 local Game
@@ -21,7 +23,7 @@ function RemoteEventClass.new(event)
 end
 
 function RemoteEventClass:FireClient(plr, ...)
-	if Game[plr] and Game[plr].ServerLoaded then
+	if Config.ReleaseType == "full" and (Game[plr] and Game[plr].ServerLoaded) then
 		self.Event:FireClient(plr, ...)
 	end
 end
@@ -35,13 +37,13 @@ end
 
 function mod.wrapper<T>(identifier: string, builder_mt: T)
 	-- TODO: check that all events made on the server are also made on the client
-	local transmitter
+	local wrapper
 	if IsServer then
 		local remoteEvent = Instance.new("RemoteEvent")
 		remoteEvent.Name = identifier
 		remoteEvent.Parent = game.ReplicatedStorage
 		
-		transmitter = setmetatable(
+		wrapper = setmetatable(
 			{
 				Event = RemoteEventClass.new(remoteEvent),
 				Configured = {
@@ -60,7 +62,7 @@ function mod.wrapper<T>(identifier: string, builder_mt: T)
 			warn("Waiting for event timed out! - " .. identifier .. "\n" .. _G.Game.LazyModules.format_lazymodules_traceback())
 		end
 		
-		transmitter = setmetatable(
+		wrapper = setmetatable(
 			{
 				Event = { Event = event },
 				Configured = {
@@ -73,7 +75,7 @@ function mod.wrapper<T>(identifier: string, builder_mt: T)
 		)
 	end
 
-	return transmitter
+	return wrapper
 end
 
 return mod

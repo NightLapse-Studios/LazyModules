@@ -25,16 +25,13 @@ local mod = {
 
 local Broadcasters = mod.Broadcasters
 
---local INIT_CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
-
 local ClassicSignal = require(game.ReplicatedFirst.Lib.ClassicSignal)
 
 local IsServer = game:GetService("RunService"):IsServer()
 
-local remote_wrapper = require(script.Parent.__remote_wrapper).wrapper
+local remote_wrapper = require(script.Parent.remote_wrapper).wrapper
 
--- Rare case of inheritance in the wild
-local BroadcastBuilder: Broadcaster = {
+local BroadcastBuilder = ({
 	CBroadcast = function(self, ...)
 		if self.monitor then
 			self.monitor(self, ...)
@@ -89,7 +86,7 @@ local BroadcastBuilder: Broadcaster = {
 		self.__ShouldAccept = func
 		return self
 	end,
-}
+} :: any) :: Broadcaster
 BroadcastBuilder.__index = BroadcastBuilder
 
 function mod.BuildBroadcaster(b: Broadcaster)
