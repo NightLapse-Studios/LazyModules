@@ -34,8 +34,30 @@ local IsServer = game:GetService("RunService"):IsServer()
 local remote_wrapper = require(script.Parent.__remote_wrapper).wrapper
 
 -- Rare case of inheritance in the wild
-local BroadcastBuilder = {
-	Type = "Builder",
+local BroadcastBuilder: Broadcaster = {
+	CBroadcast = function(self, ...)
+		if self.monitor then
+			self.monitor(self, ...)
+		end
+
+		self.Event.Event:FireServer(...)
+	end,
+	SBroadcast = function(self, ...)
+		if self.monitor then
+			self.monitor(self, ...)
+		end
+
+		self[2]:Fire(nil, ...)
+		self.Event.Event:FireAllClients(nil, ...)
+	end,
+	SBroadcastLikePlayer = function(self, plr, ...)
+		if self.monitor then
+			self.monitor(self, ...)
+		end
+
+		self[2]:Fire(plr, ...)
+		self.Event.Event:FireAllClients(plr, ...)
+	end,
 
 	ClientConnection = function(self, func: CGameEventConnection)
 		if not func then return self end
@@ -67,63 +89,38 @@ local BroadcastBuilder = {
 		self.__ShouldAccept = func
 		return self
 	end,
+}
+BroadcastBuilder.__index = BroadcastBuilder
 
-	Build = function(self)
-		if IsServer then
-			self.Event.Event.OnServerEvent:Connect(function(plr, ...)
-				local should_accept = self.__ShouldAccept(plr, ...)
+function mod.BuildBroadcaster(b: Broadcaster)
+	if IsServer then
+		b.Event.Event.OnServerEvent:Connect(function(plr, ...)
+			local should_accept = b.__ShouldAccept(plr, ...)
 
-				if should_accept then
-					self[2]:Fire(plr, ...)
+			if should_accept then
+				b[2]:Fire(plr, ...)
 
-					for i,v in game.Players:GetPlayers() do
-						if v == plr then continue end
-						self.Event:FireClient(v, plr, ...)
-					end
+				for i,v in game.Players:GetPlayers() do
+					if v == plr then continue end
+					b.Event:FireClient(v, plr, ...)
 				end
-			end)
-		else
-			self.Event.Event.OnClientEvent:Connect(function(plr, ...)
-				self[2]:Fire(plr, ...)
-			end)
-		end
+			end
+		end)
+	else
+		b.Event.Event.OnClientEvent:Connect(function(plr, ...)
+			b[2]:Fire(plr, ...)
+		end)
 	end
+end
+
+export type Broadcaster = {
+	ClientConnection: <T, C...>(T, fn: (C...) -> ()) -> (T & {
+		SBroadcast: (self: T, C...) -> (),
+		SBroadcastLikePlayer: (self: T, Player, C...) -> ()
+	}),
+	ServerConnection: <T, C...>(T, fn: (Player, C...) -> ()) -> (T & { CBroadcast: (self: T, C...) -> ()}),
+	ShouldAccept: <T, C...>(T, fn: (Player, C...) -> boolean) -> (T & { __ShouldAccept: (Player, C...) -> boolean }),
 }
-
-local BroadcasterClient = {
-	Broadcast = function(self, ...)
-		if self.monitor then
-			self.monitor(self, ...)
-		end
-
-		self.Event.Event:FireServer(...)
-	end
-}
-local BroadcasterServer = {
-	Broadcast = function(self, ...)
-		if self.monitor then
-			self.monitor(self, ...)
-		end
-
-		self[2]:Fire(nil, ...)
-		self.Event.Event:FireAllClients(nil, ...)
-	end,
-	BroadcastLikePlayer = function(self, plr, ...)
-		if self.monitor then
-			self.monitor(self, ...)
-		end
-
-		self[2]:Fire(plr, ...)
-		self.Event.Event:FireAllClients(plr, ...)
-	end,
-}
-
-setmetatable(BroadcasterClient, { __index = BroadcastBuilder })
-setmetatable(BroadcasterServer, { __index = BroadcastBuilder })
-
-local mt_BroadcastBuilder = {__index = BroadcastBuilder}
-mod.client_mt = {__index = BroadcasterClient}
-mod.server_mt = {__index = BroadcasterServer}
 
 local function default_should_accept()
 	return true
@@ -131,11 +128,10 @@ end
 
 -- Broadcasters use a client->server?->all-clients model
 function mod.NewBroadcaster(signals_module, identifier: string): Broadcaster
-	local broadcaster = remote_wrapper(identifier, mt_BroadcastBuilder)
+	local broadcaster = remote_wrapper(identifier, BroadcastBuilder)
 	broadcaster[2] = ClassicSignal.new()
 	broadcaster.Connections = 0
 	broadcaster.__ShouldAccept = default_should_accept
-	setmetatable(broadcaster, mt_BroadcastBuilder)
 
 	if Broadcasters.Identifiers:inspect(identifier) ~= nil then
 		error("Re-declared broadcaster `" .. identifier .. "` in `" .. signals_module.CurrentModule .. "`")
@@ -146,7 +142,5 @@ function mod.NewBroadcaster(signals_module, identifier: string): Broadcaster
 
 	return broadcaster
 end
-
-export type Broadcaster = typeof(mod.NewBroadcaster({CurrentModule=""}, "Ex"))
 
 return mod

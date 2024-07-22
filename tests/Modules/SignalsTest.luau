@@ -18,7 +18,7 @@ local confirmations = { }
 
 local mod = { } :: LMT.LazyModule
 
-function mod.__build_signals(G, B)
+function mod.__build_signals(G, B: LMT.Signals)
     TestConfirmationTransmitter = B:NewTransmitter("TestConfirmationTransmitter")
         :ServerConnection(function(plr, name: string)
             if name == "Handshake" then
@@ -30,35 +30,35 @@ function mod.__build_signals(G, B)
         :ClientConnection(function(name: string)
             confirmations[name] = true
         end)
-        
+
     TestBroadcaster = B:NewBroadcaster("TestBroadcaster")
-        :ShouldAccept(function(test_cond: boolean)
+        :ShouldAccept(function(plr, test_cond: boolean)
             return test_cond
         end)
-        :ServerConnection(function(plr)
+        :ServerConnection(function(plr, _: boolean)
             -- plr will be nill if a broadcast originates on the server
             if plr then
-                TestConfirmationTransmitter:Transmit(plr, "TestBroadcaster")
+                TestConfirmationTransmitter:STransmit(plr, "TestBroadcaster")
             end
         end)
         :ClientConnection(function()
-            TestConfirmationTransmitter:Transmit("TestBroadcaster")
+            TestConfirmationTransmitter:CTransmit("TestBroadcaster")
         end)
 
     TestTransmitter = B:NewTransmitter("TestTransmitter")
-        :ServerConnection(function(plr, a, b)
-            TestConfirmationTransmitter:Transmit(plr, "TestTransmitter")
+        :ServerConnection(function(plr)
+            TestConfirmationTransmitter:STransmit(plr, "TestTransmitter")
         end)
         :ClientConnection(function(name: string)
-            TestConfirmationTransmitter:Transmit("TestTransmitter")
+            TestConfirmationTransmitter:CTransmit("TestTransmitter")
         end)
 end
 
 local function client_signals()
     -- An initial event to give the server a player to send its events to
-    TestConfirmationTransmitter:Transmit("Handshake")
-    TestBroadcaster:Broadcast(true)
-    TestTransmitter:Transmit(true)
+    TestConfirmationTransmitter:CTransmit("Handshake")
+    TestBroadcaster:CBroadcast(true)
+    TestTransmitter:CTransmit()
 end
 
 local function server_signals()
@@ -66,8 +66,8 @@ local function server_signals()
         task.wait()
     end
     
-    TestBroadcaster:Broadcast(true)
-    TestTransmitter:Transmit(TestPlayer, true)
+    TestBroadcaster:SBroadcast(true)
+    TestTransmitter:STransmit(TestPlayer, true)
 end
 
 function mod.__tests(G: LMT.LMGame, T: LMT.Tester)

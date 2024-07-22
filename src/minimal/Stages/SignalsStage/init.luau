@@ -55,10 +55,6 @@ local Transmitters = Transmitter.Transmitters
 local Broadcasters = Broadcaster.Broadcasters
 local Events = Event.Events
 
-local mt_ClientTransmitter = Transmitter.client_mt
-local mt_ServerTransmitter = Transmitter.server_mt
-local mt_ClientBroadcaster = Broadcaster.client_mt
-local mt_ServerBroadcaster = Broadcaster.server_mt
 local mt_ClientEvent = Event.client_mt
 local mt_ServerEvent = Event.server_mt
 
@@ -185,11 +181,6 @@ function mod.BuildSignals(G: any)
 		for ident, transmitter in identifers do
 			local transmitter_str = "Transmitter `" .. module .. "::" .. ident
 
-			if CONTEXT == "CLIENT" then
-				setmetatable(transmitter, mt_ClientTransmitter)
-			else
-				setmetatable(transmitter, mt_ServerTransmitter)
-			end
 		end
 	end
 
@@ -197,11 +188,9 @@ function mod.BuildSignals(G: any)
 		for ident, broadcaster in identifers do
 			local transmitter_str = "Broadcaster `" .. module .. "::" .. ident .. "` "
 
-			broadcaster:Build()
+			Broadcaster.BuildBroadcaster(broadcaster)
 
-			if CONTEXT == "CLIENT" then
-				setmetatable(broadcaster, mt_ClientBroadcaster)
-			elseif CONTEXT == "SERVER" then
+			if CONTEXT == "SERVER" then
 				if broadcaster.Connections > 0 then
 					if broadcaster.__ShouldAccept == false then
 						warn(transmitter_str .. "has no config call to Builder:ShouldAccept(func)\nTherefore any client firing this event will be trusted!")
@@ -213,8 +202,6 @@ function mod.BuildSignals(G: any)
 						end
 					end
 				end
-
-				setmetatable(broadcaster, mt_ServerBroadcaster)
 			end
 		end
 	end

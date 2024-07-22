@@ -20,7 +20,7 @@ local PlayerDataModules = { }
 local PlayerDataModulesOrder = { }
 
 local mod = { }
-local ActualList = { }
+local LoadedPlayers: { Player } = { }
 
 -- A better PlayerAdded event
 local PlayerAddedBindable = Instance.new("BindableEvent")
@@ -28,7 +28,7 @@ mod.PlayerAdded = {
 	Connect = function(_, func)
 		local con = PlayerAddedBindable.Event:Connect(func)
 
-		for _,plr in pairs(ActualList) do
+		for _,plr in pairs(LoadedPlayers) do
 			task.spawn(func, plr)
 		end
 
@@ -57,7 +57,7 @@ local function OnPlayerLoadFinished( binding: PlayerDataBinding, plrClass )
 
 	IDAssociations:add(plr.UserId, plr)
 	NameAssociations:add(plr.Name, plr)
-	table.insert(ActualList, plr)
+	table.insert(LoadedPlayers, plr)
 	
 	-- Reserialize everything with the latest version, then send it to clients
 	local serial_data, private_serial_data = {}, {}
@@ -66,11 +66,11 @@ local function OnPlayerLoadFinished( binding: PlayerDataBinding, plrClass )
 		serial_data[mod_name] = DataStore3.SerializeObject(ds_obj)
 	end
 
-	for i, other_plr in mod.GetPlayers() do
+	for i, other_plr in LoadedPlayers do
 		if other_plr == plr then
-			AddRemotePlayerTransmitter:Transmit(other_plr, plr.UserId, serial_data)
+			AddRemotePlayerTransmitter:STransmit(other_plr, plr.UserId, serial_data)
 		else
-			AddRemotePlayerTransmitter:Transmit(other_plr, plr.UserId, serial_data)
+			AddRemotePlayerTransmitter:STransmit(other_plr, plr.UserId, serial_data)
 		end
 	end
 	
@@ -118,7 +118,7 @@ function mod.RegisterPlayerDataModule(name, ctor_args)
 end
 
 -- @Context CLIENT
-local function AddRemotePlayer(plr_id, data)
+local function AddRemotePlayer(plr_id: number, data)
 	local plr = PlayerService:GetPlayerByUserId(plr_id)
 
 	if not plr then
@@ -206,12 +206,12 @@ function mod.__build_signals(G, B)
 				plrClass:Destroy()
 			end
 			
-			local idx = table.find(ActualList, plr)
+			local idx = table.find(LoadedPlayers, plr)
 			if idx then
 				IDAssociations:remove(plr.UserId, plr)
 				NameAssociations:remove(plr.Name, plr)
 				
-				table.remove(ActualList, idx)
+				table.remove(LoadedPlayers, idx)
 			end
 		end)
 	elseif Game.CONTEXT == "CLIENT" then
@@ -248,7 +248,7 @@ function mod.__get_gamestate(plr)
 	return t
 end
 
-function mod.GetAssociatedPlayer(id_or_name: number | string)
+function mod.GetAssociatedPlayer(id_or_name: number | string): Player
 	if typeof(id_or_name) == "string" then
 		return NameAssociations:get(id_or_name)
 	elseif typeof(id_or_name) == "number" then
@@ -257,16 +257,16 @@ function mod.GetAssociatedPlayer(id_or_name: number | string)
 end
 
 function mod.GetPlayers()
-	return ActualList
+	return LoadedPlayers
 end
 
 function mod.GetCharacters()
-	local PlayerCount = #ActualList
+	local PlayerCount = #LoadedPlayers
 	local tbl = table.create(PlayerCount)
 
 	local Increment = 0
 	for i = 1, PlayerCount do
-		local Char = ActualList[i].Character
+		local Char = LoadedPlayers[i].Character
 		if Char then
 			Increment += 1
 			tbl[Increment] = Char

@@ -30,10 +30,29 @@ local remote_wrapper = require(script.Parent.__remote_wrapper).wrapper
 
 -- These wrappers are named from the perspective of their callers
 -- so the client one uses "FireServer" to transmit and vice-versa
-local TransmitterBuilder = {
-	Type = "Builder",
+local TransmitterBuilder: Transmitter = {
+	STransmit = function(self, ...)
+		if self.monitor then
+			self.monitor(self, ...)
+		end
 
-	ClientConnection = function(self, func: opt_func)
+		self.Event.Event:FireClient(...)
+	end,
+	STransmitAll = function(self, ...)
+		if self.monitor then
+			self.monitor(self, ...)
+		end
+
+		self.Event.Event:FireAllClients(...)
+	end,
+	CTransmit = function(self, ...)
+		if self.monitor then
+			self.monitor(self, ...)
+		end
+
+		self.Event.Event:FireServer(...)
+	end,
+	ClientConnection = function(self, func)
 		if not func then return self end
 		if IsServer then return self end
 
@@ -41,7 +60,7 @@ local TransmitterBuilder = {
 
 		return self
 	end,
-	ServerConnection = function(self, func: opt_func)
+	ServerConnection = function(self, func)
 		if not func then return self end
 		if not IsServer then return self end
 
@@ -50,41 +69,19 @@ local TransmitterBuilder = {
 		return self
 	end
 }
-local ClientTransmitter = {
-	Transmit = function(self, ...)
-		if self.monitor then
-			self.monitor(self, ...)
-		end
+TransmitterBuilder.__index = TransmitterBuilder
 
-		self.Event.Event:FireServer(...)
-	end,
+export type Transmitter = {
+	ClientConnection: <T, C...>(T, fn: (C...) -> ()) -> (T & {
+		STransmit: (self: T, Player, C...) -> (),
+		-- Discouraged over broadcasters
+		STransmitAll: (self: T, C...) -> ()
+	}),
+	ServerConnection: <T, C...>(T, fn: (Player, C...) -> ()) -> (T & { CTransmit: (self: T, C...) -> ()}),
 }
-local ServerTransmitter = {
-	Transmit = function(self, ...)
-		if self.monitor then
-			self.monitor(self, ...)
-		end
-
-		self.Event.Event:FireClient(...)
-	end,
-	TransmitAll = function(self, ...)
-		if self.monitor then
-			self.monitor(self, ...)
-		end
-
-		self.Event.Event:FireAllClients(...)
-	end,
-}
-
-setmetatable(ClientTransmitter, { __index = TransmitterBuilder })
-setmetatable(ServerTransmitter, { __index = TransmitterBuilder })
-
-local mt_TransmitterBuilder = { __index = TransmitterBuilder }
-mod.client_mt = { __index = ClientTransmitter }
-mod.server_mt = { __index = ServerTransmitter }
 
 function mod.NewTransmitter(signals_module, identifier: string): Transmitter
-	local transmitter = remote_wrapper(identifier, mt_TransmitterBuilder)
+	local transmitter = remote_wrapper(identifier, TransmitterBuilder)
 
 --[[ 	local Modules = Transmitters.Modules
 	Modules[self.CurrentModule] = Modules[self.CurrentModule] or { } ]]
@@ -99,7 +96,5 @@ function mod.NewTransmitter(signals_module, identifier: string): Transmitter
 
 	return transmitter
 end
-
-export type Transmitter = typeof(mod.NewTransmitter({CurrentModule=""}, "Ex"))
 
 return mod
