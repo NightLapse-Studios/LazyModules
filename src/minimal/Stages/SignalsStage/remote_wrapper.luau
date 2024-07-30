@@ -46,10 +46,6 @@ function mod.wrapper<T>(identifier: string, builder_mt: T)
 		wrapper = setmetatable(
 			{
 				Event = RemoteEventClass.new(remoteEvent),
-				Configured = {
-					Server = false,
-					Client = false,
-				},
 				Name = identifier
 			},
 			builder_mt
@@ -65,10 +61,6 @@ function mod.wrapper<T>(identifier: string, builder_mt: T)
 		wrapper = setmetatable(
 			{
 				Event = { Event = event },
-				Configured = {
-					Server = false,
-					Client = false,
-				},
 				Name = identifier
 			},
 			builder_mt

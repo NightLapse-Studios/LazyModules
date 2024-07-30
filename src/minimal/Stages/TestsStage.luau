@@ -114,7 +114,7 @@ function mod.GiveLM(lm)
 	lm.RegisterModuleStage(STAGE_NAME, STAGE_PRIORITY, run_module_stage, nil, should_run_stage)
 end
 
-export type Tester = typeof(mod.Tester(""))
+export type Tester = typeof(NewTester(""))
 
 local function try_new_output_buf(self: Tester, name: string)
 	if self.TestOutputs[name] then
@@ -168,8 +168,8 @@ function Tester:Fuzz(name, count, generator, test_runner)
 			print("\t\t❌ " .. err .. "\n\t\tWith input:", ret)
 		end
 
-		if os.clock() - cycle_start_time > 1 then
-			print(tostring(i) .. " out of " .. tostring(count) .. " iterations")
+		if os.clock() - cycle_start_time > 0.5 then
+			print(name .. ": " .. tostring(i) .. " out of " .. tostring(count) .. " iterations")
 			task.wait()
 			cycle_start_time = os.clock()
 		end

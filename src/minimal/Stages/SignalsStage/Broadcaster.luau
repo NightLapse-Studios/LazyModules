@@ -56,22 +56,20 @@ local BroadcastBuilder = ({
 		self.Event.Event:FireAllClients(plr, ...)
 	end,
 
-	ClientConnection = function(self, func: CGameEventConnection)
+	ClientConnection = function(self, func)
 		if not func then return self end
 		if IsServer then return self end
 
-		self.Configured.Client = true
 		self.Connections += 1
 		self[2]:Connect(func)
 
 		return self
 	end,
 
-	ServerConnection = function(self, func: SGameEventConnection)
+	ServerConnection = function(self, func)
 		if not func then return self end
 		if not IsServer then return self end
 
-		self.Configured.Server = true
 		self.Connections += 1
 		self[2]:Connect(func)
 

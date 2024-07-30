@@ -113,7 +113,6 @@ local function __monitor(signal)
 end
 
 function mod.Monitor( ... )
-	-- TODO: You can't put Signals.Events in here. We should probably sunset Events
 	local signals = { ... }
 	for i,v in signals do
 		__monitor(v)
@@ -121,8 +120,6 @@ function mod.Monitor( ... )
 end
 
 
--- In practice, the number 32 appears to be able to be 1
--- But I have a gut feeling that it's possible to validly use LazyModules but have delayed signals declared
 local WAIT_LIMIT = 4
 
 local function wait_for(async_table)
