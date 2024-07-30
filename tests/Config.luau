@@ -124,6 +124,7 @@ Config.ModuleCollectionBlacklist = {
 	game.ReplicatedFirst.Lib.LazyModules,
 	Server = {
 		game.ReplicatedFirst.Lib.Pumpkin,
+		game.ReplicatedFirst.Lib.UserInput,
 	},
 	Client = {
 		game.StarterPlayer.StarterPlayerScripts:WaitForChild("PlayerModule"),
@@ -131,7 +132,7 @@ Config.ModuleCollectionBlacklist = {
 	},
 }
 
-Config.ReleaseType = "base"
+Config.ReleaseType = "full"
 
 --=============================================--
 --=                                           =--
