@@ -1,4 +1,3 @@
-local APIUtils = require(game.ReplicatedFirst.Lib.APIUtils)
 local RunService = game:GetService("RunService")
 local IsClient = RunService:IsClient()
 local IsServer = RunService:IsServer()
@@ -11,8 +10,8 @@ local mt_BUILDER = { __index = BUILDER }
 
 
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
-local META_CONTEXTS = Enums.META_CONTEXTS
-local RUN_CONTEXT = if IsServer then META_CONTEXTS.SERVER else META_CONTEXTS.CLIENT
+local MetaContexts = Enums.MetaContexts
+local RUN_CONTEXT = if IsServer then MetaContexts.SERVER else MetaContexts.CLIENT
 
 function mod.FUNCTIONAL_METATABLE()
 	local mt_builder = { }
@@ -41,54 +40,49 @@ end
 local CONFIGURATOR = { }
 local mt_CONFIGURATOR = { __index = CONFIGURATOR }
 
-local function strategize(strategy: Enums<META_CONTEXTS>, thing: any)
-	if strategy == META_CONTEXTS.BOTH then
+local function strategize(strategy: Enums.MetaContext, thing: any)
+	if strategy == MetaContexts.BOTH then
 		return thing
-	elseif strategy == META_CONTEXTS.CLIENT and IsClient then
+	elseif strategy == MetaContexts.CLIENT and IsClient then
 		return thing
-	elseif strategy == META_CONTEXTS.SERVER and IsServer then
+	elseif strategy == MetaContexts.SERVER and IsServer then
 		return thing
-	elseif strategy == META_CONTEXTS.AUTO then
+	elseif strategy == MetaContexts.AUTO then
 		error("META_CONTEXTS.AUTO describes accepted contexts, so cannot be used as a strategy")
 	end
 end
 
-local function make_strategy(fn_identifier: string, strategy: Enums<META_CONTEXTS>, inner_func: (any)->any)
-	if strategy == META_CONTEXTS.BOTH then
+local function make_strategy(fn_identifier: string, strategy: Enums.MetaContext, inner_func: (any)->any)
+	if strategy == MetaContexts.BOTH then
 		return function(self, ...)
 			inner_func(self, ...)
 
 			return self
 		end
-	elseif strategy == META_CONTEXTS.CLIENT then
+	elseif strategy == MetaContexts.CLIENT then
 		return function(self, ...)
-			if RUN_CONTEXT == META_CONTEXTS.CLIENT then
+			if RUN_CONTEXT == MetaContexts.CLIENT then
 				inner_func(self, ...)
 			end
 
 			return self
 		end
-	elseif strategy == META_CONTEXTS.SERVER then
+	elseif strategy == MetaContexts.SERVER then
 		return function(self, ...)
-			if RUN_CONTEXT == META_CONTEXTS.SERVER then
+			if RUN_CONTEXT == MetaContexts.SERVER then
 				inner_func(self, ...)
 			end
 
 			return self
 		end
-	elseif strategy == META_CONTEXTS.AUTO then
-		return function(self, context: Enums<META_CONTEXTS>, ...)
-			if Enums.META_CONTEXTS[context] == nil then
-				warn("Auto-configurator option `" .. fn_identifier .. "` expected a META_CONTEXT enum value, got " .. tostring(context) .. " instead")
-				return self
-			end
-
-			if context == META_CONTEXTS.AUTO then
+	elseif strategy == MetaContexts.AUTO then
+		return function(self, context: Enums.MetaContext, ...)
+			if context == MetaContexts.AUTO then
 				warn("Makes no sense to passe META_CONTEXTS.AUTO to the auto-configurator func\n\tUse BOTH instead?")
 				return self
 			end
 
-			if context == RUN_CONTEXT or context == META_CONTEXTS.BOTH then
+			if context == RUN_CONTEXT or context == MetaContexts.BOTH then
 				inner_func(self, ...)
 			end
 
@@ -110,10 +104,9 @@ function mod.CONFIGURATOR(target_obj: table)
 	return mt_configurator
 end
 
-function CONFIGURATOR:SETTER(context: Enums<META_CONTEXTS>?, fn_identifier: string, field_identifier: string)
-	context = context or META_CONTEXTS.BOTH
+function CONFIGURATOR:SETTER(context: Enums.MetaContext?, fn_identifier: string, field_identifier: string)
+	context = context or MetaContexts.BOTH
 
-	assert(Enums.META_CONTEXTS[context] ~= nil)
 	assert(typeof(fn_identifier) == "string")
 	assert(typeof(field_identifier) == "string")
 
@@ -127,10 +120,9 @@ function CONFIGURATOR:SETTER(context: Enums<META_CONTEXTS>?, fn_identifier: stri
 	return self
 end
 
-function CONFIGURATOR:NAMED_LIST(context: Enums<META_CONTEXTS>?, fn_identifier: string, field_identifier: string)
-	context = context or META_CONTEXTS.BOTH
+function CONFIGURATOR:NAMED_LIST(context: Enums.MetaContext?, fn_identifier: string, field_identifier: string)
+	context = context or MetaContexts.BOTH
 
-	assert(Enums.META_CONTEXTS[context] ~= nil)
 	assert(typeof(fn_identifier) == "string")
 	assert(typeof(field_identifier) == "string")
 
@@ -143,7 +135,7 @@ function CONFIGURATOR:NAMED_LIST(context: Enums<META_CONTEXTS>?, fn_identifier: 
 	return self
 end
 
-function CONFIGURATOR:FINISHER(context: Enums<META_CONTEXTS>, fn_finisher)
+function CONFIGURATOR:FINISHER(context: Enums.MetaContext, fn_finisher)
 	self.__FINISHER = strategize(context, fn_finisher)
 
 	return self
@@ -179,10 +171,10 @@ function mod.__tests(G, T)
 	end
 
 	local cfg = mod.CONFIGURATOR({ __index = obj})
-		:SETTER(META_CONTEXTS.CLIENT, "ClientTest", "__ClientTest")
-		:SETTER(META_CONTEXTS.SERVER, "ServerTest", "__ServerTest")
-		:SETTER(META_CONTEXTS.AUTO, "AutoTest", "__AutoTest")
-		:SETTER(META_CONTEXTS.BOTH, "BothTest", "__BothTest")
+		:SETTER(MetaContexts.CLIENT, "ClientTest", "__ClientTest")
+		:SETTER(MetaContexts.SERVER, "ServerTest", "__ServerTest")
+		:SETTER(MetaContexts.AUTO, "AutoTest", "__AutoTest")
+		:SETTER(MetaContexts.BOTH, "BothTest", "__BothTest")
 		:FINISH()
 
 	local function new_test_cfg()
@@ -201,25 +193,25 @@ function mod.__tests(G, T)
 		local client_targeted = new_test_cfg()
 			:ClientTest(1)
 			:ServerTest(2)
-			:AutoTest(META_CONTEXTS.CLIENT, 3)
+			:AutoTest(MetaContexts.CLIENT, 3)
 			:BothTest(4)
 			:FINISH()
 
 		local server_targeted = new_test_cfg()
 			:ClientTest(1)
 			:ServerTest(2)
-			:AutoTest(META_CONTEXTS.SERVER, 3)
+			:AutoTest(MetaContexts.SERVER, 3)
 			:BothTest(4)
 			:FINISH()
 
 		local both_targeted = new_test_cfg()
 			:ClientTest(1)
 			:ServerTest(2)
-			:AutoTest(META_CONTEXTS.BOTH, 3)
+			:AutoTest(MetaContexts.BOTH, 3)
 			:BothTest(4)
 			:FINISH()
 
-		if RUN_CONTEXT == META_CONTEXTS.CLIENT then
+		if RUN_CONTEXT == MetaContexts.CLIENT then
 			T:WhileSituation( "on the client",
 				T.Equal, client_targeted.__ClientTest, 1,
 				T.Equal, client_targeted.__ServerTest, UNINIT_VALUE,
@@ -236,7 +228,7 @@ function mod.__tests(G, T)
 				T.Equal, both_targeted.__AutoTest, 3,
 				T.Equal, both_targeted.__BothTest, 4
 			)
-		elseif RUN_CONTEXT == META_CONTEXTS.SERVER then
+		elseif RUN_CONTEXT == MetaContexts.SERVER then
 			T:WhileSituation( "on the server",
 				T.Equal, client_targeted.__ClientTest, UNINIT_VALUE,
 				T.Equal, client_targeted.__ServerTest, 2,

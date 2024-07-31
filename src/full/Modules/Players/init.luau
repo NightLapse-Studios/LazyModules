@@ -4,7 +4,9 @@
 
 local PlayerService = game:GetService("Players")
 
-local Game = _G.Game
+local LMT = require(game.ReplicatedFirst.Lib.LMTypes)
+
+local Game: LMT.LMGame = _G.Game
 local AssociativeList = require(game.ReplicatedFirst.Lib.AssociativeList)
 local DataStore3 = require(game.ReplicatedFirst.Modules.DataStore3)
 local PlayerClass = require(game.ReplicatedFirst.Modules.Players.PlayerClass)
@@ -48,7 +50,7 @@ local function OnPlayerLoadFinished( binding: PlayerDataBinding, plrClass )
 		return
 	end
 
-	while Game.LOADING_CONTEXT < Enums.LOAD_CONTEXTS.FINISHED do
+	while Game.LoadingContext.Value < Enums.LoadingContexts.FINISHED.Value do
 		task.wait()
 	end
 
@@ -95,7 +97,7 @@ local function LoadClientData(plrClass: PlayerClass.PlayerClass)
 		data_bindings[i] = obj
 	end
 
-	local binding = DataStore3.NewDataBinding(storeName, DSkey, data_bindings, plrClass, OnPlayerLoadFinished, PlayerDataModulesOrder)
+	local binding = DataStore3.NewDataBinding(storeName.Value, DSkey, data_bindings, plrClass, OnPlayerLoadFinished, PlayerDataModulesOrder)
 	plrClass.DataBinding = binding
 
 	return binding
@@ -107,7 +109,7 @@ type PlayerDataBinding = typeof(LoadClientData(game.Players.LocalPlayer))
 -- Data modules will be serialized and deserialized in the order they are registered by this function
 function mod.RegisterPlayerDataModule(name, ctor_args)
 	local Game = _G.Game
-	assert(Game.LOADING_CONTEXT < Enums.LOAD_CONTEXTS.RUNNING_STAGES, "RegisterPlayerDataModule must be called before Game.Begin")
+	assert(Game.LoadingContext.Value < Enums.LoadingContexts.RUNNING_STAGES.Value, "RegisterPlayerDataModule must be called before Game.Begin")
 
 	local mod = Game:Get(name)
 	assert(typeof(mod.new) == "function", string.format(ERR_DATA_MODULE_INVALID, name))
@@ -185,7 +187,7 @@ function mod.__build_signals(G, B)
 		end)
 		
 		PlayerService.PlayerRemoving:Connect(function(plr)
-			while not (Game.LOADING_CONTEXT >= Enums.LOAD_CONTEXTS.FINISHED) do
+			while not (Game.LoadingContext.Value >= Enums.LoadingContexts.FINISHED.Value) do
 				task.wait()
 			end
 			

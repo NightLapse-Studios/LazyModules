@@ -440,7 +440,7 @@ end
 
 function DSBinding.GetAsync<T>(self: DSBinding<T>, bypass_cache: boolean)
 	-- In case the client sends this before we're even ready
-	while Globals.LOADING_CONTEXT < Enums.LOAD_CONTEXTS.FINISHED do
+	while Globals.LoadingContext.Value < Enums.LoadingContexts.FINISHED.Value do
 		task.wait()
 	end
 

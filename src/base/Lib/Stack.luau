@@ -6,30 +6,40 @@
 ]]
 
 local mod = { }
-local mt_Stack = { __index = mod }
+local Stack = { }
+Stack.__index = { __index = mod }
 
-function mod:push(item)
+function Stack:push(item)
 	table.insert(self, item)
 	return #self
 end
 
-function mod:pop()
+function Stack:pop()
 	return table.remove(self)
 end
 
-function mod:get(idx)
+function Stack:get(idx)
 	assert(typeof(idx) == "number")
 	return self[idx]
 end
 
 function mod.new()
 	local t = { }
-	return setmetatable(t, mt_Stack)
+	return setmetatable(t, Stack)
 end
 
+export type Stack<T> = {
+	[number]: T,
+	push: (self: Stack<T>, item: T) -> number,
+	pop: (self: Stack<T>) -> T,
+	get: (self: Stack<T>, idx: number) -> T,
+	add: (self: Stack<T>, item: T) -> number,
+	remove: (self: Stack<T>, idx: number) -> T
+}
+
 -- Support for mixing interfaces
-mod.add = mod.push
-mod.remove = mod.pop
+Stack.add = Stack.push
+Stack.remove = Stack.pop
 
 function mod.__tests(G, T)
 	-- TODO: Tests

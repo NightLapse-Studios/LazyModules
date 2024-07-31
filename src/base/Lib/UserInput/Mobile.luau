@@ -1,3 +1,5 @@
+--!strict
+
 local RunService = game:GetService("RunService")
 
 local mod = { }
@@ -124,7 +126,7 @@ local GestureUsers = {
 -- based on listener.keycode whereas some of them use a more specific code to narrow down an auxiliary one
 -- Thus we can't always just look up the keycode, nor do we want to always require specifying the specific code
 local GestureUserPushers = {
-	[Enums.AuxiliaryInputCodes.InputGestures.Any] = function(listener, maskable)
+	[Enums.AuxInputCodes.AuxInputGestures.Any] = function(listener, maskable)
 		local stack = GestureUsers[maskable[1]]
 		stack:set(maskable)
 	end,
@@ -143,7 +145,7 @@ local GestureUserPushers = {
 }
 
 local GestureUserRemovers = {
-	[Enums.AuxiliaryInputCodes.InputGestures.Any] = function(listener, maskable)
+	[Enums.AuxInputCodes.AuxInputGestures.Any] = function(listener, maskable)
 		local stack = GestureUsers[maskable[1]]
 		stack:remove(maskable)
 	end,
@@ -350,7 +352,7 @@ local function ChangeTouchDetector(name, props, bind_callback, unbind_callback, 
 end
 
 local function push_gesture(code)
-	local input = UserInput.CustomInputObject(code, Enums.AuxiliaryInputCodes.InputGestures.Any, Enum.UserInputState.Change, Enums.UserInputType.Gesture)
+	local input = UserInput.CustomInputObject(code, Enums.AuxInputCodes.AuxInputGestures.Any, Enum.UserInputState.Change, Enums.UserInputType.Gesture)
 	UserInput.TakeCustomInput(input)
 	input = UserInput.CustomInputObject(Enum.UserInputType.MouseButton1, nil, Enum.UserInputState.Begin, Enum.UserInputType.MouseButton1)
 	UserInput.TakeCustomInput(input)

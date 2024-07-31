@@ -18,7 +18,7 @@ export type ModuleStage = {
 	ShouldRunStage: boolean | (() -> boolean),
 	Callback: (LMGame, (LMGame, ...any) -> (), module_name: string) -> (),
 	FinishedCallback: boolean | (() -> ()),
-	StageName: string
+	StageName: string,
 }
 export type GlobalStage = {
 	Type: "Global",
@@ -33,7 +33,7 @@ local mod = { }
 
 local Stages: { ModuleStage | GlobalStage } = { }
 
-local LOAD_CONTEXTS = Enums.LOAD_CONTEXTS
+local LOAD_CONTEXTS = Enums.LoadingContexts
 local CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
 local SOURCE_NAME = debug.info(function() return end, "s")
 
@@ -72,20 +72,20 @@ end
 
 local Initialized = { }
 
-local function set_context(G: LMGame, context: number)
-	local prior = G.LOADING_CONTEXT
+local function set_context(G: LMGame, context: Enums.LoadingContext)
+	local prior = G.LoadingContext
 
-	if (context < prior) then
+	if (context.Value < prior.Value) then
 		error(`\n{CONTEXT} \n LM Init: returning to older startup context than current.\nOld context: {prior}\nNew context: {context}\n\nThis is likely LM misuse or an LM bug`)
 	end
 
-	G.LOADING_CONTEXT = context
+	G.LoadingContext = context
 
 	return prior
 end
 
-local function reset_context(G: LMGame, prev: number)
-	G.LOADING_CONTEXT = prev
+local function reset_context(G: LMGame, prev: Enums.LoadingContext)
+	G.LoadingContext = prev
 end
 
 local function can_init(mod_name: string)
@@ -132,7 +132,7 @@ function mod.newGame()
 		_ModuleNames = { },
 		_Initialized = { },
 		CONTEXT = CONTEXT,
-		LOADING_CONTEXT = -1
+		LoadingContext = Enums.LoadingContexts.UNSET
 	}
 
 	setmetatable(newGame, LMGame)
@@ -249,7 +249,7 @@ end
 
 
 function LMGame.Get(self: LMGame, name: string, opt_specific_context: ("CLIENT" | "SERVER")?)
-	if self.LOADING_CONTEXT < LOAD_CONTEXTS.COLLECTED then
+	if self.LoadingContext.Value < LOAD_CONTEXTS.COLLECTED.Value then
 		error("Game:Get before collection stage makes no sense")
 	end
 
@@ -267,7 +267,7 @@ function LMGame.Get(self: LMGame, name: string, opt_specific_context: ("CLIENT" 
 end
 
 function LMGame.Load(self: LMGame, module: ModuleScript)
---[[ 	if self.LOADING_CONTEXT < LOAD_CONTEXTS.INIT then
+--[[ 	if self.LoadingContext < LOAD_CONTEXTS.INIT then
 		error("Game:Load is not intended for use before init stage. Could work but could be dangerous, here be dragons..")
 	end
 

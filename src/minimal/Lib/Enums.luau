@@ -1,191 +1,159 @@
+--!strict
 
+local Enums = { }
 
-local Enums = {
-	DataStores = {
-		Players = "Players",
-		Test = "TestStore"
-	},
+export type InputGesture =
+	{ Name: "Left", Value: number } |
+	{ Name: "Right", Value: number } |
+	{ Name: "Up", Value: number } |
+	{ Name: "Down", Value: number } |
+	{ Name: "None", Value: number }
 
-	-- Stack-based list of contexts
-	-- There are brief ones and lasting ones, the brief ones are reset once the context wraps up
-	-- wheras the lasting ones are set permenantly prior to the associated brief contexts being used
-	-- Mostly for internal soundness checking
-	--
-	-- Also allows a thread from some stage to wait for specific stages to pass
-	-- 	for example loading players takes time and is "done" at known stages on client
-	--
-	-- This enum must be numerically sorted acording to the order the steps are executed
-	LOAD_CONTEXTS = {
-		COLLECTION = 1,
-		REQUIRE = 2,
-		COLLECTED = 3,
-
-		RUNNING_STAGES = 4,
-
-		FINISHED = 1000
-	},
-
-	META_CONTEXTS = {
-		CLIENT = 1,
-		SERVER = 2,
-		AUTO = 3,
-		BOTH = 4,
-		[1] = "CLIENT",
-		[2] = "SERVER",
-		[3] = "AUTO",
-		[4] = "BOTH",
-	},
-
-	-- These values are arbitrary but supposed to be not be used by other Input enums values
-	-- 990 seemed like a suitable starting number
-	InputGestures = {
-		Left = 800,
-		Right = 801,
-		Up = 802,
-		Down = 803,
-		None = 804,
-	},
-
-	AuxiliaryInputCodes = {
-		KeyCodes = {
-			Any = 901,
-		},
-		InputGestures = {
-			Any = 1001,
-			Total = 1002,
-			Last = 1003,
-		}
-	},
-
-	UserInputType = {
-		Gesture = 2001,
-		DPad = 2002,
-	},
-
-	GestureDisplayMode = {
-		Off = 1,
-		Last = 2,
-		Temp = 3,
-	},
-
-	AllInputs = { },
-
-	EmissionShape = {
-		Edge = 0,
-		Disc = 1,
-		Area = 2,
-		Center = 3,
-	},
-	EmissionDirection = {
-		Up = 0,
-		Down = 1,
-		Left = 2,
-		Right = 3,
-		In = 4,
-		Out = 5,
-	},
-	EmissionEdge = {
-		Top = 0,
-		Bottom = 1,
-		Left = 2,
-		Right = 3,
-	},
-	ForcerType = {
-		Collision = 0,
-	},
-	SpriteSheetMode = {
-		Linear = 0,
-		Complete = 1,
-	},
-
-	CameraMode = {
-		Studio = 2,
-		Constant = 3,
-		ThirdPersonLocked = 4,
-	},
-
-	LayoutOrder = {
-		Primary = 1,
-		Secondary = 2,
-		Tertiary = 3,
-		Special = 4,
-	},
-
-	ResetType = {
-		OnDeath = 1,
-		EachRound = 2,
-		Both = 3,
-	},
-
-	DataTypes = {
-		RbxEnum = 0,
-		EnumItem = 0,
-
-		Enums = 1,
-		boolean = 2,
-		string = 3,
-		Color3 = 4,
-		number = 5,
-		UDim2 = 6,
-	},
-
-	WidgetPositions = {
-		TopCenter = 0,
-		RightCenter = 1,
-		BottomCenter = 2,
-		LeftCenter = 3,
-		TopRight = 4,
-		TopLeft = 5,
-		BottomLeft = 6,
-		BottomRight = 7,
-		Center = 8,
-	},
-
-	InputDeclinedReason = {
-		TooLong = 0,
-		TooShort = 1,
-		InvalidCharacters = 2,
-		Unchanged = 3,
-		NotUnique = 4,
-		Spamming = 5,
-		FrequencyLimit = 6,
-		FilterIssues = 7,
-		Unknown = 8,
-		Filtered = 9,
-		TeamFire = 10
-	},
-
-	-- Related to Interactables within the world
-	InteractShowType = {
-		Enabled = 1,
-		Locked = 2,
-		Unavailable = 3,
-		Disabled = 4,
-	},
-
-	ShowInteractType = {
-		Hover = 1,
-		Range_Hover = 2, -- Hover overrides range
-		None = 3,
-	},
-
-	InteractBasis = {
-		Mouse = 1,
-		Range = 2,
-	},
-
-	InteractType = {
-		Inventory = 2,
-		None = 3,			--Useful for interactables with no client behavior because the client won't need to know type.
-		PromptString = 4,
-		HoverPromptString = 5,
-		HoverPromptStringPress = 6,
-		Quest = 7,
-		Shrine = 8,
-		NPC = 9,
-		GraveStone = 10,
-	}
+local InputGestures: {
+	Left: InputGesture,
+	Right: InputGesture,
+	Up: InputGesture,
+	Down: InputGesture,
+	None: InputGesture,
+} = {
+	Left = { Name = "Left", Value = 800 },
+	Right = { Name = "Right", Value = 801 },
+	Up = { Name = "Up", Value = 802 },
+	Down = { Name = "Down", Value = 803 },
+	None = { Name = "None", Value = 804 },
 }
+Enums.InputGestures = InputGestures
+
+export type AuxKeyCode =
+	{ Name: "Any", Value: number }
+
+export type AuxInputGesture =
+	{ Name: "Any", Value: number } |
+	{ Name: "Total", Value: number } |
+	{ Name: "Last", Value: number }
+
+export type AuxCode = AuxKeyCode | AuxInputGesture
+
+local AuxKeyCodes: {
+	Any: AuxKeyCode,	
+} = {
+	Any = { Name = "Any", Value = 901 },
+}
+local AuxInputGestures: {
+	Any: AuxInputGesture,
+	Total: AuxInputGesture,
+	Last: AuxInputGesture,
+} = {
+	Any = { Name = "Any", Value = 1001 },
+	Total = { Name = "Total", Value = 1002 },
+	Last = { Name = "Last", Value = 1003 },
+}
+Enums.AuxInputCodes = { AuxKeyCodes = AuxKeyCodes, AuxInputGestures = AuxInputGestures }
+
+export type DataStoreName =
+	{ Name: "Players", Value: "Players" } |
+	{ Name: "TestStore", Value: "TestStore" }
+
+local DataStoreNames: {
+	Players: DataStoreName,
+	Test: DataStoreName,
+} = {
+	Players = { Name = "Players", Value = "Players" },
+	Test = { Name = "TestStore", Value = "TestStore" }
+}
+Enums.DataStores = DataStoreNames
+
+-- Stack-based list of contexts
+-- There are brief ones and lasting ones, the brief ones are reset once the context wraps up
+-- wheras the lasting ones are set permenantly prior to the associated brief contexts being used
+-- Mostly for internal soundness checking
+--
+-- Also allows a thread from some stage to wait for specific stages to pass
+-- 	for example loading players takes time and is "done" at known stages on client
+--
+-- This enum must be numerically sorted acording to the order the steps are executed
+
+export type LoadingContext =
+	{ Name: "UNSET", Value: number } |
+	{ Name: "COLLECTION", Value: number } |
+	{ Name: "REQUIRE", Value: number } |
+	{ Name: "COLLECTED", Value: number } |
+	{ Name: "RUNNING_STAGES", Value: number } |
+	{ Name: "FINISHED", Value: number }
+
+local LoadingContexts: {
+	UNSET: LoadingContext,
+	COLLECTION: LoadingContext,
+	REQUIRE: LoadingContext,
+	COLLECTED: LoadingContext,
+	RUNNING_STAGES: LoadingContext,
+	FINISHED: LoadingContext,
+} = {
+	UNSET = { Name = "UNSET", Value = -1 },
+	COLLECTION = { Name = "COLLECTION", Value = 1 },
+	REQUIRE = { Name = "REQUIRE", Value = 2 },
+	COLLECTED = { Name = "COLLECTED", Value = 3 },
+	RUNNING_STAGES = { Name = "RUNNING_STAGES", Value = 4 },
+	FINISHED = { Name = "FINISHED", Value = 1000 }
+}
+Enums.LoadingContexts = LoadingContexts
+
+export type MetaContext = 
+	{ Name: "CLIENT", Value: number } |
+	{ Name: "SERVER", Value: number } |
+	{ Name: "AUTO", Value: number } |
+	{ Name: "BOTH", Value: number }
+
+local MetaContexts: {
+	CLIENT: MetaContext,
+	SERVER: MetaContext,
+	AUTO: MetaContext,
+	BOTH: MetaContext,
+	[number]: string?,
+} = {
+	CLIENT = { Name = "CLIENT", Value = 1 },
+	SERVER = { Name = "SERVER", Value = 2 },
+	AUTO = { Name = "AUTO", Value = 3 },
+	BOTH = { Name = "BOTH", Value = 4 },
+	[1] = "CLIENT",
+	[2] = "SERVER",
+	[3] = "AUTO",
+	[4] = "BOTH",
+}
+Enums.MetaContexts = MetaContexts
+
+export type UserInputType2 =
+	{ Name: "Gesture", Value: number } |
+	{ Name: "DPad", Value: number }
+
+local UserInputType: {
+	Gesture: UserInputType2,
+	DPad: UserInputType2,	
+} = {
+	Gesture = { Name = "Gesture", Value = 2001 },
+	DPad = { Name = "DPad", Value = 2002 },
+}
+Enums.UserInputType = UserInputType
+
+-- TODO: Reimplement this functionality
+export type GestureDisplayMode =
+	{ Name: "Off", Value: number } |
+	{ Name: "Last", Value: number } |
+	{ Name: "Temp", Value: number }
+
+local GestureDisplayMode: {
+	Off: GestureDisplayMode,
+	Last: GestureDisplayMode,
+	Temp: GestureDisplayMode,	
+} = {
+	Off = { Name = "Off", Value = 1 },
+	Last = { Name = "Last", Value = 2 },
+	Temp = { Name = "Temp", Value = 3 },
+}
+Enums.GestureDisplayMode = GestureDisplayMode
+
+local AllInputs = { }
+Enums.AllInputs = AllInputs
 
 for _, enums in Enum:GetEnums() do
 	local items = enums:GetEnumItems()

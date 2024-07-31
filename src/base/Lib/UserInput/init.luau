@@ -55,13 +55,52 @@ local Game
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
-local mod = {
-	Handlers = { },
-	Intercepts = { },
-	Hooks = { },
+local mod = { }
+
+type BaseListener = {
+	InterceptCount: number,
+	MaxIntercepts: number,
+
+	down_callback: InputBeganCallback,
+	up_callback: InputEndedCallback | false,
+	disconnected_callback: (BaseListener) -> () | false,
+	keycode: InputBasis,
+	
+	runsOnProcessed: boolean,
+	armed: boolean,
+	__SourceFile: string?,
+
+	Disconnect: (self: BaseListener) -> BaseListener,
+	SetRunsRobloxProcessed: (self: BaseListener, boolean) -> BaseListener,
+	SetDisconnectCallback: (self: BaseListener, (BaseListener) -> ()) -> BaseListener,
 }
 
-local PendingCustomInputs = { }
+export type Hook = { Type: "Hook" } & BaseListener
+export type Handler = { Type: "Handler" } & BaseListener
+export type Intercept = { Type: "Intercept" } & BaseListener
+
+export type AnyListener = Hook | Handler | Intercept
+
+export type InputObject2 = {
+	Delta: Vector3,
+	KeyCode: KeyCode2,
+	Position: Vector3,
+	UserInputState: Enum.UserInputState,
+	UserInputType: InputType2,
+	AuxiliaryCode: Enums.AuxCode | false
+}
+
+export type KeyCode2 = Enum.KeyCode | Enums.InputGesture
+export type InputType2 = Enum.UserInputType | Enums.UserInputType2
+export type InputBasis = KeyCode2 | InputType2 | Enums.AuxCode
+
+export type InputBeganCallback = (input: InputObject2, processed: boolean) -> (boolean)
+export type InputEndedCallback = (input: InputObject2, processed: boolean) -> (boolean)
+
+local Handlers: { [InputBasis]: Stack.Stack<Handler?> } = { }
+local Intercepts: { [InputBasis]: Stack.Stack<Intercept?> } = { }
+local Hooks: { [InputBasis]: Stack.Stack<Hook?> } = { }
+local PendingCustomInputs: { InputObject2 } = { }
 
 local CustomKeycodes = {
 	[Enum.UserInputType.MouseButton1] = true,
@@ -89,24 +128,24 @@ local CustomKeycodes = {
 	[Enums.InputGestures.Right] = true,
 	[Enums.InputGestures.Up] = true,
 	[Enums.InputGestures.Down] = true,
-	[Enums.AuxiliaryInputCodes.InputGestures.Any] = true,
-	[Enums.AuxiliaryInputCodes.InputGestures.Total] = true,
-	[Enums.AuxiliaryInputCodes.InputGestures.Last] = true,
-	[Enums.AuxiliaryInputCodes.KeyCodes.Any] = true,
+	[Enums.AuxInputCodes.AuxInputGestures.Any] = true,
+	[Enums.AuxInputCodes.AuxInputGestures.Total] = true,
+	[Enums.AuxInputCodes.AuxInputGestures.Last] = true,
+	[Enums.AuxInputCodes.AuxKeyCodes.Any] = true,
 	[Enums.UserInputType.DPad] = true,
 }
 
 
 
 for i,v in Enum.KeyCode:GetEnumItems() do
-	mod.Handlers[v] = Stack.new()
-	mod.Hooks[v] = Stack.new()
-	mod.Intercepts[v] = Stack.new()
+	Handlers[v] = (Stack.new() :: any) :: Stack.Stack<Handler>
+	Intercepts[v] = (Stack.new() :: any) :: Stack.Stack<Intercept>
+	Hooks[v] = (Stack.new() :: any) :: Stack.Stack<Hook>
 end
 for i,_ in CustomKeycodes do
-	mod.Handlers[i] = Stack.new()
-	mod.Hooks[i] = Stack.new()
-	mod.Intercepts[i] = Stack.new()
+	Handlers[i] = (Stack.new() :: any) :: Stack.Stack<Handler>
+	Intercepts[i] = (Stack.new() :: any) :: Stack.Stack<Intercept>
+	Hooks[i] = (Stack.new() :: any) :: Stack.Stack<Hook>
 end
 
 
@@ -185,11 +224,11 @@ end
 
 mod.EnumAssociations = EnumAssociations
 
-local ListenerCreatedCallbacks = {
+local ListenerCreatedCallbacks: { [InputBasis]: (Hook | Intercept | Handler) -> () } = {
 	[Enums.UserInputType.DPad] = Mobile.PushDPadUser
 }
 
-local ListenerDestroyedCallbacks = {
+local ListenerDestroyedCallbacks: { [InputBasis]: (Hook | Intercept | Handler) -> () } = {
 	[Enums.UserInputType.DPad] = Mobile.RemoveDPadUser
 }
 
@@ -227,7 +266,7 @@ function ListenerType:SetDisconnectCallback(callback)
 end
 
 
-function ListenerType.new(type, down_callback, up_callback, keycode, max_ct)
+function ListenerType.new(type: "Handler" | "Intercept" | "Hook", down_callback: InputBeganCallback, up_callback: InputEndedCallback?, keycode: InputBasis, max_ct: number?)
 	local listener = {
 		Type = type,
 		InterceptCount = 0,
@@ -241,7 +280,6 @@ function ListenerType.new(type, down_callback, up_callback, keycode, max_ct)
 		runsOnProcessed = false,
 		-- For intercepts which also listen for releases, we track if they sank the input first via this `armed` value
 		armed = false,
-		extra = { }
 	}
 
 	if ListenerCreatedCallbacks[keycode] then
@@ -259,15 +297,10 @@ function ListenerType.new(type, down_callback, up_callback, keycode, max_ct)
 
 	setmetatable(listener, ListenerType)
 
-	return listener
+	return (listener :: any) :: AnyListener
 end
 
-type Intercept = typeof(ListenerType.new("Intercepts", nil, nil, Enum.KeyCode.A, 100))
-type Hook = typeof(ListenerType.new("Hooks", nil, nil, Enum.KeyCode.A))
-type Handler = typeof(ListenerType.new("Handlers", nil, nil, Enum.KeyCode.A))
-type Listener = (Intercept | Hook | Handler)
-
-function mod:Intercept(keycode, down_callback: routine, opt_up_callback: routine?, opt_max_ct: number?)
+function mod.Intercept(keycode: InputBasis, down_callback: InputBeganCallback, opt_up_callback: InputEndedCallback?, opt_max_ct: number?)
 	if Config.LogInputListeners then
 		local s,l,n = debug.info(1, "sln")
 		print("New Intercept for `" .. tostring(keycode) .. "`\n\tFrom:\n" .. s .. ":" .. l .. " function " .. n .. "\n")
@@ -275,33 +308,33 @@ function mod:Intercept(keycode, down_callback: routine, opt_up_callback: routine
 
 	opt_max_ct = opt_max_ct or 1
 
-	local listener = ListenerType.new("Intercepts", down_callback, opt_up_callback, keycode, opt_max_ct)
-	mod.Intercepts[keycode]:push(listener)
+	local listener = ListenerType.new("Intercept", down_callback, opt_up_callback, keycode, opt_max_ct) :: Intercept
+	Intercepts[keycode]:push(listener)
 
 	return listener
 end
 
-function mod:Hook(keycode, down_callback: routine, opt_up_callback: routine?)
+function mod.Hook(keycode: InputBasis, down_callback: InputBeganCallback, opt_up_callback: InputEndedCallback?)
 	if Config.LogInputListeners then
 		local s,l,n = debug.info(1, "sln")
 		print("New Hook for `" .. tostring(keycode) .. "`\n\tFrom:\n" .. s .. ":" .. l .. " function " .. n .. "\n")
 	end
 
-	local listener = ListenerType.new("Hooks", down_callback, opt_up_callback, keycode)
-	mod.Hooks[keycode]:push(listener)
+	local listener = ListenerType.new("Hook", down_callback, opt_up_callback, keycode) :: Hook
+	Hooks[keycode]:push(listener)
 
 	return listener
 end
 
-function mod:Handler(keycode, down_callback: routine, opt_up_callback: routine?)
+function mod.Handler(keycode: InputBasis, down_callback: InputBeganCallback, opt_up_callback: InputEndedCallback?)
 	--local old_primary = mod.Listeners[keycode][1]
 	if Config.LogInputListeners then
 		local s,l,n = debug.info(1, "sln")
 		print("New Handler for `" .. tostring(keycode) .. "`\n\tFrom:\n" .. s .. ":" .. l .. " function " .. n .. "\n")
 	end
 
-	local listener = ListenerType.new("Handlers", down_callback, opt_up_callback, keycode)
-	mod.Handlers[keycode]:push(listener)
+	local listener = ListenerType.new("Handler", down_callback, opt_up_callback, keycode) :: Handler
+	Handlers[keycode]:push(listener)
 
 	return listener
 end
@@ -309,14 +342,14 @@ end
 
 
 
-function mod.CustomInputObject(keycode, opt_aux_code, input_state, input_type)
+function mod.CustomInputObject(keycode: KeyCode2, opt_aux_code: Enums.AuxCode?, input_state: Enum.UserInputState, input_type: Enums.UserInputType2 | Enum.UserInputType)
 	assert(keycode)
 	assert(input_state)
 	assert(input_type)
 	--TODO: Better aux code processing
-	opt_aux_code = opt_aux_code or Enums.AuxiliaryInputCodes.KeyCodes.Any
+	local opt_aux_code: Enums.AuxCode = opt_aux_code or Enums.AuxInputCodes.AuxKeyCodes.Any
 
-	local t = {
+	local t: InputObject2 = {
 		Delta = Vector3.new(),
 		KeyCode = keycode,
 		AuxiliaryCode = opt_aux_code,
@@ -328,7 +361,7 @@ function mod.CustomInputObject(keycode, opt_aux_code, input_state, input_type)
 	return t
 end
 
-function mod.TakeCustomInput(input)
+function mod.TakeCustomInput(input: InputObject2)
 	table.insert(PendingCustomInputs, input)
 end
 
@@ -342,7 +375,9 @@ local function desktop_mouse_pos()
 end
 
 -- we must enforce lockcenter on mobile, because roblox does some weird thing
-local TouchResponsibleForMouse: InputObject|false = false
+local TouchResponsibleForMouse: InputObject | false = false
+local GuiService = game:GetService("GuiService")
+local Camera = workspace.CurrentCamera
 local function mobile_mouse_pos()
 	local inset = GuiService:GetGuiInset()
 	return Camera.ViewportSize/2 - inset
@@ -398,7 +433,7 @@ end
 
 local empty_table = { }
 function mod.__build_signals(G, B)
-	local function TransformTriggers(original_input, new_input)
+	local function TransformTriggers(original_input: InputObject, new_input: InputObject2)
 		if original_input.KeyCode == Enum.KeyCode.ButtonR2 and original_input.UserInputState ~= Enum.UserInputState.Change then
 			new_input.KeyCode = Enum.KeyCode.Unknown
 			new_input.UserInputType = Enum.UserInputType.MouseButton1
@@ -408,7 +443,7 @@ function mod.__build_signals(G, B)
 		end
 	end
 	
-	local function TransformTouch(original_input, new_input)
+	local function TransformTouch(original_input: InputObject, new_input: InputObject2)
 		-- @2.0 test if MouseMovement ends on mobile
 		if original_input.UserInputType ~= Enum.UserInputType.Touch then
 			return
@@ -435,7 +470,7 @@ function mod.__build_signals(G, B)
 
 	-- This function is handled customly in Mobile.lua if IsMobile == true
 	-- Via the GestureDetector container within the file
-	local function DetectGestures(original_input, new_input)
+	local function DetectGestures(original_input: InputObject, new_input: InputObject2)
 		if new_input.UserInputType == Enum.UserInputType.MouseMovement then
 			GestureDetector.GestureDataSubmittedThisTick = true
 
@@ -459,11 +494,10 @@ function mod.__build_signals(G, B)
 		end
 	end
 
-	local function TransformInput(original_input: InputObject)
-		local new_input = {
+	local function TransformInput(original_input: InputObject): InputObject2
+		local new_input: InputObject2 = {
 			Delta = original_input.Delta,
 			KeyCode = original_input.KeyCode,
-			-- Auxi
 			AuxiliaryCode = false,
 			Position = original_input.Position,
 			UserInputState = original_input.UserInputState,
@@ -479,7 +513,7 @@ function mod.__build_signals(G, B)
 		return new_input
 	end
 
-	local function get_group(input, pool: table, aux: boolean?)
+	local function get_group<T>(input: InputObject2, pool: { [InputBasis]: Stack.Stack<T> }, aux: boolean?)
 		if aux then
 			return pool[input.AuxiliaryCode] or empty_table
 		else
@@ -487,9 +521,9 @@ function mod.__build_signals(G, B)
 		end
 	end
 
-	local function do_up_callback(input, pool: table, logging: boolean?, return_on_handle: boolean?, processed)
-		for i = #pool, 1, -1 do
-			local listener: Listener = pool[i]
+	local function do_up_callback<T>(input, stack: {T}, logging: boolean?, return_on_handle: boolean?, processed): (boolean, T?)
+		for i = #stack, 1, -1 do
+			local listener = stack[i]
 			local relevant_callback = listener.up_callback
 			if relevant_callback and ((not processed) or listener.runsOnProcessed) then
 				if logging then
@@ -505,9 +539,9 @@ function mod.__build_signals(G, B)
 
 		return false, nil
 	end
-	local function do_down_callback(input, pool: table, logging: boolean?, return_on_handle: boolean?, processed)
-		for i = #pool, 1, -1 do
-			local listener: Listener = pool[i]
+	local function do_down_callback<T>(input, stack: {T}, logging: boolean?, return_on_handle: boolean?, processed): (boolean, T?)
+		for i = #stack, 1, -1 do
+			local listener = stack[i]
 			local relevant_callback = listener.down_callback
 			if relevant_callback and ((not processed) or listener.runsOnProcessed) then
 				if logging then
@@ -523,7 +557,7 @@ function mod.__build_signals(G, B)
 
 		return false, nil
 	end
-	local function process_interception(listener: Listener)
+	local function process_interception(listener: Intercept)
 		listener.armed = true
 
 		if listener.MaxIntercepts < math.huge then
@@ -536,7 +570,7 @@ function mod.__build_signals(G, B)
 	end
 
 	local function do_hooks(input, down: boolean, logging: boolean, processed: boolean)
-		local hooks, aux_hooks = get_group(input, mod.Hooks, false), get_group(input, mod.Hooks, true)
+		local hooks, aux_hooks = get_group(input, Hooks, false), get_group(input, Hooks, true)
 
 		logging = logging and (#hooks > 0 or #aux_hooks > 0)
 		if logging then
@@ -554,7 +588,7 @@ function mod.__build_signals(G, B)
 
 	local function do_intercepts(input, down: boolean, logging: boolean, processed: boolean)
 		local intercepted = false
-		local intercepts, aux_intercepts = get_group(input, mod.Intercepts, false), get_group(input, mod.Intercepts, true)
+		local intercepts, aux_intercepts = get_group(input, Intercepts, false), get_group(input, Intercepts, true)
 
 		logging = logging and (#intercepts > 0 or #aux_intercepts > 0)
 		if logging then
@@ -562,7 +596,7 @@ function mod.__build_signals(G, B)
 		end
 
 		if down then
-			local sinker: Listener? = nil
+			local sinker: Intercept? = nil
 			intercepted, sinker = do_down_callback(input, intercepts, logging, true, processed)
 			if intercepted and sinker then
 				process_interception(sinker)
@@ -576,7 +610,7 @@ function mod.__build_signals(G, B)
 				process_interception(sinker)
 			end
 		else
-			local sinker: Listener? = nil
+			local sinker: Intercept? = nil
 			intercepted, sinker = do_up_callback(input, intercepts, logging, true, processed)
 			if intercepted and sinker then
 				process_interception(sinker)
@@ -595,7 +629,7 @@ function mod.__build_signals(G, B)
 	end
 
 	local function do_handlers(input, down: boolean, logging: boolean, processed: boolean)
-		local handlers, aux_handlers = get_group(input, mod.Handlers, false), get_group(input, mod.Handlers, true)
+		local handlers, aux_handlers = get_group(input, Handlers, false), get_group(input, Handlers, true)
 
 		logging = logging and (#handlers > 0 or #aux_handlers > 0)
 		if logging then
@@ -613,11 +647,7 @@ function mod.__build_signals(G, B)
 
 	-- TODO @2.0 fire off key up events when we open a menu
 	-- TODO @Important testing the intercept functionality in regards to key up and down "armed" thing
-	local function InputBegan(input: InputObject, processed: boolean, already_transformed: boolean?)
-		if not already_transformed then
-			input = TransformInput(input)
-		end
-
+	local function TransformedInputBegan(input: InputObject2, processed: boolean)
 		local logging = if Config.LogInputProcessing and input.KeyCode then true else false
 		if logging then
 			local should_ignore: boolean? = Config.LogInputProcessingFilters.UserInputType[input.UserInputType]
@@ -639,11 +669,11 @@ function mod.__build_signals(G, B)
 		end
 	end
 
-	local function InputEnded(input: InputObject, processed: boolean, already_transformed: boolean?)
-		if not already_transformed then
-			input = TransformInput(input)
-		end
+	local function RawInputBegan(input: InputObject, processed: boolean)
+		TransformedInputBegan(TransformInput(input), processed)
+	end
 
+	local function TransformedInputEnded(input: InputObject2, processed: boolean)
 		local logging = if Config.LogInputProcessing and input.KeyCode then true else false
 		if logging then
 			local should_ignore: boolean? = Config.LogInputProcessingFilters.UserInputType[input.UserInputType]
@@ -665,23 +695,25 @@ function mod.__build_signals(G, B)
 		end
 	end
 
-	UserInputService.InputBegan:Connect(InputBegan)
-	UserInputService.InputEnded:Connect(InputEnded)
+	local function RawInputEnded(input: InputObject, processed: boolean)
+		TransformedInputEnded(TransformInput(input), processed)
+	end
+
+	UserInputService.InputBegan:Connect(RawInputBegan)
+	UserInputService.InputEnded:Connect(RawInputEnded)
 
 	-- This connection handles the mousewheel
 	UserInputService.InputChanged:Connect(function(input: InputObject, processed: boolean)
-		input = TransformInput(input)
-		
 		if input.UserInputState ~= Enum.UserInputState.Change then
 			return
 		end
 		
-		InputBegan(input, processed, true)
+		RawInputBegan(input, processed)
 	end)
 
 	local function release_all_inputs()
 		for _, v in Enum.KeyCode:GetEnumItems() do
-			InputEnded({
+			RawInputEnded({
 				Delta = Vector3.new(0, 0, 0),
 				KeyCode = v,
 				Position = Vector3.new(0, 0, 0),
@@ -690,7 +722,7 @@ function mod.__build_signals(G, B)
 			})
 		end
 		for i, _ in CustomKeycodes do
-			InputEnded({
+			RawInputEnded({
 				Delta = Vector3.new(0, 0, 0),
 				KeyCode = i,
 				Position = Vector3.new(0, 0, 0),
@@ -704,9 +736,9 @@ function mod.__build_signals(G, B)
 	RunService:BindToRenderStep("CustomInput", Enum.RenderPriority.Input.Value - 1, function()
 		for i,v in PendingCustomInputs do
 			if v.UserInputState == Enum.UserInputState.End then
-				InputEnded(v, false, true)
+				TransformedInputEnded(v, false)
 			else
-				InputBegan(v, false, true)
+				TransformedInputBegan(v, false)
 			end
 		end
 

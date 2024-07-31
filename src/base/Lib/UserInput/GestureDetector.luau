@@ -112,7 +112,7 @@ local function detect_gestures(mag_sig, angle_sig)
 	end
 
 	-- Detected, let's ship an event to UserInput
-	local input = UserInput.CustomInputObject(last_dir, Enums.AuxiliaryInputCodes.InputGestures.Any, Enum.UserInputState.Change, Enums.UserInputType.Gesture)
+	local input = UserInput.CustomInputObject(last_dir, Enums.AuxInputCodes.AuxInputGestures.Any, Enum.UserInputState.Change, Enums.UserInputType.Gesture)
 	UserInput.TakeCustomInput(input)
 
 	mod.LastGesture = input.KeyCode

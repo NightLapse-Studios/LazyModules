@@ -2,13 +2,12 @@ local mod = { }
 
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
 local Meta = require(game.ReplicatedFirst.Lib.Meta)
-local META_CONTEXTS = Enums.META_CONTEXTS
 
 local no_op_func = function() end
 
 local MaskableStack = { }
 local Configurator = Meta.CONFIGURATOR({ __index = MaskableStack })
-	:SETTER(META_CONTEXTS.BOTH, "OnTopValueChanged", "__OnTopValueChanged")
+	:SETTER(Enums.MetaContexts.BOTH, "OnTopValueChanged", "__OnTopValueChanged")
 	:FINISH()
 
 function MaskableStack:__getTopValue()

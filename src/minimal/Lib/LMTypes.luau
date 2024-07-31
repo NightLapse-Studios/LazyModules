@@ -1,5 +1,8 @@
+--!strict
+
 local Tests = require(game.ReplicatedFirst.Lib.LazyModules.Stages.TestsStage)
 local Signals = require(game.ReplicatedFirst.Lib.LazyModules.Stages.SignalsStage)
+local Enums = require(game.ReplicatedFirst.Lib.Enums)
 
 export type Tester = Tests.Tester
 export type Signals = Signals.SignalAPI
@@ -35,7 +38,7 @@ export type LMGame = {
 	_ModuleNames: 		{ [LazyModule]: string },
 	_Initialized: 		{ [string]: boolean },
 	CONTEXT: 			("CLIENT" | "SERVER"),
-	LOADING_CONTEXT: 	number,
+	LoadingContext: 	Enums.LoadingContext,
 	[Player]: 			unknown
 }
 

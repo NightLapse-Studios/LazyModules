@@ -11,9 +11,6 @@ function mod.require<M>(_s: M)
 
 	local co = coroutine.create(require)
 
-	if _s.Name == "Effects" then
-		print()
-	end
 	local succ, ret = coroutine.resume(co, _s)
 
 	if not succ then
