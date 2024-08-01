@@ -1,3 +1,5 @@
+--!strict
+
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -10,7 +12,7 @@ local mod = { }
 local spots = {}
 local spotID = 0
 
-function mod.MarkSpot(pos, color, size, extra_data, singular_name, __t)
+function mod.MarkSpot(pos: Vector3, color: Color3, size: Vector3, extra_data: string?, singular_name: string?, __t: number?)
 	local p = Instance.new("Part")
 	p.Color = color or Color3.new(1,1,1)
 	p.Material = Enum.Material.SmoothPlastic
@@ -48,7 +50,7 @@ function mod.MarkSpot(pos, color, size, extra_data, singular_name, __t)
 end
 
 function mod.TempMarkSpot(pos, t, size, color, extra_data, singular_name)
-	local p = mod.MarkSpot(pos, size, color, extra_data, singular_name, t)
+	local p = mod.MarkSpot(pos, color, size, extra_data, singular_name, t)
 
 	Debris:AddItem(p, t)
 
@@ -307,16 +309,18 @@ end
 
 -- Make listed functions available for export
 local APIUtils = require(game.ReplicatedFirst.Lib.APIUtils)
-APIUtils.EXPORT_LIST(mod)
-	:ADD("MarkSpot")
-	:ADD("TempMarkSpot")
-	:ADD("DebugCFAxis")
-	:ADD("DebugModelAxis")
-	:ADD("DebugGlobalAxis")
-	:ADD("VisualizeLine")
-	:ADD("VisualizePlane")
-	:ADD("DebugHighlight")
-	:ADD("DebugLabel")
-	:ADD("FunctionCycler")
+local Exports = APIUtils.ExportList({
+	MarkSpot = mod.MarkSpot,
+	TempMarkSpot = mod.TempMarkSpot,
+	DebugCFAxis = mod.DebugCFAxis,
+	DebugModelAxis = mod.DebugModelAxis,
+	DebugGlobalAxis = mod.DebugGlobalAxis,
+	VisualizeLine = mod.VisualizeLine,
+	VisualizePlane = mod.VisualizePlane,
+	DebugHighlight = mod.DebugHighlight,
+	DebugLabel = mod.DebugLabel,
+	FunctionCycler = mod.FunctionCycler,
+})
+mod = Exports:ExposeTo(mod)
 
 return mod

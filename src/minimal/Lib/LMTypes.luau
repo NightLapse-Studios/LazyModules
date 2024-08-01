@@ -3,6 +3,7 @@
 local Tests = require(game.ReplicatedFirst.Lib.LazyModules.Stages.TestsStage)
 local Signals = require(game.ReplicatedFirst.Lib.LazyModules.Stages.SignalsStage)
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
+local StdLib = require(game.ReplicatedFirst.Lib.StdLib)
 
 export type Tester = Tests.Tester
 export type Signals = Signals.SignalAPI
@@ -39,7 +40,7 @@ export type LMGame = {
 	CONTEXT: 			("CLIENT" | "SERVER"),
 	LoadingContext: 	Enums.LoadingContext,
 	[Player]: 			unknown
-}
+} & typeof(StdLib.LoadExports({}))
 
 export type CollectModule<S, T> = { [S]: T }
 
