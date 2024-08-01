@@ -6,16 +6,38 @@
 
 local module = { }
 local CircleBuffer = { }
-local mt = { __index = CircleBuffer }
+CircleBuffer.__index = CircleBuffer
 
-function module.new(length: number)
-	local buf = setmetatable(table.create(length + 3), mt)
+export type CircleBuffer<T> = {
+	[number]: T,
+	NextWrite: number,
+	Length: number,
+	Written: number,
+	
+	toidx: (self: CircleBuffer<T>, pos: number) -> number,
+	clear: (self: CircleBuffer<T>) -> (),
+	push: (self: CircleBuffer<T>, val: T) -> (),
+	writeFromFront: (self: CircleBuffer<T>, pos: number, val: T) -> (),
+	getElementFromFront: (self: CircleBuffer<T>, pos: number) -> T,
+	appendFromFront: (self: CircleBuffer<T>, val: T, key: any) -> (),
+	writeAtSequence: (self: CircleBuffer<T>, seq: number, val: T) -> number,
+	getSize: (self: CircleBuffer<T>) -> number,
+	__rawRead: (self: CircleBuffer<T>, pos: number) -> T?,
+	readFromFront: (self: CircleBuffer<T>, val: T) -> number,
+}
+
+function module.new<T>(length: number, opt_mock: T)
+	local buf = setmetatable(table.create(length + 3), CircleBuffer)
 
 	buf.NextWrite = 1
 	buf.Length = length
 	buf.Written = 0
 
-	return buf
+	if opt_mock then
+		return (buf :: any) :: CircleBuffer<T>
+	else
+		return (buf :: any) :: CircleBuffer<unknown>
+	end
 end
 
 local function incriment(self, num)
@@ -109,6 +131,14 @@ function module.__tests(G, T)
 			T.Equal, cbuf:__rawRead(3), d,
 			T.Equal, cbuf:__rawRead(4), nil,
 			T.Equal, cbuf:__rawRead(5), nil
+		)
+
+		T:ForContext( "over-reading before wrap-around",
+			T.Equal, cbuf:readFromFront(0), d,
+			T.Equal, cbuf:readFromFront(-1), s,
+			T.Equal, cbuf:readFromFront(-2), a,
+			T.Equal, cbuf:readFromFront(-3), nil,
+			T.Equal, cbuf:readFromFront(-4), nil
 		)
 
 		cbuf:writeFromFront(2, g)

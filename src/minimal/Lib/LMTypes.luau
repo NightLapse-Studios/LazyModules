@@ -9,7 +9,6 @@ export type Signals = Signals.SignalAPI
 
 export type Transmitter = Signals.Transmitter
 export type Broadcaster = Signals.Broadcaster
-export type Event = Signals.Event
 
 -- Signals that a module with __load_gamestate has done its job
 export type LoadedFunc = () -> ()

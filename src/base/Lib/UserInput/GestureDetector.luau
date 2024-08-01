@@ -8,10 +8,13 @@ local mod = {
 local UserInput
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
 local CircleBuffer = require(game.ReplicatedFirst.Lib.CircleBuffer)
+local LMT = require(game.ReplicatedFirst.Lib.LMTypes)
 
-local SIG_SAMPLE_LEN = 32
-local DETECTION_SAMPLES = 5
-local MIN_GESTURE_MAG = 25 * ((_G.Game.ScreenSizeXRatio + _G.Game.ScreenSizeYRatio) / 2)
+local Game: LMT.LMGame = _G.Game
+
+local SIG_SAMPLE_LEN: number = 32
+local DETECTION_SAMPLES: number = 5
+local MIN_GESTURE_MAG: number = 25 * ((Game.ScreenSizeXRatio + Game.ScreenSizeYRatio) / 2)
 
 -- Used when ConsumeDelta isn't available
 local Pos = Vector3.new(0, 0, 0)
@@ -27,10 +30,10 @@ end
 
 local function NewSignal()
 	local t = {
-		Buffer = CircleBuffer.new(SIG_SAMPLE_LEN),
+		Buffer = CircleBuffer.new(SIG_SAMPLE_LEN, 1),
 		
 		FilteredSig = {
-			Buffer = CircleBuffer.new(SIG_SAMPLE_LEN),
+			Buffer = CircleBuffer.new(SIG_SAMPLE_LEN, 1),
 		}
 	}
 
@@ -39,6 +42,8 @@ local function NewSignal()
 
 	return t
 end
+
+type SignalBuf = typeof(NewSignal())
 
 local MagSig = NewSignal()
 local AngleSig = NewSignal()
@@ -56,7 +61,7 @@ local function IsDown(ang: number)
 	return (ang <= PI and ang > (PI - OffsetRange)) or (ang >= -PI and ang < (-PI + OffsetRange))
 end
 
-local function get_dir(ang)
+local function get_dir(ang): Enums.InputGesture | false
 	if IsLeft(ang) then
 		-- print("Left ", ang)
 		return Enums.InputGestures.Left
@@ -76,7 +81,7 @@ end
 
 local LastDetectedGestureDir = 0
 local function detect_gestures(mag_sig, angle_sig)
-	local last_dir = false
+	local last_dir: Enums.InputGesture | false = false
 	local last_mag = 0
 	local total_mag = 0
 	for i = 1, DETECTION_SAMPLES, 1 do
@@ -136,7 +141,7 @@ for i = 1, SMOOTHING_SAMPLE_CT, 1 do
 	end
 end
 
-local function apply_z_transform(sig, n: number)
+local function apply_z_transform(sig: SignalBuf, n: number)
 	assert(sig.FilteredSig)
 
 	for _ = n, 1, -1 do

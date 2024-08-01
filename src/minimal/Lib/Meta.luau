@@ -91,7 +91,7 @@ local function make_strategy(fn_identifier: string, strategy: Enums.MetaContext,
 	end
 end
 
-function mod.CONFIGURATOR(target_obj: table)
+function mod.CONFIGURATOR(target_obj: { [any]: any })
 	assert(target_obj, "Configurator must know what it is going to transform into after it's finished")
 
 	local mt_configurator = {
@@ -104,9 +104,7 @@ function mod.CONFIGURATOR(target_obj: table)
 	return mt_configurator
 end
 
-function CONFIGURATOR:SETTER(context: Enums.MetaContext?, fn_identifier: string, field_identifier: string)
-	context = context or MetaContexts.BOTH
-
+function CONFIGURATOR:SETTER(context: Enums.MetaContext, fn_identifier: string, field_identifier: string)
 	assert(typeof(fn_identifier) == "string")
 	assert(typeof(field_identifier) == "string")
 
@@ -120,9 +118,7 @@ function CONFIGURATOR:SETTER(context: Enums.MetaContext?, fn_identifier: string,
 	return self
 end
 
-function CONFIGURATOR:NAMED_LIST(context: Enums.MetaContext?, fn_identifier: string, field_identifier: string)
-	context = context or MetaContexts.BOTH
-
+function CONFIGURATOR:NAMED_LIST(context: Enums.MetaContext, fn_identifier: string, field_identifier: string)
 	assert(typeof(fn_identifier) == "string")
 	assert(typeof(field_identifier) == "string")
 
