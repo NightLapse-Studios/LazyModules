@@ -28,6 +28,8 @@ local MobileButtonUI
 local CharacterInputUI
 local UserInput
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
+local GestureDetector = require(script.Parent.GestureDetector)
+
 local GestureArrowAsset = "rbxassetid://14448456628"
 
 function mod.HasUIStarted()
@@ -361,8 +363,6 @@ local function push_gesture(code)
 end
 
 function mod.__ui(G, I, P, Roact)
-	local GestureDetector = G.Load("GestureDetector")
-
 	CameraAreaIsActive, updCameraAreaIsActive = I:Binding(true)
 	local inner_pos, upd_inner_pos = I:Binding(UDim2.new(0, 0, 0, 0))
 	local modal_pos, upd_modal_pos = I:Binding(UDim2.new(-1, 0, 0, 0))
@@ -700,7 +700,6 @@ function mod.__ui(G, I, P, Roact)
 
 		return tree
 	end 
-
 
 	local input_container = Instance.new("ScreenGui", game.Players.LocalPlayer.PlayerGui)
 	input_container.Name = "MobileInput"
