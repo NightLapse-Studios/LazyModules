@@ -167,6 +167,60 @@ for _, enums in Enum:GetEnums() do
 	end
 end
 
+export type CameraMode =
+	{ Name: "ThirdPerson", Value: number} |
+	{ Name: "Studio", Value: number}
+
+local CameraMode: {
+	ThirdPerson: CameraMode,
+	Studio: CameraMode
+} = {
+	ThirdPerson = { Name = "ThirdPerson", Value = 1 },
+	Studio = { Name = "Studio", Value = 2 },
+}
+Enums.CameraMode = CameraMode
+
+export type LookAlignment =
+	{ Name: "AimFollowsCamera", Value: number } |
+	{ Name: "AimFollowsMouseHit", Value: number } |
+	{ Name: "CharacterFollowsCamera", Value: number } |
+	{ Name: "CharacterFollowsMouseHit", Value: number } |
+	{ Name: "None", Value: number } |
+	{ Name: "CharacterFollowsCallback", Value: number } |
+	{ Name: "AbsolutelyNone", Value: number }
+
+local LookAlignment: {
+	AimFollowsCamera: LookAlignment,
+	AimFollowsMouseHit: LookAlignment,
+	CharacterFollowsMouseHit: LookAlignment,
+	CharacterFollowsCamera: LookAlignment,
+	None: LookAlignment,
+	CharacterFollowsCallback: LookAlignment,
+	AbsolutelyNone: LookAlignment
+} = {
+	AimFollowsCamera = { Name = "AimFollowsCamera", Value = 1},
+	AimFollowsMouseHit = { Name = "AimFollowsMouseHit", Value = 2},
+	CharacterFollowsCamera = { Name = "CharacterFollowsCamera", Value = 3},
+	CharacterFollowsMouseHit = { Name = "CharacterFollowsMouseHit", Value = 7},
+	CharacterFollowsCallback = { Name = "CharacterFollowsCallback", Value = 4},
+	None = { Name = "None", Value = 5},
+	AbsolutelyNone = { Name = "AbsolutelyNone", Value = 6}
+}
+Enums.LookAlignment = LookAlignment
+
+export type KeyboardLayout = 
+	{ Name: "QWERTY", Value: number } |
+	{ Name: "Dvorak", Value: number }
+
+local KeyboardLayout: {
+	QWERTY: KeyboardLayout,
+	Dvorak: KeyboardLayout
+} = {
+	QWERTY = { Name = "QWERTY", Value = 1},
+	Dvorak = { Name = "Dvorak", Value = 2},
+}
+Enums.KeyboardLayout = KeyboardLayout
+
 for _, v in pairs(Enum.KeyCode:GetEnumItems())do
 	Enums.AllInputs[ string.split(tostring(v), ".")[3] ] = v
 end

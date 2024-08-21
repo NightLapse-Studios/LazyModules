@@ -297,12 +297,10 @@ function mod.Build()
 
 				if RS:IsClient() then
 					for i,v in signal.Connections do
-						print("Client connect for broadcaster", signal.Name)
 						signal.Wrapper.Event.OnClientEvent:Connect(v)
 					end
 				else
 					for i,v in signal.Connections do
-						print("Server connect for broadcaster", signal.Name)
 						signal.Wrapper.Event.OnServerEvent:Connect(v)
 					end
 				end
@@ -315,12 +313,10 @@ function mod.Build()
 
 				if RS:IsClient() then
 					for i,v in signal.Connections do
-						print("Client connect for transmitter", signal.Name)
 						signal.Wrapper.Event.OnClientEvent:Connect(v)
 					end
 				else
 					for i,v in signal.Connections do
-						print("Server connect for transmitter", signal.Name)
 						signal.Wrapper.Event.OnServerEvent:Connect(v)
 					end
 				end

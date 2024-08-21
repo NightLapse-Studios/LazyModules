@@ -79,6 +79,7 @@ Config.GroupID = 5418470
 Config.AnimationFadeTime = 0.1
 
 Config.BaseWalkSpeed = ContextVar(12, 12, 12, 12)
+Config.SprintSpeed = 0.5
 Config.Gravity = Vector3.new(0, -32.2, 0) -- Bullets
 
 --=============================================--

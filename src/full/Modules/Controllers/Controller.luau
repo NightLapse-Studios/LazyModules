@@ -16,6 +16,7 @@ local UserInput = if Game.CONTEXT == "CLIENT" then require(game.ReplicatedFirst.
 local Mobile = if Game.CONTEXT == "CLIENT" then require(game.ReplicatedFirst.Lib.UserInput.Mobile) else nil
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
 local Signals = require(game.ReplicatedFirst.Lib.Signals)
+local Config = require(game.ReplicatedFirst.Config)
 
 local UpdateLookDirectionBroadcaster = Signals.NewBroadcaster("UpdateLookDirectionBroadcaster")
 	:UpConnectionType(function(plr, args: { number }, type_: string) end)
@@ -217,6 +218,44 @@ end
 
 function mod.CancelInterruptMovement()
 	MovementEnabled = true
+end
+
+local walk_speed_tickets = {}
+
+local function apply_walk_speed()
+	local walkSpeed = Config.BaseWalkSpeed
+	
+	for name, ticket in walk_speed_tickets do
+		walkSpeed *= ticket.Affect
+	end
+	
+	game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = walkSpeed
+end
+
+function mod.TicketWalkSpeed(affect: number, name: string)
+	if walk_speed_tickets[name] then
+		return walk_speed_tickets[name]
+	end
+	
+	walk_speed_tickets[name] = {Affect = affect, Name = name}
+	
+	apply_walk_speed()
+
+	return walk_speed_tickets[name]
+end
+
+function mod.RemoveWalkSpeed(ticket)
+	if ticket and walk_speed_tickets[ticket.Name] then
+		walk_speed_tickets[ticket.Name] = nil
+		
+		apply_walk_speed()
+	end
+end
+
+function mod.RemoveAllWalkSpeeds()
+	for i,v in pairs(walk_speed_tickets) do
+		mod.RemoveWalkSpeed(v)
+	end
 end
 
 function mod.TryDestroy(name)

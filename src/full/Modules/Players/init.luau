@@ -11,7 +11,6 @@ local AssociativeList = require(game.ReplicatedFirst.Lib.AssociativeList)
 local DataStore3 = require(game.ReplicatedFirst.Modules.DataStore3)
 local PlayerClass = require(game.ReplicatedFirst.Modules.Players.PlayerClass)
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
-local JWorld = require(game.ReplicatedFirst.Modules.Entities.JecsWorld)
 local Signals = require(game.ReplicatedFirst.Lib.Signals)
 
 local IDAssociations = AssociativeList.new()
@@ -80,12 +79,6 @@ local function OnPlayerLoadFinished( binding: PlayerDataBinding, plrClass )
 	PlayerAddedBindable:Fire(plr)
 	
 	Game.LoadedPlayers[plr] = true
-
-	if plr.Character then
-		JWorld.SpawnCharacter(plr)
-	else
-		plr.CharacterAdded:Once(function() JWorld.SpawnCharacter(plr) end)
-	end
 end
 
 -- @Context SERVER

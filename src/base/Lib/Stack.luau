@@ -7,7 +7,7 @@
 
 local mod = { }
 local Stack = { }
-Stack.__index = { __index = mod }
+Stack.__index = Stack
 
 function Stack:push(item)
 	table.insert(self, item)
@@ -24,7 +24,7 @@ function Stack:get(idx)
 end
 
 function mod.new()
-	local t = { }
+	local t = {}
 	return setmetatable(t, Stack)
 end
 

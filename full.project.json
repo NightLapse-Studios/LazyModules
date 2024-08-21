@@ -50,7 +50,7 @@
 			"$className": "StarterPlayer",
 			"StarterPlayerScripts": {
 				"$className": "StarterPlayerScripts",
-				"$path": "src/minimal/StarterPlayerScripts",
+				"$path": "src/full/StarterPlayerScripts",
 				"$ignoreUnknownInstances": true
 			}
 		},

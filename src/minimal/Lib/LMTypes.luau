@@ -1,15 +1,10 @@
 --!strict
 
 local Tests = require(game.ReplicatedFirst.Lib.LazyModules.Stages.TestsStage)
-local Signals = require(game.ReplicatedFirst.Lib.LazyModules.Stages.SignalsStage)
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
 local StdLib = require(game.ReplicatedFirst.Lib.StdLib)
 
 export type Tester = Tests.Tester
-export type Signals = Signals.SignalAPI
-
-export type Transmitter = Signals.Transmitter
-export type Broadcaster = Signals.Broadcaster
 
 -- Signals that a module with __load_gamestate has done its job
 export type LoadedFunc = () -> ()
@@ -23,7 +18,6 @@ export type GameStateData = { [unknown]: unknown }
 
 export type LazyModule = Module & {
 	__init: 			((G: LMGame) -> ())?,
-	__build_signals: 	((G: LMGame, B: Signals) -> ())?,
 	__ui: 				((G: LMGame, I: Pumpkin, P: PropSet) -> ())?,
 	__run: 				((G: LMGame) -> ())?,
 	__tests: 			((G: LMGame, T: Tests.Tester) -> ())?,
@@ -39,7 +33,9 @@ export type LMGame = {
 	_Initialized: 		{ [string]: boolean },
 	CONTEXT: 			("CLIENT" | "SERVER"),
 	LoadingContext: 	Enums.LoadingContext,
-	[Player]: 			unknown
+	RaycastResult: 		RaycastResult | false,
+	RaycastResultNP:	RaycastResult | false,
+	LoadedPlayers: 		{ [Player]: boolean? },
 } & typeof(StdLib.LoadExports({}))
 
 export type CollectModule<S, T> = { [S]: T }

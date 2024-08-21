@@ -11,8 +11,6 @@ local Vectors = require(game.ReplicatedFirst.Modules.Vectors)
 local Views = if Game.CONTEXT == "CLIENT" then require(game.StarterPlayer.StarterPlayerScripts.Views) else nil
 -- local FootSteps = G.Load("FootSteps")
 local UserInput = if Game.CONTEXT == "CLIENT" then require(game.ReplicatedFirst.Lib.UserInput) else nil
-local EffectUtil = if Game.CONTEXT == "CLIENT" then require(game.StarterPlayer.StarterPlayerScripts.EffectUtil) else nil
-local FootSteps = if Game.CONTEXT == "CLIENT" then require(game.StarterPlayer.StarterPlayerScripts.FootSteps) else nil
 local Config = require(game.ReplicatedFirst.Config)
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
 local PlrObjs = require(game.ReplicatedFirst.Modules.Players).Objects
@@ -22,8 +20,9 @@ local percent_lateral_torso = 0.25
 local percent_vertical_torso = 0.35
 
 local FRAME_TIME = 0.016666667
-local WATER_SLOW_DOWN = 0.6
 local JUMP_COOLDOWN = 0.7
+-- Unused because it relies on too much bloat
+local WATER_SLOW_DOWN = 0.6
 
 local LocalAlignment = false
 local Camera = workspace.CurrentCamera
@@ -216,11 +215,11 @@ function CharacterController:__init(G)
 		end,
 		DisabledFunc = function(self)
 			if WalkSpeedTicket then
-				WalkSpeedTicket = EffectUtil.RemoveWalkSpeed(WalkSpeedTicket)
+				WalkSpeedTicket = Controllers.RemoveWalkSpeed(WalkSpeedTicket)
 				FOVTween = Views.SmoothResetFOV(FOVTween)
 			end
 			
-			WaterSlowDownTicket = EffectUtil.RemoveWalkSpeed(WaterSlowDownTicket)
+			WaterSlowDownTicket = Controllers.RemoveWalkSpeed(WaterSlowDownTicket)
 		end,
 		DestroyFunc = false,
 		MovementUpdate = function(self, direction, dt)
@@ -260,14 +259,6 @@ function CharacterController:__init(G)
 			if Waist then
 				Waist.Transform = CFrame.Angles(0, 0, -turn_rate / 5.2) * Waist.Transform
 			end
-			
-			-- Slow down in water
-			local stepper = FootSteps.GetByRootPart(self.Model.PrimaryPart)
-			if stepper and stepper:IsInWater() then
-				WaterSlowDownTicket = EffectUtil.TicketWalkSpeed(WATER_SLOW_DOWN, "WaterSlowDown")
-			else
-				WaterSlowDownTicket = EffectUtil.RemoveWalkSpeed(WaterSlowDownTicket)
-			end
 		end,
 		JumpCallback = function(self)
 			if tick() - LastJump > JUMP_COOLDOWN and not Humanoid.Jump then
@@ -283,10 +274,10 @@ function CharacterController:__init(G)
 		end,
 		SprintCallback = function(self, down)
 			if down then
-				WalkSpeedTicket = EffectUtil.TicketWalkSpeed(1 + Config.SprintSpeed, "Sprint")
+				WalkSpeedTicket = Controllers.TicketWalkSpeed(1 + Config.SprintSpeed, "Sprint")
 				FOVTween = Views.TweenFOV(13, 0.25, FOVTween)
 			elseif WalkSpeedTicket then
-				WalkSpeedTicket = EffectUtil.RemoveWalkSpeed(WalkSpeedTicket)
+				WalkSpeedTicket = Controllers.RemoveWalkSpeed(WalkSpeedTicket)
 				FOVTween = Views.SmoothResetFOV(FOVTween)
 			end
 		end,
