@@ -23,7 +23,11 @@ function RemoteEventClass.new(event)
 end
 
 function RemoteEventClass:FireClient(plr, ...)
-	if Config.ReleaseType == "full" and (Game[plr] and Game[plr].ServerLoaded) then
+	if Config.ReleaseType == "full" then
+		if Game.LoadedPlayers[plr] then
+			self.Event:FireClient(plr, ...)
+		end
+	else
 		self.Event:FireClient(plr, ...)
 	end
 end
@@ -35,7 +39,7 @@ function RemoteEventClass:FireAllClients(...)
 end
 
 
-function mod.wrapper<T>(identifier: string, builder_mt: T)
+function mod.wrapper(identifier: string)
 	-- TODO: check that all events made on the server are also made on the client
 	local wrapper
 	if IsServer then
@@ -43,28 +47,19 @@ function mod.wrapper<T>(identifier: string, builder_mt: T)
 		remoteEvent.Name = identifier
 		remoteEvent.Parent = game.ReplicatedStorage
 		
-		wrapper = setmetatable(
-			{
-				Event = RemoteEventClass.new(remoteEvent),
-				Name = identifier
-			},
-			builder_mt
-		)
+		wrapper = {
+			Event = remoteEvent,
+		}
 	else
 		local event = game.ReplicatedStorage:WaitForChild(identifier, 4)
 		
 		if not event then
-			-- By this point LM should exist
-			warn("Waiting for event timed out! - " .. identifier .. "\n" .. _G.Game.LazyModules.format_lazymodules_traceback())
+			error("Waiting for event timed out! - " .. identifier)
 		end
 		
-		wrapper = setmetatable(
-			{
-				Event = { Event = event },
-				Name = identifier
-			},
-			builder_mt
-		)
+		wrapper = {
+			Event = event,
+		}
 	end
 
 	return wrapper

@@ -35,7 +35,7 @@ local Stages: { ModuleStage | GlobalStage } = { }
 
 local LOAD_CONTEXTS = Enums.LoadingContexts
 local CONTEXT = if game:GetService("RunService"):IsServer()  then "SERVER" else "CLIENT"
-local SOURCE_NAME = debug.info(function() return end, "s")
+_G.LMSOURCENAME = debug.info(function() return end, "s")
 
 local CollectionBlacklist: {Instance} = Config.ModuleCollectionBlacklist
 local ContextCollectionBlacklist: {Instance} = if CONTEXT == "SERVER" then Config.ModuleCollectionBlacklist.Server else Config.ModuleCollectionBlacklist.Client
@@ -97,29 +97,6 @@ local function can_init(mod_name: string)
 	return true
 end
 
-function mod.format_lazymodules_traceback()
-	local traceback = ""
-
-	local stack_idx = 0
-	repeat
-		stack_idx += 1
-		local source, line, fn_name = debug.info(stack_idx, "sln")
-
-		if source == SOURCE_NAME then
-			continue
-		end
-
-		if not source then
-			break
-		end
-
-		traceback = traceback .. source .. ":" .. line .. " function " .. fn_name .. "\n"
-	until false
-
-	return traceback
-end
-
-
 
 local LMGame = { }
 LMGame.__index = LMGame
@@ -132,7 +109,10 @@ function mod.newGame()
 		_ModuleNames = { },
 		_Initialized = { },
 		CONTEXT = CONTEXT,
-		LoadingContext = Enums.LoadingContexts.UNSET
+		LoadingContext = Enums.LoadingContexts.UNSET,
+		RaycastResult = false,
+		RaycastResultNP = false,
+		LoadedPlayers = { }
 	}
 
 	setmetatable(newGame, LMGame)

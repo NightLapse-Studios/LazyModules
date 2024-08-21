@@ -1,4 +1,7 @@
+--!strict
+
 local IsServer = game:GetService("RunService"):IsServer()
+local Players = game:GetService("Players")
 
 local STAGE_NAME = if IsServer then "__get_gamestate" else "__load_gamestate"
 local STAGE_PRIORITY = if IsServer then 5000 else 2000
@@ -8,6 +11,10 @@ local AsyncList = require(game.ReplicatedFirst.Lib.AsyncList)
 local mod = { }
 
 if IsServer then
+	local ClientReadyEvent = Instance.new("RemoteEvent")
+	ClientReadyEvent.Name = "ClientReadyEvent"
+	ClientReadyEvent.Parent = game.ReplicatedStorage
+
 	local function try_get_game_state(module_value, plr)
 		local s, r = pcall(function() return module_value.__get_gamestate end)
 		if s and r then
@@ -16,13 +23,9 @@ if IsServer then
 	end
 
 	local function setup_data_collectors(Game)
-		local ClientReadyEvent = Instance.new("RemoteEvent")
-		ClientReadyEvent.Name = "ClientReadyEvent"
-		ClientReadyEvent.Parent = game.ReplicatedStorage
-
 		-- This connection exists for the lifetime of the game
 		ClientReadyEvent.OnServerEvent:Connect(function(plr)
-			while (not Game[plr]) or not (Game[plr].ServerLoaded) do
+			while not Game.LoadedPlayers[plr] do
 				task.wait()
 			end
 
@@ -65,15 +68,16 @@ else
 		local ClientReadyEvent = game.ReplicatedStorage:WaitForChild("ClientReadyEvent") :: RemoteEvent
 		ClientReadyEvent.OnClientEvent:Connect(function(game_state)
 			-- Wait for the server to send us our datastore value, at which point we get inserted into the Game object
-			while not Game[game.Players.LocalPlayer] do
+			-- The action happens in Players.luau
+			while not Game.LoadedPlayers[Players.LocalPlayer] do
 				task.wait()
 			end
-	
+			
 			for module_name, data in game_state do
 				local module_value = Game._CollectedModules[module_name]
 				load_gamestate_wrapper(module_value, module_name, data, modules_loaded_list)
 			end
-	
+			
 			while modules_loaded_list:is_awaiting() do
 				-- print(modules_loaded_list.awaiting.Contents)
 				task.wait()
@@ -84,6 +88,10 @@ else
 
 		ClientReadyEvent:FireServer()
 		CanContinue.Event:Wait()
+
+		if Players.LocalPlayer.Character == nil then
+			Players.LocalPlayer.CharacterAdded:Wait()
+		end
 	end
 
 	function mod.GiveLM(lm)

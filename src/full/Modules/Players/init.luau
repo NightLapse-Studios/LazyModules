@@ -11,18 +11,24 @@ local AssociativeList = require(game.ReplicatedFirst.Lib.AssociativeList)
 local DataStore3 = require(game.ReplicatedFirst.Modules.DataStore3)
 local PlayerClass = require(game.ReplicatedFirst.Modules.Players.PlayerClass)
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
+local JWorld = require(game.ReplicatedFirst.Modules.Entities.JecsWorld)
+local Signals = require(game.ReplicatedFirst.Lib.Signals)
 
 local IDAssociations = AssociativeList.new()
 local NameAssociations = AssociativeList.new()
 
-local AddRemotePlayerTransmitter
+local AddRemotePlayerTransmitter = Signals.NewTransmitter("AddRemotePlayerTransmitter")
+	:DownConnectionType(function(plr_id: number, data: unknown) end)
 
 local ERR_DATA_MODULE_INVALID = "Data module %s is missing method(s) or function(s)"
 local PlayerDataModules = { }
 local PlayerDataModulesOrder = { }
 
 local mod = { }
+local Objects: { [Player]: PlayerObject } = { } 
 local LoadedPlayers: { Player } = { }
+
+mod.Objects = Objects
 
 -- A better PlayerAdded event
 local PlayerAddedBindable = Instance.new("BindableEvent")
@@ -54,8 +60,7 @@ local function OnPlayerLoadFinished( binding: PlayerDataBinding, plrClass )
 		task.wait()
 	end
 
-	Game[plr] = plrClass
-	Game[plrClass] = plr
+	Objects[plr] = plrClass
 
 	IDAssociations:add(plr.UserId, plr)
 	NameAssociations:add(plr.Name, plr)
@@ -69,15 +74,18 @@ local function OnPlayerLoadFinished( binding: PlayerDataBinding, plrClass )
 	end
 
 	for i, other_plr in LoadedPlayers do
-		if other_plr == plr then
-			AddRemotePlayerTransmitter:STransmit(other_plr, plr.UserId, serial_data)
-		else
-			AddRemotePlayerTransmitter:STransmit(other_plr, plr.UserId, serial_data)
-		end
+		AddRemotePlayerTransmitter:TransmitDown(other_plr, plr.UserId, serial_data)
 	end
 	
 	PlayerAddedBindable:Fire(plr)
-	plrClass.ServerLoaded = true
+	
+	Game.LoadedPlayers[plr] = true
+
+	if plr.Character then
+		JWorld.SpawnCharacter(plr)
+	else
+		plr.CharacterAdded:Once(function() JWorld.SpawnCharacter(plr) end)
+	end
 end
 
 -- @Context SERVER
@@ -142,12 +150,14 @@ local function AddRemotePlayer(plr_id: number, data)
 		plrClass[mod_name] = obj
 	end
 
-	Game[plr] = plrClass
-	Game[plrClass] = plr
+	Objects[plr] = plrClass
+	Game.LoadedPlayers[plr] = true
 end
 
+AddRemotePlayerTransmitter:DownConnection(AddRemotePlayer)
+
 local function RemoveRemotePlayer( plr )
-	local plrClass = Game[plr]
+	local plrClass = Objects[plr]
 
 	for i,v in plrClass do
 		if typeof(v) == "table" and v.Destroy then
@@ -155,26 +165,17 @@ local function RemoveRemotePlayer( plr )
 		end
 	end
 
-	Game[plr] = nil
-	Game[plrClass] = nil
+	Objects[plr] = nil
+	Game.LoadedPlayers[plr] = nil
 	
 	plrClass:Destroy()
 end
 
-local RunStageHasPassed = false
-function mod.__run(G)
-	RunStageHasPassed = true
-end
-
-function mod.__build_signals(G, B)
-	AddRemotePlayerTransmitter = B:NewTransmitter("AddRemotePlayerTransmitter")
-		:ClientConnection(AddRemotePlayer)
-
+function mod.__run(G: LMT.LMGame)
 	if Game.CONTEXT == "SERVER" then
-		PlayerService.PlayerAdded:Connect(function(plr)
-			while not (RunStageHasPassed and plr:IsDescendantOf(game)) do
+		game.ReplicatedStorage:WaitForChild("ClientReadyEvent").OnServerEvent:Connect(function(plr)
+			while not plr:IsDescendantOf(game) do
 				task.wait()
-				print("!")
 			end
 			
 			if not plr:IsDescendantOf(game) then
@@ -191,7 +192,7 @@ function mod.__build_signals(G, B)
 				task.wait()
 			end
 			
-			local plrClass = Game[plr]
+			local plrClass = Objects[plr]
 
 			if plrClass then
 				plrClass.DataBinding:Finalize()
@@ -202,8 +203,8 @@ function mod.__build_signals(G, B)
 					end
 				end
 				
-				Game[plr] = nil
-				Game[plrClass] = nil
+				Objects[plr] = nil
+				Game.LoadedPlayers[plr] = nil
 				
 				plrClass:Destroy()
 			end
@@ -236,7 +237,7 @@ function mod.__get_gamestate(plr)
 
 	for i, other_plr in mod.GetPlayers() do
 		if other_plr ~= plr then
-			local plrClass = Game[other_plr]
+			local plrClass = Objects[other_plr]
 			
 			local serial_data = { }
 			for k,v in PlayerDataModules do

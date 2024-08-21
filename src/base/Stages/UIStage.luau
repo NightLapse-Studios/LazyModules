@@ -10,7 +10,7 @@ local function run_module_stage(game, fn, mod_name: string)
 end
 
 function mod.GiveLM(lm)
-	lm.RegisterModuleStage(STAGE_NAME, STAGE_PRIORITY, run_module_stage)
+	lm.RegisterModuleStage(STAGE_NAME, STAGE_PRIORITY, run_module_stage, nil, function() return game:GetService("RunService"):IsClient() end)
 end
 
 return mod
