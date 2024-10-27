@@ -1,6 +1,8 @@
 # LazyModules
 
-LazyModules (LM) is an opinionated framework for roblox games. It is based on streamlining issues we (Rusty and Vijet) have encountered making large, complex games in roblox. If you use it the way we have used it, it is transformational in what it feels like to write and debug a roblox game.
+LazyModules (LM) is an opinionated framework for roblox games. It is based on streamlining issues we (Rusty and Vijet) have encountered making moderate-to-large, complex games in roblox. If you use it the way we have used it, it is transformational in what it feels like to write and debug a roblox game.
+
+The minimal release is recommended; the libraries and practices for the base and full releases are still being ironed out. In fact the full release is just bonkers and ultimately an experiment with how much of the "new game" process we can pre-solve in principle.
 
 # Template file
 
@@ -8,11 +10,11 @@ A [template file](src/full/Modules/BaseLazyModule.luau) that uses all stages sup
 
 ## How it works
 
-LM does Module-globbing, i.e. it requires all modules (specified by directory whitelist/blacklists in [Config.luau](src/base/Config.luau)). However, you are **never** intended to require LM in your modules, so your game itself still uses `require` trees to form is structure.
+LM does Module-globbing, i.e. it requires all modules (specified by directory whitelist/blacklists in [Config.luau](src/base/Config.luau)). However, you are **never** intended to require LM in your modules, so your game itself still uses `require` trees to form is structure. The globbing process uses a require wrapper that can be used to automate error reporting if production has some startup issue not present in dev environments.
 
-Similar to Knit, LM supports an "execution model" which we refer to as startup stages, but they are available everywhere. Through these stages, LM is passed into your modules as long as you define e.g. a `mod.__init(G)` function. The `Game` object, abbreviated as `G`, can be used to solve file-dependency issues with `G:Get("<ModuleName>")`. However this should only be done when necessary to promote type safety in your project.
+Similar to Knit, LM supports an "execution model" which we refer to as startup stages, but they are available everywhere. Through these stages, LM is passed into your modules as long as you define e.g. a `mod.__init(G)` function. The `Game` object (abbreviated as `G`) can be used to solve file-dependency issues with `G:Get("<ModuleName>")`. However  you should structure your project as if you do not have  ability and only use it when you deem it absolutely necessary.
 
-Some startup stages are used to remove the need for boilerplate when doing common things like networking. The `__build_signals(G, B)` stage provides `B` which can be used to create remote events with context-agnostic usage.
+Some startup stages are used to remove the need for boilerplate when doing common things like networking. The `__build_signals(G, B)` stage provides `B` which can be used to create remote events with run-context-agnostic usage.
 
 ```luau
 local MyTransmitter
