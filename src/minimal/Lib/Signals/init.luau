@@ -194,7 +194,7 @@ function Broadcaster:BroadcastUp(...)
 	end
 
 	if self.Encoding then
-		EventQueue.Submit(Players.LocalPlayer, self.Name, ...)
+		EventQueue.Submit(Players.LocalPlayer, self.Name, Players.LocalPlayer, ...)
 	else
 		self.Wrapper.Event:FireServer(...)
 	end
@@ -288,7 +288,7 @@ function mod.Build()
 		if signal.Type == "Broadcaster" then
 			if signal.Encoding then
 				if RS:IsClient() then
-					SerDesBody ..= `\t@optional "{signal.Name}": periodic_array(array({signal.Encoding})),\n`
+					SerDesBody ..= `\t@optional "{signal.Name}": periodic_array(array(player,{signal.Encoding})),\n`
 				else
 					SerDesBody ..= `\t@optional "{signal.Name}": periodic_array(array(player,{signal.Encoding})),\n`
 				end
