@@ -1,8 +1,8 @@
 --!strict
 --!native
 
-local Players = game:GetService("Players")
 local Tokenizer = require(script.Tokenizer)
+local Players = game:GetService("Players")
 
 local SCRIPT_NAME = script.Name
 
@@ -198,6 +198,7 @@ type ASTParseHostNodes =
 		| ASTParseStruct
 		| ASTParseErrorWChildren
 		| ASTParseCFrame
+		| ASTParsePlayer
 	}
 type ASTParseTerminals = { ASTParseTerminal | ASTParseError | ASTParseErrorWChildren }
 type ASTParseNodes =
@@ -341,7 +342,7 @@ type ASTValidCFrame = {
 }
 type ASTValidPlayer = {
 	Type: "player",
-	Value: { ASTValidPlayer },
+	Value: false,
 	Extra: false,
 	TokenIndex: number,
 	TokenSize: number,
@@ -349,12 +350,7 @@ type ASTValidPlayer = {
 }
 
 type ASTValidChildren = { ASTValidNodes }
-type ASTValidTerminal =
-	ASTValidTypeLiteral
-	| ASTValidStringLiteral
-	| ASTValidNumberLiteral
-	| ASTValidString
-	| ASTValidPlayer
+type ASTValidTerminal = ASTValidTypeLiteral | ASTValidStringLiteral | ASTValidNumberLiteral | ASTValidString
 type ASTValidHostNodes =
 	{ ASTValidTerminal }
 	& { 
@@ -365,6 +361,7 @@ type ASTValidHostNodes =
 		| ASTValidMap
 		| ASTValidStruct
 		| ASTValidCFrame
+		| ASTValidPlayer
 	}
 type ASTValidTerminals = { ASTValidTerminal }
 type ASTValidNodes =
@@ -545,8 +542,7 @@ local function write_size_specifier(v: number, b: buffer, idx: number)
 	-- subtract 1 so we can store 1-4 in 2 bits
 	local encoded_size = bytes - 1
 	-- pack the length into the number, using its 2 most significant bits
-	v = bit32.lshift(v, 2)
-	v = bit32.replace(v, encoded_size, 0, 2)
+	v = bit32.replace(v, encoded_size, bytes * 8 - 2, 2)
 
 	return raw_byte_writers[bytes](v, b, idx)
 end
@@ -554,10 +550,11 @@ end
 local function read_size_specifier(b: buffer, idx: number)
 	-- To allowe a size specifier to terminate a buffer, we can't assume its size
 	local first = buffer.readu8(b, idx)
-	local bytes = bit32.extract(first, 0, 2) + 1
+	local bytes = bit32.extract(first, 6, 2) + 1
 	local dat = raw_byte_readers[bytes](b, idx)
+	local bits = bytes * 8
 
-	return bit32.rshift(dat, 2), bytes
+	return bit32.extract(dat, 0, bits - 2), bytes
 end
 
 local function count_table_keys(t: {})
@@ -830,6 +827,8 @@ local RootConstructs = {
 	enum = true,
 	map = true,
 	struct = true,
+	cframe = true,
+	player = true
 }
 
 local function ASTNodeIsValidHost<Node>(node: Node)
@@ -1124,10 +1123,6 @@ local function cframe(tokens: Tokens, idx: number)
 	local node: ASTParseCFrame = new_node("cframe", children, idx, consumed_total)
 	return node, consumed_total
 end
-local function player(tokens: Tokens, idx: number)
-	local node: ASTParsePlayer = new_node("player", false, idx, 1)
-	return node, 1
-end
 local function size_specifier(tokens: Tokens, idx: number)
 	local seperator = tokens[idx + 1]
 	local size = tonumber(tokens[idx + 2])
@@ -1149,6 +1144,10 @@ end
 local function binding(tokens: Tokens, idx: number, children: ASTValidTerminals, token_size: number)
 	local node: ASTParseBinding = new_node("binding", children, idx, token_size)
 	return node, token_size
+end
+local function player(tokens: Tokens, idx: number)
+	local node: ASTParsePlayer = new_node("player", false, idx, 1)
+	return node, 1
 end
 local function i8(tokens: Tokens, idx: number)
 	return type_literal(tokens, idx)
@@ -2091,11 +2090,13 @@ local SerializeVisitor: SerializeVisitor = {
 		return f
 	end,
 	player = function(self, node)
-		return function(p: Player, b: buffer, idx: number)
-			local id = p.UserId
+		return function(v: Player, b: buffer, idx: number)
+			local user_id = v.UserId
+			local top = user_id // 2^32
+			local bottom = user_id % 2^32
 
-			buffer.writeu32(b, idx, id)
-			buffer.writeu32(b, idx + 4, id // 2^32)
+			buffer.writeu32(b, 0, top)
+			buffer.writeu32(b, 4, bottom)
 
 			return 8
 		end
@@ -2119,7 +2120,7 @@ type DeserializeVisitor = ValidVisitor<
 	ReaderFn<{ [unknown]: unknown }>,
 	ReaderFn<{ [unknown]: unknown }>,
 	ReaderFn<CFrame>,
-	ReaderFn<Player?>
+	ReaderFn<Player>
 >
 
 local DeserializeVisitor: DeserializeVisitor = {
@@ -2374,12 +2375,12 @@ local DeserializeVisitor: DeserializeVisitor = {
 	end,
 	player = function(self, node)
 		return function(b: buffer, idx: number)
-			local low = buffer.readu32(b, idx)
-			local high = buffer.readu32(b, idx + 4) * 2^32
+			local top = buffer.readu32(b, idx)
+			local bottom = buffer.readu32(b, idx + 4)
+			local id = top * 2^32 + bottom
+			local plr = Players:GetPlayerByUserId(id)
 
-			local player = Players:GetPlayerByUserId(low + high)
-
-			return player, 8
+			return plr, 8
 		end
 	end
 }
