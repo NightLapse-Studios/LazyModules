@@ -1,15 +1,27 @@
 --!strict
+--!native
 
 local mod = { }
-local mt_AssociativeList = { __index = mod }
+local AssociativeList = {}
+AssociativeList.__index = AssociativeList
 
-function mod:add(a, b)
+export type AssociativeList<T, R> = {
+	add: (self: AssociativeList<T, R>, a: T, b: R) -> (),
+	remove: (self: AssociativeList<T, R>, a_or_b: T | R) -> (),
+	get: (self: AssociativeList<T, R>, a_or_b: T | R) -> (T | R),
+	get_associated_list: (self: AssociativeList<T, R>, a_or_b: T | R) -> { [T]: R } | { [R]: T },
+	size: number,
+	_a: { [T]: R },
+	_b: { [R]: T },
+}
+
+function AssociativeList:add(a, b)
 	self.size += 1
 	self._a[a] = b
 	self._b[b] = a
 end
 
-function mod:remove(a_or_b)
+function AssociativeList:remove(a_or_b)
 	local a1, l1 = self:get(a_or_b)
 	local a2, l2 = self:get(a1)
 	l1[a_or_b] = nil
@@ -17,7 +29,7 @@ function mod:remove(a_or_b)
 	self.size -= 1
 end
 
-function mod:get(a_or_b)
+function AssociativeList:get(a_or_b)
 	local a, b = self._a[a_or_b], self._b[a_or_b]
 
 	if a and b then
@@ -30,7 +42,7 @@ end
 
 -- TODO: Figure out naming scheme for these that is more intuitive
 -- You basically have to look at the source here to see which list is returned
-function mod:get_associated_list(a_or_b)
+function AssociativeList:get_associated_list(a_or_b)
 	local a, b = self._a[a_or_b], self._b[a_or_b]
 
 	if a and b then
@@ -40,7 +52,7 @@ function mod:get_associated_list(a_or_b)
 
 	if a then return self._a else return self._b end
 end
-function mod:get_other_associated_list(a_or_b)
+function AssociativeList:get_other_associated_list(a_or_b)
 	local a, b = self._a[a_or_b], self._b[a_or_b]
 
 	if a and b then
@@ -57,7 +69,7 @@ function mod.new()
 		_a = { },
 		_b = { }
 	}
-	return setmetatable(t, mt_AssociativeList)
+	return setmetatable(t, AssociativeList)
 end
 
 return mod
