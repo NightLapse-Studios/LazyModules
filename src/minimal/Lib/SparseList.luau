@@ -5,18 +5,18 @@ local mod = { }
 local SparseList = { }
 SparseList.__index = SparseList
 
-export type SparseList = {
-	Contents: 		{ any },
+export type SparseList<T> = {
+	Contents: 		{ T },
 	insert_stack: 	{ number },
 
-	insert: 		(SparseList, item: any) -> number,
-	remove: 		(SparseList, idx: number) -> any,
-	find_remove: 	(SparseList, item: any) -> boolean,
-	is_empty:		(SparseList) -> boolean,
-	dump: 			(SparseList) -> string,
+	insert: 		(SparseList<T>, item: T) -> number,
+	remove: 		(SparseList<T>, idx: number) -> T,
+	find_remove: 	(SparseList<T>, item: T) -> boolean,
+	is_empty:		(SparseList<T>) -> boolean,
+	dump: 			(SparseList<T>) -> string,
 }
 
-function mod.new( opt_len: number? ): SparseList
+function mod.new<T>( type: T, opt_len: number? ): SparseList<T>
 	local n = {
 		Contents = opt_len and table.create(opt_len) or { },
 		insert_stack = { }
@@ -24,7 +24,7 @@ function mod.new( opt_len: number? ): SparseList
 
 	setmetatable(n, SparseList)
 
-	return (n :: any):: SparseList
+	return (n :: any):: SparseList<T>
 end
 
 local function push_stack(stack, val)
@@ -96,7 +96,7 @@ function SparseList:dump()
 	return s
 end
 
-function mod.newFromList( list: { any } ): SparseList
+function mod.newFromList<T>( list: { T } ): SparseList<T>
 	local n = {
 		Contents = list,
 		insert_stack = { }
@@ -104,7 +104,7 @@ function mod.newFromList( list: { any } ): SparseList
 
 	setmetatable(n, SparseList)
 
-	return (n :: any) :: SparseList
+	return (n :: any) :: SparseList<T>
 end
 
 function mod.__tests(G, T)
