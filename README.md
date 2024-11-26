@@ -83,8 +83,8 @@ LM has "tiers" of releases which correspond to different levels of invasiveness 
 * [Minimal](src/minimal/README.md)
 	* The barebones of just startup stages, including a tests stage
 * [Base](src/base/README.md)
-	* Adds DebugMenu and Debug library
-	* Adds __ui stage and Pumpkin/Roact
+	* ~~Adds DebugMenu~~ (on hold from Pumpkin removal)
+	* Add basic debug visualizer library
 * [Full](src/full/README.md)
 	* Adds a Player class accessible from `Game[plr]` after DataStore for associated player is fetched
 	* Adds `PlayerDataModules` associated with the Player class

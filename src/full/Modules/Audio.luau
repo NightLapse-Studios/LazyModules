@@ -3,7 +3,6 @@
 local LMT = require(game.ReplicatedFirst.Lib.LMTypes)
 local Game: LMT.LMGame = _G.Game
 local Config = require(game.ReplicatedFirst.Config)
-local DebugMenu = require(game.ReplicatedFirst.Lib.Debug.DebugMenu)
 local Tweens = require(game.ReplicatedFirst.Modules.Tweens)
 local Assets = require(game.ReplicatedFirst.Modules.Assets)
 local SettingsMod = require(game.ReplicatedFirst.Modules.Settings)
@@ -15,20 +14,20 @@ local mod = { }
 
 local PlayingSounds = { }
 
-local MusicBinding = Settings.MusicAudioVolume.Binding[1]
-local EffectsBinding = Settings.EffectsAudioVolume.Binding[1]
+local MusicSetting = Settings.MusicAudioVolume.Value
+local EffectsSetting = Settings.EffectsAudioVolume.Value
 
 local GroupCallbacks = {
 	Music = function(s: SoundBuilder)
 		local sound = s.__Sound
 		local volume = sound.Volume
-		volume *= MusicBinding:getValue()
+		volume *= MusicSetting
 		sound.Volume = volume								
 	end,
 	Effects = function(s: SoundBuilder)
 		local sound = s.__Sound
 		local volume = sound.Volume
-		volume *= EffectsBinding:getValue()
+		volume *= EffectsSetting
 		sound.Volume = volume								
 	end,
 --[[ 	BugelSync = function(sound: SoundBuilder)
@@ -137,7 +136,8 @@ function mod.SoundBuilder(asset_str, volume, ...: string)
 	setmetatable(t, SoundBuilder)
 
 	if Game.CONTEXT ~= "SERVER" then
-		if Config.VolumeOverrides then
+		-- TODO @PumpkinRemoval Hook this back up to vide once debug UI is done in vide
+--[[ 		if Config.VolumeOverrides then
 			local asset_name = if Config.OnlyHookKnownSounds then nil else asset_str
 			for i,v in Assets.Sounds do
 				if v == asset_str then
@@ -154,7 +154,7 @@ function mod.SoundBuilder(asset_str, volume, ...: string)
 					s.Volume = v
 				end)
 			end
-		end
+		end ]]
 	end
 
 	return (t :: any) :: SoundBuilder

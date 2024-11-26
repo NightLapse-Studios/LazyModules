@@ -9,8 +9,6 @@
 
 local TweenService = game:GetService("TweenService")
 
-local DebugMenu = require(game.ReplicatedFirst.Lib.Debug.DebugMenu)
-
 local TweenWrapper = { }
 TweenWrapper.__index = TweenWrapper
 
@@ -101,7 +99,8 @@ local function auto_slider(self, i, v, menu_identifier)
 		max = v * 10
 		inc = v/100
 	end
-	self[i] = DebugMenu.RegisterOverrideSlider(i, v, min, max, inc, menu_identifier)
+	-- TODO @PumpkinRemoval
+	-- self[i] = DebugMenu.RegisterOverrideSlider(i, v, min, max, inc, menu_identifier)
 end
 
 function TweenWrapper:Sliderify(menu_identifier, targets)

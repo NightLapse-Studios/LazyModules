@@ -10,9 +10,6 @@ end
 function mod.__run(G)
 	table.insert(Stages, "__run")
 end
-function mod.__ui(G, I, P, R)
-	table.insert(Stages, "__ui")
-end
 function mod.__tests(G, T: LMT.Tester)
 	table.insert(Stages, "__tests")
 
@@ -28,7 +25,6 @@ function mod.__tests(G, T: LMT.Tester)
 		T:Test("Start in the right order", function()
 			T:ForContext("full+ tiers",
 				T.Equal, Stages[1], "__init",
-				T.Equal, Stages[2], "__ui",
 				T.Equal, Stages[3], "__run",
 				T.Equal, Stages[4], "__tests"
 			)

@@ -7,8 +7,6 @@ local Enums = require(game.ReplicatedFirst.Lib.Enums)
 
 local LMTypes = require(game.ReplicatedFirst.Lib.LMTypes)
 
--- local Pumpkin = require(game.ReplicatedFirst.Lib.Pumpkin)
-
 export type LMGame = LMTypes.LMGame
 export type LazyModule = LMTypes.LazyModule
 export type LMCallback = (LMGame, (LMGame, ...any) -> ()) -> ()

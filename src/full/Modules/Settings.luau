@@ -3,7 +3,6 @@
 local LMT = require(game.ReplicatedFirst.Lib.LMTypes)
 local Game: LMT.LMGame = _G.Game
 local Enums = require(game.ReplicatedFirst.Lib.Enums)
-local Roact = require(game.ReplicatedFirst.Lib.Pumpkin.lib.Roact)
 local Signal = require(game.ReplicatedFirst.Lib.ClassicSignal)
 local Signals = require(game.ReplicatedFirst.Lib.Signals)
 local PlrObjs = require(game.ReplicatedFirst.Modules.Players).Objects
@@ -181,7 +180,7 @@ mod.Settings = {
 		CorrespondingEnum = false,
 		EnumOrder = { },
 		CorrespondingStat = "EffectsVolumeSetting",
-		Binding = { Roact.createBinding(1.0) },
+		Value = 1.0,
 		OnChange = Signal.new(),
 	},
 	MusicAudioVolume = {
@@ -191,7 +190,7 @@ mod.Settings = {
 		CorrespondingEnum = false,
 		EnumOrder = { },
 		CorrespondingStat = "MusicVolumeSetting",
-		Binding = { Roact.createBinding(1.0) },
+		Value = 1.0,
 		OnChange = Signal.new(),
 	},
 	KeyboardLayout = {
@@ -201,7 +200,7 @@ mod.Settings = {
 		CorrespondingEnum = Enums.KeyboardLayout,
 		EnumOrder = { Enums.KeyboardLayout.QWERTY, Enums.KeyboardLayout.Dvorak },
 		CorrespondingStat = "KeyboardLayoutSetting",
-		Binding = { Roact.createBinding(Enums.KeyboardLayout.QWERTY) },
+		Value = Enums.KeyboardLayout.QWERTY,
 		OnChange = Signal.new(),
 	},
 	MoveLeftBinding = {
@@ -211,7 +210,7 @@ mod.Settings = {
 		CorrespondingEnum = false,
 		EnumOrder = { },
 		CorrespondingStat = "MoveLeftBinding",
-		Binding = { Roact.createBinding(Enum.KeyCode.A) },
+		Value = Enum.KeyCode.A,
 		OnChange = Signal.new()
 	},
 	MoveRightBinding = {
@@ -221,7 +220,7 @@ mod.Settings = {
 		CorrespondingEnum = false,
 		EnumOrder = { },
 		CorrespondingStat = "MoveRightBinding",
-		Binding = { Roact.createBinding(Enum.KeyCode.D) },
+		Value = Enum.KeyCode.D,
 		OnChange = Signal.new()
 	},
 	MoveBackBinding = {
@@ -231,7 +230,7 @@ mod.Settings = {
 		CorrespondingEnum = false,
 		EnumOrder = { },
 		CorrespondingStat = "MoveBackBinding",
-		Binding = { Roact.createBinding(Enum.KeyCode.S) },
+		Value = Enum.KeyCode.S,
 		OnChange = Signal.new()
 	},
 	MoveForwardBinding = {
@@ -241,7 +240,7 @@ mod.Settings = {
 		CorrespondingEnum = false,
 		EnumOrder = { },
 		CorrespondingStat = "MoveForwardBinding",
-		Binding = { Roact.createBinding(Enum.KeyCode.W) },
+		Value = Enum.KeyCode.W,
 		OnChange = Signal.new()
 	},
 	SwitchCameraLeftBinding = {
@@ -251,7 +250,7 @@ mod.Settings = {
 		CorrespondingEnum = false,
 		EnumOrder = { },
 		CorrespondingStat = "SwitchCameraLeftBinding",
-		Binding = { Roact.createBinding(Enum.KeyCode.Q) },
+		Value = Enum.KeyCode.Q,
 		OnChange = Signal.new()
 	},
 	SwitchCameraRightBinding = {
@@ -261,7 +260,7 @@ mod.Settings = {
 		CorrespondingEnum = false,
 		EnumOrder = { },
 		CorrespondingStat = "SwitchCameraRightBinding",
-		Binding = { Roact.createBinding(Enum.KeyCode.E) },
+		Value = Enum.KeyCode.E,
 		OnChange = Signal.new()
 	},
 	UnlockMouseBinding = {
@@ -271,7 +270,7 @@ mod.Settings = {
 		CorrespondingEnum = false,
 		EnumOrder = { },
 		CorrespondingStat = "UnlockMouseBinding",
-		Binding = { Roact.createBinding(Enum.KeyCode.LeftControl) },
+		Value = Enum.KeyCode.LeftControl,
 		OnChange = Signal.new()
 	},
 	JumpBinding = {
@@ -281,7 +280,7 @@ mod.Settings = {
 		CorrespondingEnum = false,
 		EnumOrder = { },
 		CorrespondingStat = "JumpBinding",
-		Binding = { Roact.createBinding(Enum.KeyCode.Space) },
+		Value = Enum.KeyCode.Space,
 		OnChange = Signal.new()
 	},
 	SprintBinding = {
@@ -291,7 +290,7 @@ mod.Settings = {
 		CorrespondingEnum = false,
 		EnumOrder = { },
 		CorrespondingStat = "SprintBinding",
-		Binding = { Roact.createBinding(Enum.KeyCode.LeftShift) },
+		Value = Enum.KeyCode.LeftShift,
 		OnChange = Signal.new()
 	},
 	PlayerListBinding = {
@@ -301,7 +300,7 @@ mod.Settings = {
 		CorrespondingEnum = false,
 		EnumOrder = { },
 		CorrespondingStat = "PlayerListBinding",
-		Binding = { Roact.createBinding(Enum.KeyCode.Tab) },
+		Value = Enum.KeyCode.Tab,
 		OnChange = Signal.new()
 	},
 }
@@ -445,7 +444,7 @@ for i,v in mod.Settings do
 	assert(v.Type)
 	-- This assertion is easier to understand than the resulting error that PlayerStats will throw
 	assert(v.CorrespondingStat)
-	assert(v.Binding)
+	assert(v.Value)
 	assert(v.EnumOrder)
 	assert(v.OnChange)
 	assert(v.DisplayStr)
@@ -470,7 +469,7 @@ function mod.GetSetting(name)
 	local setting = mod.Settings[name]
 	assert(setting)
 	
-	return setting.Binding[1]:getValue()
+	return setting.Value
 end
 
 function mod.ChangeSetting(plr: Player?, name: string, value, opt_dont_transmit: boolean?)
@@ -491,8 +490,8 @@ function mod.ChangeSetting(plr: Player?, name: string, value, opt_dont_transmit:
 		end
 	end
 
-	local old = setting.Binding[1]:getValue()
-	setting.Binding[2](value)
+	local old = setting.Value
+	setting.Value = value
 	setting.OnChange:Fire(plr, old, value)
 
 	if Game.CONTEXT == "CLIENT" then

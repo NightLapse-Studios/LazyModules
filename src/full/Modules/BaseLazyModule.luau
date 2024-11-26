@@ -14,10 +14,6 @@ function mod.__build_signals(G: LMT.LMGame, B: LMT.Signals)
 
 end
 
-function mod.__ui(G: LMT.LMGame, I: LMT.Pumpkin, P: LMT.PropSet)
-
-end
-
 function mod.__run(G: LMT.LMGame)
 
 end

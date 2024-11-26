@@ -8,6 +8,7 @@ local Config = require(game.ReplicatedFirst.Config)
 local Enums = game.ReplicatedFirst.Lib:FindFirstChild("Enums")
 local Meta = game.ReplicatedFirst.Lib:FindFirstChild("Meta")
 local Debug = game.ReplicatedFirst.Lib:FindFirstChild("Debug")
+-- TODO: @PumpkinRemoval Reimplement
 local DebugMenu = if Debug then Debug:FindFirstChild("DebugMenu") else nil
 local Maskables = game.ReplicatedFirst.Lib:FindFirstChild("Maskables")
 
@@ -31,7 +32,8 @@ local ExportList = {
 	Enums = if Enums then require(Enums) else nil,
 	Meta = if Meta then require(Meta) else nil,
 	Debug = if Debug then require(Debug) else nil,
-	DebugMenu = if DebugMenu then require(DebugMenu) else nil,
+	-- TODO: @PumpkinRemoval Reimplement
+	-- DebugMenu = if DebugMenu then require(DebugMenu) else nil,
 	Maskables = if Maskables then require(Maskables) else nil,
 	Config = require(game.ReplicatedFirst.Config),
 	empty_table = { },

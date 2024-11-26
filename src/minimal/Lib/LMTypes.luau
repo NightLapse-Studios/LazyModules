@@ -18,7 +18,6 @@ export type GameStateData = { [unknown]: unknown }
 
 export type LazyModule = Module & {
 	__init: 			((G: LMGame) -> ())?,
-	__ui: 				((G: LMGame, I: Pumpkin, P: PropSet) -> ())?,
 	__run: 				((G: LMGame) -> ())?,
 	__tests: 			((G: LMGame, T: Tests.Tester) -> ())?,
 	__get_gamestate: 	((G: LMGame, plr: Player) -> GameStateData)?,
@@ -35,20 +34,9 @@ export type LMGame = {
 	LoadingContext: 	Enums.LoadingContext,
 	RaycastResult: 		RaycastResult | false,
 	RaycastResultNP:	RaycastResult | false,
-	LoadedPlayers: 		{ [Player]: boolean? },
+	LoadedPlayers: 		{ [Player]: true? },
 } & typeof(StdLib.LoadExports({}))
 
 export type CollectModule<S, T> = { [S]: T }
-
-local pumpkin = game.ReplicatedFirst.Lib:FindFirstChild("Pumpkin")
-if not pumpkin then
-	return { }
-end
-
-local _Pumpkin = require(game.ReplicatedFirst.Lib.Pumpkin)
--- Pumpkin types
--- It is recommended you grab these from this file and import pumpkin via the __ui stage
-export type PropSet = _Pumpkin.PropSet
-export type Pumpkin = _Pumpkin.PumpkinAPI
 
 return { }
