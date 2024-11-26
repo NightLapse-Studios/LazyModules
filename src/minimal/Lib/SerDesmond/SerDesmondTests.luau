@@ -149,10 +149,10 @@ function mod.__tests(G: LMT.LMGame, T: LMT.Tester)
 			T:ForContext(
 				"writing",
 				--						  [s=1 v=1][s=1 v=63][   s=2 v=64    ]
-				--						   ssvvvvvv ssvvvvvv ssvvvvvv vvvvvvvv
-				T.Equal, dump_bits(buf1), "00100000 00111111 10000000 10000000",
+				--						   vvvvvvSS vvvvvvSS vvvvvvSS vvvvvvvv
+				T.Equal, dump_bits(buf1), "10000000 11111100 00000010 00000010",
 				--						  [           s=3 v=2^30-1           ]
-				--						   ssvvvvvv vvvvvvvv vvvvvvvv vvvvvvvv
+				--						   vvvvvvSS vvvvvvvv vvvvvvvv vvvvvvvv
 				T.Equal, dump_bits(buf2), "11111111 11111111 11111111 11111111"
 			)
 
@@ -163,7 +163,7 @@ function mod.__tests(G: LMT.LMGame, T: LMT.Tester)
 			SerDesmond.write_size_specifier(1, full_buf, 1)
 
 			T:ForContext("written size",
-				T.Equal, dump_bits(full_buf), "11111111 00100000 11111111 11111111"
+				T.Equal, dump_bits(full_buf), "11111111 10000000 11111111 11111111"
 			)
 
 			T:ForContext(

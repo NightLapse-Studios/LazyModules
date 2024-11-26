@@ -25,8 +25,8 @@ function mod.__tests(G, T: LMT.Tester)
 		T:Test("Start in the right order", function()
 			T:ForContext("full+ tiers",
 				T.Equal, Stages[1], "__init",
-				T.Equal, Stages[3], "__run",
-				T.Equal, Stages[4], "__tests"
+				T.Equal, Stages[2], "__run",
+				T.Equal, Stages[3], "__tests"
 			)
 		end)
 	end
