@@ -1,5 +1,5 @@
 --!strict
-
+--!native
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -35,6 +35,9 @@ local MouseBehaviorPriorToOverride: Enum.MouseBehavior | false = false
 local Views = {
 	CameraMode = nil,
 }
+
+local ViewConstructors: { [Enums.CameraMode]: (BasePart | Humanoid) -> View } = { }
+local CurrentView: View? = nil
 
 local Transitioning: boolean = false
 local TransitionDur: number = 0
@@ -210,53 +213,181 @@ local function clamp_algorithm(char_pos, final_pos, angle_cf, dist_offset)
 	return CurrentZoom
 end
 
-local function third_person_cam_update(ViewData, PrimaryPart, dt)
-	-- We need to use the right vector of the camera after rotation, not before
-	local angle_cf: CFrame = rotate_camera(OldCameraCF.LookVector, MouseDelta)
+type View = {
+	MinCameraZoom: number | false,
+	MaxCameraZoom: number | false,
+	MouseBehavior: Enum.MouseBehavior,
+	Update: (BasePart, number) -> CFrame,
+	Destroy: () -> nil,
+	[any]: nil
+}
+ViewConstructors[Enums.CameraMode.ThirdPerson] = function()
+	return {
+		MouseBehavior = Enum.MouseBehavior.LockCenter,
+		MinCameraZoom = 0,
+		MaxCameraZoom = 200,
+		Update = function(PrimaryPart, dt)
+			-- We need to use the right vector of the camera after rotation, not before
+			local angle_cf: CFrame = rotate_camera(OldCameraCF.LookVector, MouseDelta)
+		
+			if CurrentZoom == 0 then
+				local head = game.Players.LocalPlayer.Character.Head
+				local pos = head.Position
+			
+				local offset = angle_cf * Vector3.new(0, head.Size.Y / 2, head.Size.X / 2)
+				pos += offset
+		
+				return CFrame.new(pos, pos + angle_cf.LookVector)
+			end
+		
+			local zoom_offset_mul = .2 * CurrentZoom
+			local shoulder_offset = Vectors.PlanarOffset(angle_cf.LookVector, PlanarOffset * zoom_offset_mul)
+		
+			local vertical_offset = get_vertical_offset(CurrentZoom)
+		
+			local dist_offset = angle_cf * Vector3.new(0, 0, CurrentZoom)
+		
+			local char_pos = Camera.CameraSubject.Position
+			local final_pos = char_pos + shoulder_offset + dist_offset + vertical_offset
+		
+			-- set the camera cframe temporarily for the ViewportPointToRay
+			Camera.CFrame = CFrame.new(final_pos, final_pos + angle_cf.LookVector)
+			local applied_zoom = clamp_algorithm(char_pos, final_pos, angle_cf, dist_offset)
+			
+			dist_offset = angle_cf * Vector3.new(0, 0, applied_zoom)
+			final_pos = char_pos + shoulder_offset + dist_offset + get_vertical_offset(applied_zoom)
+		
+			return CFrame.new(final_pos, final_pos + angle_cf.LookVector)
+		end,
+		Destroy = function()
+		end
+	}
+end
+ViewConstructors[Enums.CameraMode.TopDownOrbital] = function()
+	local ang = 0
+	local OrbitalSpeed = 150
+	local QHeld, EHeld = false, false
+	local CWHandler = UserInput.Handler(Enum.KeyCode.Q,
+		function()
+			QHeld = true
+			return true
+		end,
+		function()
+			QHeld = false
+			return true
+		end)
+	local CCWHandler = UserInput.Handler(Enum.KeyCode.E,
+		function()
+			EHeld = true
+			return true
+		end,
+		function()
+			EHeld = false
+			return true
+		end)
 
-	if CurrentZoom == 0 then
-		local head = game.Players.LocalPlayer.Character.Head
-		local pos = head.Position
-	
-		local offset = angle_cf * Vector3.new(0, head.Size.Y / 2, head.Size.X / 2)
-		pos += offset
+	local UnzoomedOffset = Vector3.new(0, 5, 1).Unit
 
-		return CFrame.new(pos, pos + angle_cf.LookVector)
+	CurrentZoom = 40
+
+	return {
+		MouseBehavior = Enum.MouseBehavior.Default,
+		MinCameraZoom = 15,
+		MaxCameraZoom = 40,
+		Update = function(PrimaryPart, dt)
+			local dir = 0
+			if QHeld then
+				dir += math.pi / 180
+			end
+			if EHeld then
+				dir -= math.pi / 180
+			end
+
+			ang += dir * dt * OrbitalSpeed
+
+			local UnrotatedOffset = UnzoomedOffset * CurrentZoom
+			local RotatedOffset = Vector3.new(UnrotatedOffset.Z * math.sin(ang), UnrotatedOffset.Y, UnrotatedOffset.Z * math.cos(ang))
+
+			return CFrame.new(PrimaryPart.Position + RotatedOffset, PrimaryPart.Position)
+		end,
+		Destroy = function()
+			CWHandler:Disconnect()
+			CCWHandler:Disconnect()
+			CWHandler = nil
+			CCWHandler = nil
+		end
+	}
+end
+ViewConstructors[Enums.CameraMode.FirstPerson] = function(primary_part)
+	local HideInstanceTypes = {
+		"BasePart",
+		"Decal",
+		"Beam",
+		"ParticleEmitter",
+		"Trail",
+		"Fire",
+		"Smoke",
+		"Sparkles",
+		"Explosion",
+	}
+
+	local model: Instance? = primary_part
+	while model and (not model:IsA("Model")) do
+		model = model.Parent
 	end
 
-	local zoom_offset_mul = .2 * CurrentZoom
-	local shoulder_offset = Vectors.PlanarOffset(angle_cf.LookVector, PlanarOffset * zoom_offset_mul)
+	assert(model)
 
-	local vertical_offset = get_vertical_offset(CurrentZoom)
-
-	local dist_offset = angle_cf * Vector3.new(0, 0, CurrentZoom)
-
-	local char_pos = Camera.CameraSubject.Position
-	local final_pos = char_pos + shoulder_offset + dist_offset + vertical_offset
-
-	-- set the camera cframe temporarily for the ViewportPointToRay
-	Camera.CFrame = CFrame.new(final_pos, final_pos + angle_cf.LookVector)
-	local applied_zoom = clamp_algorithm(char_pos, final_pos, angle_cf, dist_offset)
+	local hidden_parts = { }
 	
-	dist_offset = angle_cf * Vector3.new(0, 0, applied_zoom)
-	final_pos = char_pos + shoulder_offset + dist_offset + get_vertical_offset(applied_zoom)
+	for _, ins in model:GetDescendants() do
+		for _, ty in HideInstanceTypes do
+			if ins:IsA(ty) then
+				ins.LocalTransparencyModifier = 1
+				table.insert(hidden_parts, ins)
+			end
+		end
+	end
 
-	return CFrame.new(final_pos, final_pos + angle_cf.LookVector)
+	model.DescendantAdded:Connect(function(ins)
+		for _, ty in HideInstanceTypes do
+			if ins:IsA(ty) then
+				ins.LocalTransparencyModifier = 1
+				table.insert(hidden_parts, ins)
+			end
+		end
+	end)
+
+	return {
+		MouseBehavior = Enum.MouseBehavior.LockCenter,
+		MinCameraZoom = 0,
+		MaxCameraZoom = 0,
+		Update = function(PrimaryPart, dt)
+			-- We need to use the right vector of the camera after rotation, not before
+			local angle_cf: CFrame = rotate_camera(OldCameraCF.LookVector, MouseDelta)
+		
+			local head = game.Players.LocalPlayer.Character.Head
+			local pos = head.Position
+		
+			local offset = angle_cf * Vector3.new(0, head.Size.Y / 2, head.Size.Z / 2)
+			pos += offset
+
+			local pp_pos = PrimaryPart.CFrame.Position
+			PrimaryPart.CFrame = CFrame.new(pp_pos, pp_pos + (angle_cf.LookVector * Vector3.new(1, 0, 1)))
+	
+			return CFrame.new(pos, pos + angle_cf.LookVector)
+		end,
+		Destroy = function()
+			for i,v in hidden_parts do
+				v.LocalTransparencyModifier = 0
+			end
+
+			hidden_parts = nil
+		end
+	}
 end
 
-Views[Enums.CameraMode.ThirdPerson] = {
-	MinCameraZoom = 5,
-	MaxCameraZoom = 20,
-	MouseBehavior = Enum.MouseBehavior.LockCenter,
-	Type = Enum.CameraType.Scriptable,
-	AutoRotateHumanoid = false,
-	Update = third_person_cam_update,
-	Enabled = function()
-
-	end
-}
-
-Views[Enums.CameraMode.Studio] = {
+--[[ ViewConstructors[Enums.CameraMode.Studio] = {
 	W = 0,
 	A = 0,
 	S = 0,
@@ -269,7 +400,6 @@ Views[Enums.CameraMode.Studio] = {
 	DragSensitivity = 0.2,
 	MouseBehavior = Enum.MouseBehavior.LockCenter,
 	cameraRot = Vector2.new(),
-	Type = Enum.CameraType.Custom,
 	Update = function(ViewData, _, dt)
 		if ViewData.RightClick then
 			UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
@@ -286,7 +416,7 @@ Views[Enums.CameraMode.Studio] = {
 			(ViewData.S - ViewData.W) * dt * ViewData.NormalSpeed * ViewData.Shift
 		)
 	end
-}
+} ]]
 
 local function SetupTransition(transition_dur)
 	Transitioning = true
@@ -301,25 +431,21 @@ local function StopTransition()
 	TransitionDur = 0
 end
 
-function Views.Start(mode: Enums.CameraMode, transition_dur: number?)
+function Views.Start(mode: Enums.CameraMode, focus_subject: (BasePart | Humanoid), transition_dur: number?)
+	Camera.CameraSubject = focus_subject
+
 	if Views.CameraMode == mode then
 		return
 	end
 
-	local newview = Views[mode]
+	local newview = ViewConstructors[mode](focus_subject)
 
+	CurrentView = newview
 	CurrentMouseBehavior = newview.MouseBehavior
-
-	if newview.Enabled then
-		newview.Enabled()
-	end
 
 	if transition_dur and transition_dur > 0 then
 		SetupTransition(transition_dur)
 	end
-
-	Camera.CameraType = newview.Type or Enum.CameraType.Custom
-	Views.CameraMode = mode
 
 	if newview.MinCameraZoom then
 		LocalPlayer.CameraMinZoomDistance = newview.MinCameraZoom
@@ -455,15 +581,9 @@ local function UpdateCamera(dt)
 	local char = LocalPlayer.Character
 	local char_primary_part = char and char.PrimaryPart
 
-	local CameraMode = Views.CameraMode
+	if not CurrentView then return end
 
-	if not CameraMode then
-		return
-	end
-
-	local ViewData = Views[CameraMode]
-
-	local targetCF = ViewData.Update(ViewData, char_primary_part, dt)
+	local targetCF = CurrentView.Update(char_primary_part, dt)
 
 	if not targetCF then
 		return
@@ -525,7 +645,7 @@ function Views.IsFirstPerson()
 end
 
 local alignment
-function Views.ToggleLockMouse(_)
+function Views.ToggleLockMouse()
 	InputUnlocksMouse = not InputUnlocksMouse
 	
 	if InputUnlocksMouse then
@@ -605,16 +725,6 @@ function Views.__run(G)
 		end)
 	end
 
-	UserInput.Hook(Enum.KeyCode.Q,
-		function(input)
-			TweenPlanarOffset(CalcXOffset_A(true))
-		end)
-
-	UserInput.Hook(Enum.KeyCode.E,
-		function(input)
-			TweenPlanarOffset(CalcXOffset_D(true))
-		end)
-
 	-- initialize over the shoulder as E
 	TweenPlanarOffset(CalcXOffset_D(true))
 	
@@ -630,7 +740,7 @@ function Views.__run(G)
 	
 	UserInput.Handler(Enum.UserInputType.MouseWheel,
 		function(input: UserInput.InputObject2, sank: boolean)
-			if Views.CameraMode ~= Enums.CameraMode.ThirdPerson then
+			if not CurrentView or (CurrentView.MinCameraZoom == false or CurrentView.MaxCameraZoom == false) then
 				return false
 			end
 			
@@ -640,7 +750,7 @@ function Views.__run(G)
 				CurrentZoom += ZOOM_INCRIMENT
 			end
 
-			CurrentZoom = math.clamp(CurrentZoom, MIN_ZOOM, MAX_ZOOM)
+			CurrentZoom = math.clamp(CurrentZoom, CurrentView.MinCameraZoom, CurrentView.MaxCameraZoom)
 
 			do_zoom_effects()
 
@@ -659,7 +769,7 @@ function Views.__run(G)
 
 			do_zoom_effects()
 		end)
-	
+
 	-- TODO @BlockBuster implement bindings?
 	-- UserInput.Handler("UnlockMouseBinding", Views.ToggleLockMouse)
 	
@@ -698,13 +808,22 @@ function Views.__run(G)
 			do_zoom_effects()
 		end
 	end)
+
+	UserInput.Handler(Enum.KeyCode.LeftControl, function(input, handled)
+		if handled then
+			return false
+		end
+
+		Views.ToggleLockMouse()
+
+		return true
+	end)
 	
 	RunService:BindToRenderStep("CameraAdd", Enum.RenderPriority.Camera.Value + 1, UpdateCamera)
 	RunService.Stepped:Connect(HouseKeeping)
 
 	local function StartInitView()
-		Camera.CameraSubject = LocalPlayer.Character.PrimaryPart
-		Views.Start(Enums.CameraMode.ThirdPerson, 0)
+		Views.Start(Enums.CameraMode.ThirdPerson, LocalPlayer.Character.PrimaryPart, 0)
 	end
 
 	if LocalPlayer.Character then

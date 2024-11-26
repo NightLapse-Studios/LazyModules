@@ -168,15 +168,18 @@ for _, enums in Enum:GetEnums() do
 end
 
 export type CameraMode =
-	{ Name: "ThirdPerson", Value: number} |
-	{ Name: "Studio", Value: number}
+	{ Name: "TopDownOrbital", Value: number } |
+	{ Name: "ThirdPerson", Value: number } |
+	{ Name: "FirstPerson", Value: number }
 
 local CameraMode: {
+	TopDownOrbital: CameraMode,
 	ThirdPerson: CameraMode,
-	Studio: CameraMode
+	FirstPerson: CameraMode
 } = {
-	ThirdPerson = { Name = "ThirdPerson", Value = 1 },
-	Studio = { Name = "Studio", Value = 2 },
+	TopDownOrbital = { Name = "TopDownOrbital", Value = 1 },
+	ThirdPerson = { Name = "ThirdPerson", Value = 2 },
+	FirstPerson = { Name = "FirstPerson", Value = 3 },
 }
 Enums.CameraMode = CameraMode
 
