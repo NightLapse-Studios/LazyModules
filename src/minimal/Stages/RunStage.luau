@@ -4,7 +4,7 @@ local STAGE_PRIORITY = 4000
 local mod = { }
 
 local function run_module_stage(game, fn, mod_name: string)
-	fn(game)
+	task.spawn(fn, game)
 end
 
 function mod.GiveLM(lm)
