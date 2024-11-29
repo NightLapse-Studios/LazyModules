@@ -11,6 +11,9 @@ local EventQueue = require(script.EventQueue)
 local Config = require(game.ReplicatedFirst.Config)
 local SerDesmond = require(game.ReplicatedFirst.Lib.SerDesmond)
 
+local IsServer = RS:IsServer()
+local IsClient = not IsServer
+
 local function default_should_accept()
 	return true
 end
@@ -102,6 +105,7 @@ function Transmitter:DownConnection(fn)
 end
 
 function Transmitter:TransmitUp(...)
+	assert(IsClient)
 	if self.Monitor then
 		print(self.Name)
 	end
@@ -114,6 +118,7 @@ function Transmitter:TransmitUp(...)
 end
 
 function Transmitter:TransmitDown(plr: Player, ...)
+	assert(IsServer)
 	if self.Monitor then
 		print(self.Name)
 	end
@@ -126,6 +131,7 @@ function Transmitter:TransmitDown(plr: Player, ...)
 end
 
 function Transmitter:TransmitDownAll(...)
+	assert(IsServer)
 	if self.Monitor then
 		print(self.Name)
 	end
@@ -189,6 +195,7 @@ function Broadcaster:ShouldAccept(fn)
 end
 
 function Broadcaster:BroadcastUp(...)
+	assert(IsClient)
 	if self.Monitor then
 		print(self.Name)
 	end
@@ -202,6 +209,7 @@ end
 
 local mock_no_plr = { UserId = 0 }
 function Broadcaster:BroadcastDown(...)
+	assert(IsServer)
 	if self.Monitor then
 		print(self.Name)
 	end
@@ -214,6 +222,7 @@ function Broadcaster:BroadcastDown(...)
 end
 
 function Broadcaster:BroadcastDownLikePlayer(plr: Player, ...)
+	assert(IsServer)
 	if self.Monitor then
 		print(self.Name)
 	end
@@ -368,7 +377,7 @@ function mod.Build()
 					if signal.Type == "Transmitter" then
 						for i,v in events do
 							for _, fn in signal.Connections do
-								task.spawn(fn, table.unpack(v))
+								task.spawn(fn, plr, table.unpack(v))
 							end
 						end
 					elseif signal.Type == "Broadcaster" then
